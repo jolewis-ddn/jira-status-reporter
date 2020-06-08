@@ -1,0 +1,9 @@
+{
+    "asi": true,
+    "node": true,
+    "esversion": 6,
+    "globals": {
+        "require": false,
+        "module": false
+    }
+}
