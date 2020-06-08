@@ -87,6 +87,19 @@ class JiraStatusReporter {
         return this._genericJiraSearch(`status in (${status}) and project=${project}`, action)
     }
     
+    countIssuesChangedThisWeekByProjectAndStatus(project, field) {
+        return this._issuesChangedThisWeekByProjectAndStatus(project, field, ACTION_COUNT)
+    }
+    
+    getIssuesChangedThisWeekByProjectAndStatus(project, field) {
+        return this._issuesChangedThisWeekByProjectAndStatus(project, field, ACTION_CONTENTS)
+    }
+    
+    _issuesChangedThisWeekByProjectAndStatus(project, field, action) {
+        debug('Issues Changed this Week by Project (%s) and Field (%s) called; action: %d', project, field, action);
+        return this._genericJiraSearch(`${field} changed after startOfWeek() and project=${project}`, action)
+    }
+
     countIssuesChangedThisMonthByProjectAndStatus(project, field) {
         return this._issuesChangedThisMonthByProjectAndStatus(project, field, ACTION_COUNT)
     }
