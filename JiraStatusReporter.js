@@ -17,6 +17,13 @@ const jira = new JiraApi({
 
 const JQL_EPIC = 'type=Epic';
 
+// const sleep = (ms) => {
+//     return new Promise(resolve => setTimeout(resolve, ms)); 
+// }
+
+const { promisify } = require('util')
+const sleep = promisify(setTimeout)
+
 class JiraStatusReporter {    
     constructor() {
         debug("jsr constructed")
@@ -32,6 +39,57 @@ class JiraStatusReporter {
     }
 
     // Functions to return issue counts or contents
+    countIssuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay) {
+        return this._issuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay, ACTION_COUNT)
+    }
+    
+    getIssuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay) {
+        return this._issuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay, ACTION_CONTENTS)
+    }
+
+    _issuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay, action) {
+        // TODO: Fix date calc
+        let jql = `status WAS "${status}" DURING ("${statusDateYear}/${statusDateMonth}/${statusDateDay}", "${statusDateYear}/${statusDateMonth}/${statusDateDay+1}")`
+        return this._genericJiraSearch(jql, action)
+    }
+
+    countIssuesByStatusAndDateRange(status, startDate, endDate) {
+        return this._issuesByStatusAndDateRange(status, startDate, endDate, ACTION_COUNT)
+    }
+    
+    getIssuesByStatusAndDateRange(status, startDate, endDate) {
+        return this._issuesByStatusAndDateRange(status, startDate, endDate, ACTION_CONTENTS)
+    }
+
+    _issuesByStatusAndDateRange(status, startDate, endDate, action) {
+        let jql = `status WAS "${status}" DURING ("${startDate}", "${endDate}")`
+        return this._genericJiraSearch(jql, action)
+    }
+
+    countIssuesCreatedOnDay(createDateYear, createDateMonth, createDateDay) {
+        return this._issuesCreatedOnDay(createDateYear, createDateMonth, createDateDay, ACTION_COUNT)
+    }
+    
+    getIssuesCreatedOnDay(createDateYear, createDateMonth, createDateDay) {
+        return this._issuesCreatedOnDay(createDateYear, createDateMonth, createDateDay, ACTION_CONTENTS)
+    }
+
+    _issuesCreatedOnDay(createDateYear, createDateMonth, createDateDay, action) {
+        let jql = `created > "${createDateYear}/${createDateMonth}/${createDateDay}" and created < "${createDateYear}/${createDateMonth}/${createDateDay+1}"`
+        return this._genericJiraSearch(jql, action)
+    }
+
+    countUpdatedYesterday() {
+        return this._updatedYesterday(ACTION_COUNT)
+    }
+
+    getUpdatedYesterday() {
+        return this._updatedYesterday(ACTION_CONTENTS)
+    }
+
+    _updatedYesterday(action) {
+        return this._genericJiraSearch("updated >= -1d and updated < startOfDay()", action)
+    }
     countRedEpics() {
         return this._redEpics(ACTION_COUNT)
     }
@@ -132,30 +190,33 @@ class JiraStatusReporter {
             switch (action) {
                 case ACTION_COUNT:
                     debug("counting...")
-                    jira.searchJira(jql, { maxResults: 1 })
-                    .then((response) => {
-                        debug(`response: ${response.total}`)
-                        resolve(response.total)
-                    })
-                    .catch((err) => { 
-                        debug("jql: %s; ERR %O", jql, err); 
-                        reject(err) 
-                    })
+                    // sleep(2500)
+                    // .then(
+                        jira.searchJira(jql, { fields: ["key"], maxResults: 1 })
+                        .then((response) => {
+                            debug(`response: ${response.total}`)
+                            setTimeout(resolve(response.total), 500)
+                        })
+                        .catch((err) => { 
+                            debug("jql: %s; ERR %O", jql, err.statusCode); 
+                            reject(err)
+                        })
+                    // )
                     break;
                 case ACTION_CONTENTS:
                         jira.searchJira(jql, { maxResults: 99 })
                         .then((results) => {
-                            resolve(results);
+                            setTimeout(resolve(results), 5000)
                         })
                         .catch((err) => { 
-                        debug("jql: %s; ERR %O", jql, err); 
-                        reject(err) 
-                    })
+                            debug("jql: %s; ERR %O", jql, err.statusCode); 
+                            reject(err)
+                        })
                     break;
                 default:
                     reject(`Unknown action specified: ${action}`)    
             }
-        })
+       })
     }
 
     // Utility functions
