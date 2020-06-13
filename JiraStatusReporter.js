@@ -186,37 +186,49 @@ class JiraStatusReporter {
     }
 
     _genericJiraSearch(jql, action) {
-        return new Promise((resolve, reject) => {
-            switch (action) {
-                case ACTION_COUNT:
-                    debug("counting...")
-                    // sleep(2500)
-                    // .then(
-                        jira.searchJira(jql, { fields: ["key"], maxResults: 1 })
-                        .then((response) => {
-                            debug(`response: ${response.total}`)
-                            setTimeout(resolve(response.total), 500)
-                        })
-                        .catch((err) => { 
-                            debug("jql: %s; ERR %O", jql, err.statusCode); 
-                            reject(err)
-                        })
-                    // )
-                    break;
-                case ACTION_CONTENTS:
-                        jira.searchJira(jql, { maxResults: 99 })
-                        .then((results) => {
-                            setTimeout(resolve(results), 5000)
-                        })
-                        .catch((err) => { 
-                            debug("jql: %s; ERR %O", jql, err.statusCode); 
-                            reject(err)
-                        })
-                    break;
-                default:
-                    reject(`Unknown action specified: ${action}`)    
-            }
-       })
+            return new Promise((resolve, reject) => {
+        sleep(500).then(() => {
+                // setTimeout(function() {
+                    switch (action) {
+                        case ACTION_COUNT:
+                            // debug("counting...")
+                            // sleep(2500)
+                            // .then(
+                                jira.searchJira(jql, { fields: ["key"], maxResults: 1 })
+                                .then((response) => {
+                                    debug(`response: ${response.total}`)
+                                    resolve(response.total)
+                                })
+                                .catch((err) => { 
+                                    debug("jql: %s; ERR %O", jql, err.statusCode); 
+                                    // sleep(3000).then(() => {
+                                    //     resolve(this._genericJiraSearch(jql, action))
+                                    // })
+                                    reject(err)
+                                })
+                            // )
+                            break;
+                        case ACTION_CONTENTS:
+                                jira.searchJira(jql, { maxResults: 99 })
+                                .then((results) => {
+                                    resolve(results)
+                                })
+                                .catch((err) => { 
+                                    debug("jql: %s; ERR %O", jql, err.statusCode);
+                                    // sleep(3000).then(resolve(this._genericJiraSearch(jql, action)))
+                                    reject(err)
+                                })
+                            break;
+                        default:
+                            reject(`Unknown action specified: ${action}`)    
+                    }
+                // }, 1000)
+           })
+        })
+    }
+
+    search(jql) {
+        return(jira.searchJira(jql)); //.then((results) => { resolve(results) }).catch((err) => { reject(err)})
     }
 
     // Utility functions

@@ -10,6 +10,8 @@
   "author": "John D. Lewis <31732476+jolewis-ddn@users.noreply.github.com>",
   "license": "MIT",
   "dependencies": {
+    "async": "^3.2.0",
+    "commander": "^5.1.0",
     "date-fns": "^2.14.0",
     "debug": "^4.1.1",
     "jira-client": "^6.17.0",
