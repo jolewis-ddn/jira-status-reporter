@@ -1,5 +1,9 @@
 "use strict";
 
+const { Command } = require('commander')
+const program = new Command()
+program.version('0.0.1')
+
 const sqlite3 = require('sqlite3').verbose()
 const db = new sqlite3.Database('./data/jira-stats.db')
 
@@ -8,50 +12,47 @@ const datefns = require('date-fns')
 const { promisify } = require('util')
 const sleep = promisify(setTimeout)
 
-// `set DEBUG=* & node simple-fetch.js`
-
 const debug = require('debug')('simple-fetch')
 const JSR = require('./JiraStatusReporter')
 
-const RED_STATUS = ['IN PROGRESS']
-const RED_STATUS1 = ['ICEBOX', 'DEFINED', 'IN PROGRESS']
-const RED_STATUS2 = ['IN REVIEW', 'DONE', 'EMERGENCY']
-const RED_STATUS3 = ['BLOCKED', 'DEAD']
-// const RED_STATUS = ['ICEBOX', 'DEFINED', 'IN PROGRESS', 'IN REVIEW', 'DONE', 'EMERGENCY', 'BLOCKED', 'DEAD']
-// const RED_STATUS = RED_STATUS1
-// const RED_STATUS = RED_STATUS2
-// const RED_STATUS = RED_STATUS3
+// Parse command line parameters
+function status(value, previous) { return previous.concat([value]) }
+program.requiredOption('-s, --status <value>', 'RED Status(es)', status, [])
+program.requiredOption('-m, --month <value>', 'Month to process')
+program.parse(process.argv)
+
+// Set up statuses (to be removed by command line params)
+const RED_STATUS = program.status
+debug(`RED_STATUS: ${RED_STATUS}`)
+const MON = +program.month - 1
+const MON_NEXT = +MON + 1
+
+// Full list of RED Statuses
+// ['ICEBOX', 'DEFINED', 'IN PROGRESS', 'IN REVIEW', 'DONE', 'EMERGENCY', 'BLOCKED', 'DEAD']
 
 let jsr = new JSR();
 
 // Date tests
+const START_DATE = new Date(2020, MON, 1, 0, 0, 0)
+// const END_DATE = datefns.endOfMonth(START_DATE)
+const END_DATE = datefns.lastDayOfMonth(START_DATE)
+
 const today = new Date()
 const dateList = datefns.eachDayOfInterval({
-    start: new Date(2020, 3, 1, 0, 0, 0),
-    // end: new Date(2020, 4, 1, 0, 0, 0),
-    end: today.setDate(today.getDate() - 1)
+    start: START_DATE,
+    end: END_DATE,
 })
 
-// const tasks = []
-// function delayMyPromise(prom, del) {
-//     return new Promise(function (res, rej) {
-//         setTimeout(function() {
-//             return res(prom);
-//         }, del);
-//     });
-// }
-
 RED_STATUS.forEach((status) => {
-    // const status = "ICEBOX"
-    // dateRange.forEach((d, ndx) => {
     dateList.forEach((d, ndx) => {
         sleep(1000).then(() => {
             let y = datefns.getYear(d)
             let m = datefns.getMonth(d)+1
             let day = datefns.getDate(d)
 
-            let m2 = m
-            let day2 = day + 1 // TODO: Fix next-day-calc
+            let nextDay = datefns.addDays(d, 1)
+            let m2 = datefns.getMonth(nextDay)+1
+            let day2 = datefns.getDate(nextDay)
 
             db.run(`delete from 'jira-stats' WHERE status='${status}' AND year=${y} AND month=${m}`)
 
