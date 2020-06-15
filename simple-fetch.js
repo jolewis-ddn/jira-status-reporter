@@ -56,7 +56,7 @@ RED_STATUS.forEach((status) => {
 
             db.run(`delete from 'jira-stats' WHERE status='${status}' AND year=${y} AND month=${m}`)
 
-            const jql = `status was "${status}" DURING ("${y}/${m}/${day}", "${y}/${m2}/${day2}")`
+            const jql = `project=RED and status was "${status}" DURING ("${y}/${m}/${day}", "${y}/${m2}/${day2}")`
             debug(`Starting... jql: ${jql}`)
 
             sleep(1000).then(() => {
