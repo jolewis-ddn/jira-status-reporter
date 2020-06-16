@@ -2,7 +2,7 @@
 
 const { Command } = require('commander')
 const program = new Command()
-program.version('0.0.1')
+program.version('0.0.2')
 
 const sqlite3 = require('sqlite3').verbose()
 const db = new sqlite3.Database('./data/jira-stats.db')
@@ -33,49 +33,57 @@ const MON_NEXT = +MON + 1
 let jsr = new JSR();
 
 // Date tests
+const TODAY = new Date()
 const START_DATE = new Date(2020, MON, 1, 0, 0, 0)
-// const END_DATE = datefns.endOfMonth(START_DATE)
-const END_DATE = datefns.lastDayOfMonth(START_DATE)
+let END_DATE = null
+if (MON == datefns.getMonth(TODAY)) {
+    // Set end date to yesterday
+    END_DATE = datefns.subDays(TODAY, 1)
+} else {
+    END_DATE = datefns.lastDayOfMonth(START_DATE)
+}
 
-const today = new Date()
 const dateList = datefns.eachDayOfInterval({
     start: START_DATE,
     end: END_DATE,
 })
 
+const QUERY_PARAMS = { maxResults: 1, fields: ["KEY"] }
+
 RED_STATUS.forEach((status) => {
     dateList.forEach((d, ndx) => {
-        sleep(1000).then(() => {
+        // sleep(1000).then(() => {
             let y = datefns.getYear(d)
             let m = datefns.getMonth(d)+1
             let day = datefns.getDate(d)
 
             let nextDay = datefns.addDays(d, 1)
+            let y2 = datefns.getYear(nextDay)
             let m2 = datefns.getMonth(nextDay)+1
             let day2 = datefns.getDate(nextDay)
 
             db.run(`delete from 'jira-stats' WHERE status='${status}' AND year=${y} AND month=${m}`)
 
-            const jql = `project=RED and status was "${status}" DURING ("${y}/${m}/${day}", "${y}/${m2}/${day2}")`
+            const jql = `project=RED and status was "${status}" DURING ("${y}/${m}/${day}", "${y2}/${m2}/${day2}")`
             debug(`Starting... jql: ${jql}`)
 
             sleep(1000).then(() => {
-                jsr.search(jql)
+                jsr.search(jql, QUERY_PARAMS)
                     .then((results) => {
                         debug(`${status} on ${y}/${m}/${day}`, results.total)
                         db.run("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)", status, y, m, day, results.total)
                     })
                     .catch((err) => {
                         // TODO: Fix this recursive HACK!
-                        sleep(2000).then(() => {
-                            jsr.search(jql)
+                        sleep(1000).then(() => {
+                            jsr.search(jql, QUERY_PARAMS)
                                 .then((results) => {
                                     debug(`Try #2: ${status} on ${y}/${m}/${day}`, results.total)
                                     db.run("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)", status, y, m, day, results.total)
                                 })
                                 .catch((err) => {
-                                    sleep(5000).then(() => {
-                                        jsr.search(jql)
+                                    sleep(3000).then(() => {
+                                        jsr.search(jql, QUERY_PARAMS)
                                             .then((results) => {
                                                 debug(`Try #3: ${status} on ${y}/${m}/${day}`, results.total)
                                                 db.run("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)", status, y, m, day, results.total)
@@ -88,57 +96,6 @@ RED_STATUS.forEach((status) => {
                         })
                     })
             })
-        })
+        // })
     })
 })
-
-// jsr.countIssuesCreatedOnDay(2020, 6, d)
-//     .then((val) => { console.log(`${ndx} Created on 6/${d}: ${val}`)})
-// })
-// })
-
-// jsr.getIssue('RED-1604')
-//     .then((msg) => {
-//         console.log(JSON.stringify(msg))
-//     })
-
-// jsr.getRedEpics().then((msg) => { console.log(JSON.stringify(msg)) })
-
-// jsr.countRedEpics().then((hits) => { console.log(`RED Epic count: ${hits}`); })
-// jsr.getIssue('RED-1559').then((result) => { console.log(result) });
-// jsr.countDeadIssues().then((hits) => { console.log(`Dead Issue count: ${hits}`); });
-
-// jsr.countIssuesDoneThisMonth("RED")
-//     .then((count) => {
-//         debug("countIssuesDone issues count: %O", count)
-//     })
-
-// jsr.getIssuesDoneThisMonth("RED")
-//     .then((content) => {
-//         debug("getIssuesDone issues count: %O", content.issues)
-//     })
-// Working
-// jsr.countIssuesByProjectAndStatus("RED", "Dead")
-// .then((count) => {
-//     console.log("RED/Dead count: ", count) 
-// });
-
-// jsr.countIssuesByProjectAndStatus("RED", "Done")
-// .then((count) => {
-//     console.log("RED/Done count: ", count) 
-// });
-
-// jsr.countOpenIssuesByProject("RED")
-// .then((count) => {
-//     console.log("RED/Open count: ", count) 
-// });
-
-// jsr.countIssuesChangedThisMonthByProjectAndStatus("RED", "status")
-// .then((count) => {
-//     console.log("RED Status changes this month: ", count) 
-// });
-
-// jsr.countIssuesDoneThisMonth("RED")
-// .then((count) => {
-//     console.log("RED Issues Done this month: ", count) 
-// });

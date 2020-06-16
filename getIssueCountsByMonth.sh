@@ -9,7 +9,6 @@ echo "Fetching all records for Month $mon..."
 for entry in "${array[@]}"
 do
 	echo "...$entry..."
-	`node simple-fetch.js -s "$entry" -m $mon`
+	`node getIssueCountsByStatusAndMonth.js -s "$entry" -m $mon`
 	sleep 3
 done
-

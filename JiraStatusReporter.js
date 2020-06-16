@@ -2,6 +2,7 @@
 const debug = require('debug')('JSR')
 const JiraApi = require('jira-client');
 const config = require('./config.js');
+const datefns = require('date-fns')
 
 const ACTION_CONTENTS = 99;
 const ACTION_COUNT = 1;
@@ -17,46 +18,55 @@ const jira = new JiraApi({
 
 const JQL_EPIC = 'type=Epic';
 
-// const sleep = (ms) => {
-//     return new Promise(resolve => setTimeout(resolve, ms)); 
-// }
-
 const { promisify } = require('util')
 const sleep = promisify(setTimeout)
 
-class JiraStatusReporter {    
+const DEFAULT_GET_FIELDS = ["key", "assignee", "status", "summary", "creator", "reporter", "subtasks", "components", "labels", "priority", "created", "versions", "updated", "project", "issuetype"]
+const DEFAULT_COUNT_FIELDS = ["key"]
+
+class JiraStatusReporter {
     constructor() {
         debug("jsr constructed")
+        this.startAt = 0
     }
 
     // Wrapper Functions
     getIssue(id) {
-        return(jira.findIssue(id))
+        return (jira.findIssue(id))
     }
-    
+
     getProject(project) {
-        return(jira.getProject(project));
+        return (jira.getProject(project));
     }
 
     // Functions to return issue counts or contents
-    countIssuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay) {
-        return this._issuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay, ACTION_COUNT)
-    }
-    
-    getIssuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay) {
-        return this._issuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay, ACTION_CONTENTS)
+    countIssuesByStatusOnDate(status, statusDate) {
+        return this._issuesByStatusOnDate(status, statusDate, ACTION_COUNT)
     }
 
-    _issuesByStatusOnDate(status, statusDateYear, statusDateMonth, statusDateDay, action) {
-        // TODO: Fix date calc
-        let jql = `status WAS "${status}" DURING ("${statusDateYear}/${statusDateMonth}/${statusDateDay}", "${statusDateYear}/${statusDateMonth}/${statusDateDay+1}")`
+    getIssuesByStatusOnDate(status, statusDate) {
+        return this._issuesByStatusOnDate(status, statusDate, ACTION_CONTENTS)
+    }
+
+    _issuesByStatusOnDate(status, statusDate, action) {
+        let statusDateYear = datefns.getYear(statusDate)
+        let statusDateMonth = datefns.getMonth(statusDate) + 1
+        let statusDateDay = datefns.getDate(statusDate)
+
+        let nextDate = datefns.addDays(statusDate, 1)
+        let nextDateYear = datefns.getYear(nextDate)
+        let nextDateMonth = datefns.getMonth(nextDate) + 1
+        let nextDateDay = datefns.getDate(nextDate)
+
+        let jql = `project = RED and status WAS "${status}" DURING ("${statusDateYear}/${statusDateMonth}/${statusDateDay}", "${nextDateYear}/${nextDateMonth}/${nextDateDay}")`
+        debug(`_issuesByStatusOnDate(${status}, ${statusDate}, ${action})... jql: ${jql}`)
         return this._genericJiraSearch(jql, action)
     }
 
     countIssuesByStatusAndDateRange(status, startDate, endDate) {
         return this._issuesByStatusAndDateRange(status, startDate, endDate, ACTION_COUNT)
     }
-    
+
     getIssuesByStatusAndDateRange(status, startDate, endDate) {
         return this._issuesByStatusAndDateRange(status, startDate, endDate, ACTION_CONTENTS)
     }
@@ -69,13 +79,13 @@ class JiraStatusReporter {
     countIssuesCreatedOnDay(createDateYear, createDateMonth, createDateDay) {
         return this._issuesCreatedOnDay(createDateYear, createDateMonth, createDateDay, ACTION_COUNT)
     }
-    
+
     getIssuesCreatedOnDay(createDateYear, createDateMonth, createDateDay) {
         return this._issuesCreatedOnDay(createDateYear, createDateMonth, createDateDay, ACTION_CONTENTS)
     }
 
     _issuesCreatedOnDay(createDateYear, createDateMonth, createDateDay, action) {
-        let jql = `created > "${createDateYear}/${createDateMonth}/${createDateDay}" and created < "${createDateYear}/${createDateMonth}/${createDateDay+1}"`
+        let jql = `created > "${createDateYear}/${createDateMonth}/${createDateDay}" and created < "${createDateYear}/${createDateMonth}/${createDateDay + 1}"`
         return this._genericJiraSearch(jql, action)
     }
 
@@ -141,18 +151,18 @@ class JiraStatusReporter {
     _issuesByProjectAndStatus(project, status, action) {
         debug('Issues by Project (%s) and Status (%s) called; action: %d', project, status, action);
         const jql = `status in (${status}) and project=${project}`
-        
+
         return this._genericJiraSearch(`status in (${status}) and project=${project}`, action)
     }
-    
+
     countIssuesChangedThisWeekByProjectAndStatus(project, field) {
         return this._issuesChangedThisWeekByProjectAndStatus(project, field, ACTION_COUNT)
     }
-    
+
     getIssuesChangedThisWeekByProjectAndStatus(project, field) {
         return this._issuesChangedThisWeekByProjectAndStatus(project, field, ACTION_CONTENTS)
     }
-    
+
     _issuesChangedThisWeekByProjectAndStatus(project, field, action) {
         debug('Issues Changed this Week by Project (%s) and Field (%s) called; action: %d', project, field, action);
         return this._genericJiraSearch(`${field} changed after startOfWeek() and project=${project}`, action)
@@ -161,22 +171,22 @@ class JiraStatusReporter {
     countIssuesChangedThisMonthByProjectAndStatus(project, field) {
         return this._issuesChangedThisMonthByProjectAndStatus(project, field, ACTION_COUNT)
     }
-    
+
     getIssuesChangedThisMonthByProjectAndStatus(project, field) {
         return this._issuesChangedThisMonthByProjectAndStatus(project, field, ACTION_CONTENTS)
     }
-    
+
     _issuesChangedThisMonthByProjectAndStatus(project, field, action) {
         debug('Issues Changed this Month by Project (%s) and Field (%s) called; action: %d', project, field, action);
         return this._genericJiraSearch(`${field} changed after startOfMonth() and project=${project}`, action)
     }
 
-    countIssuesDoneThisMonth(project) { 
-        return(this._issuesDoneThisMonth(project, ACTION_COUNT)) 
+    countIssuesDoneThisMonth(project) {
+        return (this._issuesDoneThisMonth(project, ACTION_COUNT))
     }
 
-    getIssuesDoneThisMonth(project) { 
-        return(this._issuesDoneThisMonth(project, ACTION_CONTENTS)) 
+    getIssuesDoneThisMonth(project) {
+        return (this._issuesDoneThisMonth(project, ACTION_CONTENTS))
     }
 
     _issuesDoneThisMonth(project, action) {
@@ -185,56 +195,137 @@ class JiraStatusReporter {
         return this._genericJiraSearch(jql, action)
     }
 
+    countIssuesByStatusInDateRange(project, status, startDate, endDate) {
+        return (this._issuesByStatusInDateRange(project, status, startDate, endDate, ACTION_COUNT))
+    }
+
+    getIssuesByStatusInDateRange(project, status, startDate, endDate) {
+        return (this._issuesByStatusInDateRange(project, status, startDate, endDate, ACTION_CONTENTS))
+    }
+
+    _issuesByStatusInDateRange(project, status, startDate, endDate, action) {
+        const y = datefns.getYear(startDate)
+        const m = datefns.getMonth(startDate)
+        const day = datefns.getDay(startDate)
+
+        const y2 = datefns.getYear(endDate)
+        const m2 = datefns.getMonth(endDate)
+        const day2 = datefns.getDay(endDate)
+
+        const jql = `project=RED and status was "${status}" DURING ("${y}/${m}/${day}", "${y}/${m2}/${day2}")`
+        debug('jql: %s; action: %d', jql, action);
+        return this._genericJiraSearch(jql, action)
+    }
+
+    setFields(fields) {
+        this.fields = fields
+    }
+
+    getFields(fields) {
+        return (this.fields)
+    }
+
+    setStartAt(startAt) { this.startAt = startAt }
+    getStartAt() { return (this.startAt) }
+    clearStartAt() { this.startAt = null }
+
     _genericJiraSearch(jql, action) {
-            return new Promise((resolve, reject) => {
-        sleep(500).then(() => {
-                // setTimeout(function() {
-                    switch (action) {
-                        case ACTION_COUNT:
-                            // debug("counting...")
-                            // sleep(2500)
-                            // .then(
-                                jira.searchJira(jql, { fields: ["key"], maxResults: 1 })
-                                .then((response) => {
-                                    debug(`response: ${response.total}`)
-                                    resolve(response.total)
-                                })
-                                .catch((err) => { 
-                                    debug("jql: %s; ERR %O", jql, err.statusCode); 
-                                    // sleep(3000).then(() => {
-                                    //     resolve(this._genericJiraSearch(jql, action))
-                                    // })
-                                    reject(err)
-                                })
-                            // )
-                            break;
-                        case ACTION_CONTENTS:
-                                jira.searchJira(jql, { maxResults: 99 })
-                                .then((results) => {
-                                    resolve(results)
-                                })
-                                .catch((err) => { 
-                                    debug("jql: %s; ERR %O", jql, err.statusCode);
-                                    // sleep(3000).then(resolve(this._genericJiraSearch(jql, action)))
-                                    reject(err)
-                                })
-                            break;
-                        default:
-                            reject(`Unknown action specified: ${action}`)    
+        return new Promise((resolve, reject) => {
+            debug(`_genericJiraSearch(${jql}) called...`)
+            var queryConfig = {}
+            var compiledResults = {}
+
+            switch (action) {
+                case ACTION_COUNT:
+                    queryConfig.fields = this.DEFAULT_COUNT_FIELDS
+                    queryConfig.maxResults = 1
+                    jira.searchJira(jql, queryConfig)
+                        .then((response) => {
+                            debug(`response: ${response.total}`)
+                            resolve(response.total)
+                        })
+                        .catch((err) => {
+                            debug("jql: %s; ERR %O", jql, err.statusCode);
+                            reject(err)
+                        })
+                    // )
+                    break;
+                case ACTION_CONTENTS:
+                    if (this.fields) {
+                        queryConfig.fields = this.fields
+                    } else {
+                        queryConfig.fields = DEFAULT_GET_FIELDS
                     }
-                // }, 1000)
-           })
+                    
+                    // First: Get max # of results
+                    queryConfig.maxResults = 1
+                    jira.searchJira(jql, queryConfig)
+                    .then((results) => {
+                        debug(`A) results.issues.length = ${results.issues.length}`)
+                        debug(`...total = ${results.total}`)
+                        let compiledResults = {}
+
+                        // Second: Calc # of queries needed
+                        queryConfig.maxResults = 99
+                        let TOTAL_RESULTS = results.total
+                        if (TOTAL_RESULTS > 0) {
+                        let runCount = Math.ceil(TOTAL_RESULTS/queryConfig.maxResults)
+                        debug(`runCount: (Math.ceil(${queryConfig.maxResults}/${TOTAL_RESULTS})) = ${runCount}`)
+
+                        // Third: Queue up queries
+                        // Build array of queries/promises to run
+                        let jobList = []
+                        for (let ctr = 0; ctr < runCount; ctr++) {
+                            queryConfig.startAt = ctr * queryConfig.maxResults
+                            debug(`jobList.push(jira.searchJira(${jql}`, queryConfig, `)`)
+                            jobList.push(jira.searchJira(jql, queryConfig))
+                        }
+
+                        debug(`jobList built... length = ${jobList.length}`)
+                        
+                        // Fourth: Run queries
+                        Promise.all(jobList)
+                            .then((rawResults) => {
+                                // Fifth: Combine results
+                                compiledResults.total = rawResults[0].total
+                                compiledResults.expand = rawResults[0].expand
+                                compiledResults.startAt = 0
+                                compiledResults.maxResults = compiledResults.total
+                                compiledResults.comment = "Compiled by JiraStatusReporter"
+                                compiledResults.issues = []
+                                for (let rrctr = 0; rrctr < rawResults.length; rrctr++) {
+                                    const element = rawResults[rrctr];
+                                    compiledResults.issues = compiledResults.issues.concat(rawResults[rrctr].issues)
+                                }
+
+                                // Complain if the expected and actual total counts don't match
+                                console.assert(compiledResults.issues.length == rawResults[0].total)
+
+                                resolve(compiledResults)
+                            })
+                            .catch((err) => {
+                                reject(err)
+                            })
+                        } else {
+                            resolve(results)
+                        }
+                    })
+                    break;
+                default:
+                    reject(`Unknown action specified: ${action}`)
+            }
         })
     }
 
-    search(jql) {
-        return(jira.searchJira(jql)); //.then((results) => { resolve(results) }).catch((err) => { reject(err)})
+    // Utility functions
+    search(jql, queryParams) {
+        debug(`search(${jql},`, queryParams, `) called`)
+        return (jira.searchJira(jql, queryParams));
     }
 
-    // Utility functions
     jqlAppendProject(project, inJql) {
-        return(inJql + ` and project=${project}`)
+        return (inJql + ` and project=${project}`)
     }
-}    
+}
 
 module.exports = JiraStatusReporter;
