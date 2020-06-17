@@ -1,0 +1,12 @@
+module.exports = {
+    jira: {
+        protocol: 'https',
+        host: 'JIRA-HOST',
+        username: 'JIRA-USERNAME',
+        password: 'JIRA-PASSWORD',
+        apiVersion: '2'
+    },
+    server: {
+        port: 9999,
+    }
+}
