@@ -35,6 +35,8 @@ Collection of node scripts to query, store, and report on Jira issues.
 * ```sh
   git clone https://github.com/jolewis-ddn/jira-status-reporter
   npm install
+  
+  mkdir data
 	```
 * Copy (or rename) `config.js-template` to `config.js`
 * Update the values in `config.js` as appropriate
