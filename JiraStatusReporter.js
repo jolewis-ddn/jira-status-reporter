@@ -214,7 +214,14 @@ class JiraStatusReporter {
 
         const jql = `project=RED and status was "${status}" DURING ("${y}/${m}/${day}", "${y}/${m2}/${day2}")`
         debug('jql: %s; action: %d', jql, action);
-        return this._genericJiraSearch(jql, action)
+        return (this._genericJiraSearch(jql, action))
+    }
+
+    getEpicAndChildren(epicId) {
+        this.setFields(["assignee","subtasks","issuelinks","customfield_10008","labels","key","status","issuetype","summary","parent"])
+        const jql = `parentEpic=${epicId}`
+        debug(`getEpicAndChildren(${epicId}) called... jql: ${jql}`)
+        return (this._genericJiraSearch(jql, ACTION_CONTENTS))
     }
 
     setFields(fields) {
