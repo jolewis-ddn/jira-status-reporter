@@ -4,6 +4,9 @@ const JiraApi = require('jira-client');
 const config = require('./config.js');
 const datefns = require('date-fns')
 
+const jsrFileMgr = require('./JiraStatusReporterFileManager')
+const chartLinkMaker = require('./ChartLinkMaker')
+
 const ACTION_CONTENTS = 99;
 const ACTION_COUNT = 1;
 
@@ -28,6 +31,8 @@ class JiraStatusReporter {
     constructor() {
         debug("jsr constructed")
         this.startAt = 0
+        this.jsrFm = new jsrFileMgr('data')
+        this.chartLinkMaker = new chartLinkMaker()
     }
 
     // Wrapper Functions
@@ -332,6 +337,14 @@ class JiraStatusReporter {
 
     jqlAppendProject(project, inJql) {
         return (inJql + ` and project=${project}`)
+    }
+
+    getFileManager() { return(this.jsrFm) }
+    getChartLinkMaker() { return(this.chartLinkMaker) }
+
+    getDemoChartImgTag() { 
+        this.chartLinkMaker().buildChartImgTag()
+            .then((res))
     }
 }
 
