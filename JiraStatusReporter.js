@@ -24,7 +24,7 @@ const JQL_EPIC = 'type=Epic';
 const { promisify } = require('util')
 const sleep = promisify(setTimeout)
 
-const DEFAULT_GET_FIELDS = ["key", "assignee", "status", "summary", "creator", "reporter", "subtasks", "components", "labels", "priority", "created", "versions", "updated", "project", "issuetype"]
+const DEFAULT_GET_FIELDS = ["key", "assignee", "status", "summary", "creator", "reporter", "subtasks", "components", "labels", "priority", "created", "versions", "updated", "project", "issuetype", "fixVersions"]
 const DEFAULT_COUNT_FIELDS = ["key"]
 
 class JiraStatusReporter {
@@ -223,7 +223,7 @@ class JiraStatusReporter {
     }
 
     getEpicAndChildren(epicId) {
-        this.setFields(["assignee","subtasks","issuelinks","customfield_10008","labels","key","status","issuetype","summary","parent"])
+        this.setFields(["assignee", "subtasks", "issuelinks","customfield_10008", "labels", "key", "status", "issuetype", "summary", "parent", "fixversion"])
         const jql = `parentEpic=${epicId}`
         debug(`getEpicAndChildren(${epicId}) called... jql: ${jql}`)
         return (this._genericJiraSearch(jql, ACTION_CONTENTS))

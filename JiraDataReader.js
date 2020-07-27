@@ -123,11 +123,14 @@ class JiraDataReader {
     }
 }
 
+const DEFAULT_CACHE_FILENAME = '.jiraCache.json'
+
 class JiraDataCache {
-    constructor() {
+    
+    constructor(cacheFilename = DEFAULT_CACHE_FILENAME) {
         debug('JiraDataCache created')
         this.loaded = false
-        this.filename = '.jiraCache.json'
+        this.filename = cacheFilename
         this.readCache(false, true)
     }
 
@@ -181,7 +184,7 @@ class JiraDataCache {
 
     reset(unlinkFile = true) {
         if (unlinkFile) {
-            fs.unlink(this.filename)
+            fs.unlinkSync(this.filename)
         }
 
         this.loaded = false

@@ -114,11 +114,239 @@ server.get('/series', (req, res, next) => {
     return next()
 })
 
+function formatCssClassName(jiraName) {
+    return(jiraName.replace(/\s/g, '-'))
+}
+
+server.get('/epics', (req, res, next) => {
+    let epicIds = req.query.id
+    let promises = []
+    switch (typeof epicIds) {
+        case typeof {}:
+            epicIds.forEach((id, ndx) => {
+                debug(`pushing ${id}...`)
+                promises.push(jsr.getEpicAndChildren(id))
+            })
+            break
+        case typeof []:
+            epicIds.forEach((id, ndx) => {
+                debug(`pushing ${id}...`)
+                promises.push(jsr.getEpicAndChildren(id))
+            })
+            break
+        case typeof "":
+            let epicList = []
+            if (epicIds.indexOf(",") > 0) {
+                epicList = epicIds.split(',')
+                epicList.push()
+            }
+            epicList.forEach((id, ndx) => {
+                debug(`pushing ${id}...`)
+                promises.push(jsr.getEpicAndChildren(id))
+            })
+            break
+        default:
+            debug(`unknown typeof epicIds: ${typeof epicIds}`)
+    }
+
+    Promise.all(promises)
+    .then((results) => {
+        res.write("<style>\n")
+        res.write(".children { padding-left: 20px; }")
+        res.write(".icon { spacing: 0px; padding: 2px; }")
+        res.write(".Icebox { background-color: white; }")
+        res.write(".In-Progress { background-color: green; }")
+        res.write(".In-Review { background-color: lightgreen; }")
+        res.write(".Done { background-color: blue; }")
+        res.write(".Dead { background-color: black; }")
+        res.write(".Emergency { background-color: red; }")
+        res.write(".Blocked { background-color: red; }")
+        res.write(".link { text-decoration: none; }")
+        res.write("</style>")
+
+        results.forEach((e) => {
+            // for getEpicAndChildren(x), the Epic is always the last Issue in the issues list
+            let epicData = e.issues.pop()
+            debug(`processing ${epicData.key}...`)
+
+            let owner = "TBD"
+            try {
+                owner = epicData.fields.assignee.displayName
+            } catch (err) {
+                owner = "unassigned"
+            }
+
+            let statusName = "unknown"
+            try {
+                statusName = epicData.fields.status.name
+            } catch (err) {
+                debug(`... unrecognized status for ${epicData.key}!`)
+                statusName = "unknown"
+            }
+        
+            res.write(`<div><a href='https://ime-ddn.atlassian.net/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${epicData.key}: ${epicData.fields.summary} (${owner}; ${statusName})')/></a>`)
+            res.write(`${epicData.key}: ${epicData.fields.summary}`)
+
+            // Process children
+            let results = { epic: [], stories: [], bugs: [], subtasks: [] }
+            e.issues.forEach((issue, ndx) => {
+                let owner = "TBD"
+                try {
+                    owner = issue.fields.assignee.displayName
+                } catch (err) {
+                    owner = "unassigned"
+                }
+
+                let statusName = "unknown"
+                try {
+                    statusName = issue.fields.status.name
+                } catch (err) {
+                    statusName = "unknown"
+                }
+
+                switch (issue.fields.issuetype.name) {
+                    case "Sub-task":
+                        results.subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Sub-task ${issue.key}...`)
+                        break
+                    case "Story":
+                        results.stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Story ${issue.key}...`)
+                        break
+                    case "Bugs":
+                        results.bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Bug ${issue.key}...`)
+                        break
+                    default:
+                        debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
+                }
+            })
+            res.write('<div class="children">' + results.stories.join('') + results.subtasks.join('') + results.bugs.join('') + '</div>')
+            res.write('</div>')
+        })
+        res.end()
+        return next()
+})
+    .catch((err) => {
+        debug(`error`)
+        debug(err)
+        res.write("error")
+        res.end()
+        return
+    })
+})
+
+server.get('/epic-old', (req, res, next) => {
+    if (req.query.id) {
+        debug(typeof req.query.id)
+        debug(`/epic called: ${req.query.id}`)
+        // let epicIds = req.query.id
+        req.query.id.forEach((epicId) => {
+
+            res.write("<style>\n")
+            res.write(".Icebox { background-color: white; }")
+            res.write(".In-Progress { background-color: green; }")
+            res.write(".In-Review { background-color: lightgreen; }")
+            res.write(".Done { background-color: blue; }")
+            res.write(".Dead { background-color: black; }")
+            res.write(".Emergency { background-color: red; }")
+            res.write(".Blocked { background-color: red; }")
+            res.write("</style>")
+
+            jsr.getEpicAndChildren(epicId)
+            // jsr.getIssue(epicId)
+            .then((e) => {
+                debug(e.issues.length)
+                debug(`processing ${e.issues[e.issues.length-1].key}...`)
+
+                // for getEpicAndChildren(x), the Epic is always the last Issue in the issues list
+                let epicData = e.issues.pop()
+
+                let owner = "TBD"
+                try {
+                    owner = epicData.fields.assignee.displayName
+                } catch (err) {
+                    owner = "unassigned"
+                }
+
+                let statusName = "unknown"
+                try {
+                    statusName = epicData.fields.status.name
+                } catch (err) {
+                    debug(`... unrecognized status for ${epicData.key}!`)
+                    statusName = "unknown"
+                }
+            
+                // res.write(`<img class='${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${epicData.key}: ${epicData.fields.summary} (${owner}; ${statusName})')/>\n`)
+                res.write(`${epicData.key}: ${epicData.fields.summary}`)
+
+                // Process children
+                let results = { epic: [], stories: [], bugs: [], subtasks: [] }
+                e.issues.forEach((issue, ndx) => {
+                    debug(issue)
+                    let owner = "TBD"
+                    try {
+                        owner = issue.fields.assignee.displayName
+                    } catch (err) {
+                        owner = "unassigned"
+                    }
+
+                    let statusName = "unknown"
+                    try {
+                        statusName = issue.fields.status.name
+                    } catch (err) {
+                        statusName = "unknown"
+                    }
+
+                    switch (issue.fields.issuetype.name) {
+                        case "Sub-task":
+                            results.subtasks.push(`<img class='${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/>\n`)
+                            debug(`Sub-task ${issue.key}...`)
+                            break
+                        case "Story":
+                            results.stories.push(`<img class='${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/>\n`)
+                            debug(`Story ${issue.key}...`)
+                            break
+                        case "Bugs":
+                            results.bugs.push(`<img class='${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/>\n`)
+                            debug(`Bug ${issue.key}...`)
+                            break
+                        default:
+                            debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
+                    }
+                })
+                res.write(results.stories.join(''))
+                res.write(results.subtasks.join(''))
+                res.write(results.bugs.join(''))
+            })
+            .catch((err) => {
+                debug(err)
+                res.write(err)
+                res.end()
+                return
+            })
+            .finally(() => {
+                res.end()
+                return next()
+            })
+        })
+        // res.end()
+        // res.send(e)
+        // return next()
+    } else {
+        res.redirect('/?error=epic%20not%20specified', next)
+        return
+    }
+})
+
 server.get('/chart', (req, res, next) => {
     let jsrCLM = jsr.getChartLinkMaker().reset()
     
     let dates = jdr.getDates()
-    let series = jdr.getSeriesData()
+    // Don't modify the original data
+    // let series = JSON.parse(JSON.stringify(jdr.getSeriesData()))
+    // n.b. es9 ... is much faster (10x) than JSON.parse/stringify
+    let series = {...jdr.getSeriesData()}
     let statuses = Object.keys(series)
     
     let reZero = false
@@ -130,10 +358,9 @@ server.get('/chart', (req, res, next) => {
         
         debug('...in /temp about to go through all statuses')
         debug(statuses)
-        // Reset statuses?
-        if (req.query.reset) {
-            debug(`reset = ${req.query.reset}`)
-            reZero = req.query.reset
+        if (req.query.rezero) {
+            debug(`reset = ${req.query.rezero}`)
+            reZero = req.query.rezero
             statuses.forEach((s, ndx) => {
                 if (reZero.includes(s)) {
                     debug(`reZeroing ${s}: First data point = ${series[s][0]}`)
@@ -181,15 +408,16 @@ server.get('/chart', (req, res, next) => {
 })
 
 server.get('/reset', (req, res, next) => {
-    // TODO: Doesn't fix chart reset...
+    jdr.reset()
     jdr.processAllFiles()
     res.redirect('/chart', next)
+    return
 })
 
 server.get('/datafiles', (req, res, next) => {
     // res.writeHead(200, { 'Content-Type': 'text/plain' })
     // res.send(jdr.getNewestFile())
-    jdr.processAllFiles()
+    // jdr.processAllFiles()
     try {
         let summary = jdr.getDataSummary()
         res.send(summary)
@@ -202,4 +430,3 @@ server.get('/datafiles', (req, res, next) => {
 server.listen(config.server.port, function() {
     console.log('%s listening at %s', server.name, server.url);
 });
-
