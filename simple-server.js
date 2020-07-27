@@ -11,7 +11,7 @@ let jdr = new JiraDataReader()
 
 const config = require('./config.js')
 
-const path = require('path')
+const path = require('path');
 
 function report(req, res, next) {
     Promise.all([
@@ -121,11 +121,8 @@ server.get('/chart', (req, res, next) => {
     let series = jdr.getSeriesData()
     let statuses = Object.keys(series)
     
-    if (req.query.reorient) {
-        debug(`reorient set to ${req.query.reorient}`)
-    } else {
-        debug(`reorient not set`)
-    }
+    let reZero = false
+    let reZeroData = []
 
     try {
         res.writeHead(200, { 'Content-Type': 'text/html' })
@@ -133,6 +130,19 @@ server.get('/chart', (req, res, next) => {
         
         debug('...in /temp about to go through all statuses')
         debug(statuses)
+        // Reset statuses?
+        if (req.query.reset) {
+            debug(`reset = ${req.query.reset}`)
+            reZero = req.query.reset
+            statuses.forEach((s, ndx) => {
+                if (reZero.includes(s)) {
+                    debug(`reZeroing ${s}: First data point = ${series[s][0]}`)
+                    reZeroData[s] = series[s][0]
+                    series[s] = series[s].map(x => x - reZeroData[s])
+                }
+            })
+        }
+
         statuses.forEach((s, ndx) => {
             if (req.query.exclude) {
                 if (!req.query.exclude.includes(s)) {
@@ -168,6 +178,12 @@ server.get('/chart', (req, res, next) => {
         res.end()
         return next()
     }
+})
+
+server.get('/reset', (req, res, next) => {
+    // TODO: Doesn't fix chart reset...
+    jdr.processAllFiles()
+    res.redirect('/chart', next)
 })
 
 server.get('/datafiles', (req, res, next) => {
