@@ -12,6 +12,12 @@ let jdr = new JiraDataReader()
 const config = require('./config.js')
 
 const path = require('path');
+// const { link, write } = require('fs');
+
+const labels = ['Epic','Story','Subtask','Bug']
+const states = ['Open','Active','Closed','Stopped']
+const backgroundColors = ['SeaShell','MediumSeaGreen','CornflowerBlue','Pink']
+const backgroundColorStr = "backgroundColor:['".concat(backgroundColors.join("','")).concat("']")
 
 function report(req, res, next) {
     Promise.all([
@@ -118,52 +124,267 @@ function formatCssClassName(jiraName) {
     return(jiraName.replace(/\s/g, '-'))
 }
 
-server.get('/epics', (req, res, next) => {
-    let epicIds = req.query.id
+function cleanTitle(title) {
+    return(title.replace(/'/g, '&apos;'))
+}
+
+function buildEpicPromisesArray(epicIds) {
+    debug(`buildEpicPromisesArray(${epicIds}) called...`)
     let promises = []
     switch (typeof epicIds) {
         case typeof {}:
             epicIds.forEach((id, ndx) => {
-                debug(`pushing ${id}...`)
+                debug(`object - pushing ${id}...`)
                 promises.push(jsr.getEpicAndChildren(id))
             })
             break
         case typeof []:
             epicIds.forEach((id, ndx) => {
-                debug(`pushing ${id}...`)
+                debug(`array - pushing ${id}...`)
                 promises.push(jsr.getEpicAndChildren(id))
             })
             break
         case typeof "":
+            debug(`string - splitting...`)
             let epicList = []
             if (epicIds.indexOf(",") > 0) {
                 epicList = epicIds.split(',')
                 epicList.push()
+            } else {
+                epicList.push(epicIds)
             }
+            debug(`... ${epicList}...`)
             epicList.forEach((id, ndx) => {
-                debug(`pushing ${id}...`)
+                debug(`string - ...pushing ${id}...`)
                 promises.push(jsr.getEpicAndChildren(id))
             })
             break
         default:
             debug(`unknown typeof epicIds: ${typeof epicIds}`)
     }
+    debug(`... about to return ${promises}`)
+    return(promises)
+}
+
+function buildLegend() {
+    // Legend...
+    // let legendStr = "<div style='font-size: larger; float: right; position: sticky; top: 10px; z-index: -1;'>"
+    let legendStr = "<div class='sticky-bottom legend'>"
+    backgroundColors.forEach((c, ndx) => {
+        legendStr += `<span style="background-color: ${c}; padding: 4px; border: 6px; border-color: ${c}; margin: 5px; border-style: solid; border-radius: 8px;">${states[ndx]}</span>`
+    })
+    legendStr += "</div>"
+    return(legendStr)
+}
+
+function buildHeader(title = "") {
+    return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">`)
+}
+
+function buildFooter() {
+    return(`<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/js/bootstrap.min.js" integrity="sha384-oesi62hOLfzrys4LxRF63OJCXdXDipiYWBnvTl9Y9/TRlw5xlKIEHpNyvvDShgf/" crossorigin="anonymous"></script>`)
+}
+
+/**
+ *Create HTML for pie charts
+ *
+ * @param {*} stats
+ */
+function buildPieCharts(stats) {
+    const w = 150
+    const h = w
+
+    debug(`buildPieCharts() called`)
+    debug(stats)
+    let results = []
+    /**
+        let stats = { 
+            epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+        }
+    */
+
+    /** Output sample:
+     %27 == '
+     http://prog-mgmt-apps:9000/chart
+     ?width=300
+     &height=300
+     &c={type:%27pie%27,data:{labels:[%27January%27,%27February%27,%27March%27,%27April%27,%20%27May%27],%20datasets:[{data:[100,200,300,400,500]}]}}
+     */
+
+    // Charts...
+    labels.forEach((i, ndx) => {
+        debug(`labels forEach => ${i} @ ${ndx} = ${stats[i]}`)
+        let linktext = `<!-- ${i} --><img src="http://prog-mgmt-apps:9000/chart?width=${w}&height=${h}&c={type:%27pie%27,data:{labels:['${states.join("','")}'],datasets:[{data:[${stats[i]['Open']},${stats[i]['Active']},${stats[i]['Closed']},${stats[i]['Stopped']}],` + backgroundColorStr + `}]},options:{title:{display:true,text:'${i}',fontSize:18},legend:{display:false,position:'bottom'}}}"/>`
+        debug(linktext)
+        results.push(linktext)
+    })
+    return(results.join(''))
+}
+
+function updateStats(stats, issueType, issueStatusName) {
+    let newStats = stats
+    switch (issueStatusName) {
+        case "Icebox":
+        case "Defined":
+            newStats[issueType]['Open'] += 1
+            break
+        case "In Progress":
+        case "In Review":
+            newStats[issueType]['Active'] += 1
+            break
+        case "Done":
+        case "Dead":
+            newStats[issueType]['Closed'] += 1
+            break
+        case "Emergency":
+        case "Blocked":
+            newStats[issueType]['Stopped'] += 1
+            break
+    }
+    return(newStats)
+}
+
+server.get('/bogus', (req, res, next) => {
+    jsr.createBogusLink()
+    res.send('ok')
+    return next()
+})
+
+server.get('/filter', (req, res, next) => {
+    jsr.getFilter(req.query.id)
+    .then((data) => {
+        debug(`getFilter returned...`)
+        debug(data)
+        res.write(buildHeader(`Filter: ${req.query.id}`))
+        res.write(buildLegend())
+        res.write(`<H1>${data.name}</H1>`)
+        jsr._genericJiraSearch(data.jql, 99)
+        .then((e) => {
+            let stats = { 
+                Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+                Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+                Subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+                Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            }
+        
+            // Write stylesheet
+            buildStylesheet(res)
+            // Process data
+
+            let results = { Epic: [], Stories: [], Bugs: [], Subtasks: [] }
+
+            e.issues.forEach((issue, ndx) => {
+                let owner = "TBD"
+                try {
+                    owner = issue.fields.assignee.displayName
+                } catch (err) {
+                    owner = "unassigned"
+                }
+
+                let statusName = "unknown"
+                try {
+                    statusName = issue.fields.status.name
+                } catch (err) {
+                    statusName = "unknown"
+                }
+
+                switch (issue.fields.issuetype.name) {
+                    case "Epic":
+                        results.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Sub-task ${issue.key}...`)
+                        stats = updateStats(stats, 'Epic', statusName)
+                        break
+                    case "Sub-task":
+                        results.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Sub-task ${issue.key}...`)
+                        stats = updateStats(stats, 'Subtask', statusName)
+                        break
+                    case "Story":
+                        results.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Story ${issue.key}...`)
+                        stats = updateStats(stats, 'Story', statusName)
+                        break
+                    case "Bug":
+                        results.Bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Bug ${issue.key}...`)
+                        stats = updateStats(stats, 'Bug', statusName)
+                        break
+                    default:
+                        debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
+                }
+            })
+            res.write('<div class="children">' + results.Stories.join('') + results.Subtasks.join('') + results.Bugs.join('') + '</div>')
+            res.write('</div>')
+            // Write charts
+            res.write(buildPieCharts(stats))
+            res.write(buildFooter())
+            res.end()
+            return next()
+        })
+        .catch((err) => {
+            debug(`error in generic search: ${err}`)
+            res.end()
+            return
+        })
+    })
+    .catch((err) => {
+        debug(`getFilter errored out...`)
+        debug(err)
+        res.send(err)
+        res.end()
+        return
+    })
+})
+
+function buildStylesheet() {
+    return(`<style>
+    .children { padding-left: 20px; }
+    .icon { spacing: 0px; padding: 4px; }
+    .Icebox { background-color: white; }
+    .In-Progress { background-color: green; }
+    .In-Review { background-color: lightgreen; }
+    .Done { background-color: blue; }
+    .Dead { background-color: black; }
+    .Emergency { background-color: red; }
+    .Blocked { background-color: red; }
+    .link { text-decoration: none; }
+    .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
+    </style>`)
+}
+
+server.get('/epics', (req, res, next) => {
+    let promises = buildEpicPromisesArray(req.query.id)
+
+    res.write(buildHeader(`Epics: ${req.query.id}`))
 
     Promise.all(promises)
     .then((results) => {
-        res.write("<style>\n")
-        res.write(".children { padding-left: 20px; }")
-        res.write(".icon { spacing: 0px; padding: 2px; }")
-        res.write(".Icebox { background-color: white; }")
-        res.write(".In-Progress { background-color: green; }")
-        res.write(".In-Review { background-color: lightgreen; }")
-        res.write(".Done { background-color: blue; }")
-        res.write(".Dead { background-color: black; }")
-        res.write(".Emergency { background-color: red; }")
-        res.write(".Blocked { background-color: red; }")
-        res.write(".link { text-decoration: none; }")
-        res.write("</style>")
+        // res.write("<style>\n")
+        // res.write(".children { padding-left: 20px; }")
+        // res.write(".icon { spacing: 0px; padding: 4px; }")
+        // res.write(".Icebox { background-color: white; }")
+        // res.write(".In-Progress { background-color: green; }")
+        // res.write(".In-Review { background-color: lightgreen; }")
+        // res.write(".Done { background-color: blue; }")
+        // res.write(".Dead { background-color: black; }")
+        // res.write(".Emergency { background-color: red; }")
+        // res.write(".Blocked { background-color: red; }")
+        // res.write(".link { text-decoration: none; }")
+        // res.write("</style>")
+        res.write(buildStylesheet())
 
+        let stats = { 
+            Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            Subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+        }
+
+        res.write(`<ul class="list-group list-group-flush">`)
         results.forEach((e) => {
             // for getEpicAndChildren(x), the Epic is always the last Issue in the issues list
             let epicData = e.issues.pop()
@@ -184,11 +405,14 @@ server.get('/epics', (req, res, next) => {
                 statusName = "unknown"
             }
         
-            res.write(`<div><a href='https://ime-ddn.atlassian.net/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${epicData.key}: ${epicData.fields.summary} (${owner}; ${statusName})')/></a>`)
+            res.write(`<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`)
+            res.write(`<a href='https://ime-ddn.atlassian.net/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanTitle(epicData.key)}: ${cleanTitle(epicData.fields.summary)} (${owner}; ${statusName})'/></a>`)
             res.write(`${epicData.key}: ${epicData.fields.summary}`)
+            stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
 
             // Process children
-            let results = { epic: [], stories: [], bugs: [], subtasks: [] }
+            let results = { Epic: [], Stories: [], Bugs: [], Subtasks: [] }
+
             e.issues.forEach((issue, ndx) => {
                 let owner = "TBD"
                 try {
@@ -206,24 +430,33 @@ server.get('/epics', (req, res, next) => {
 
                 switch (issue.fields.issuetype.name) {
                     case "Sub-task":
-                        results.subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Sub-task ${issue.key}...`)
+                        stats = updateStats(stats, 'Subtask', statusName)
                         break
                     case "Story":
-                        results.stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Story ${issue.key}...`)
+                        stats = updateStats(stats, 'Story', statusName)
                         break
                     case "Bugs":
-                        results.bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Bug ${issue.key}...`)
+                        stats = updateStats(stats, 'Bug', statusName)
                         break
                     default:
                         debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
                 }
             })
-            res.write('<div class="children">' + results.stories.join('') + results.subtasks.join('') + results.bugs.join('') + '</div>')
-            res.write('</div>')
+            res.write('<div class="children">' + results.Stories.join('') + results.Subtasks.join('') + results.Bugs.join('') + `<span class="badge bg-primary rounded-pill">1</span>` + '</div>')
+            res.write(`</li>`)
+            // res.write('</div>')
         })
+        res.write(`</ul>`)
+
+        res.write(buildPieCharts(stats))
+        res.write(buildLegend())
+        res.write(buildFooter())
         res.end()
         return next()
 })

@@ -35,6 +35,9 @@ class JiraStatusReporter {
         this.chartLinkMaker = new chartLinkMaker()
     }
 
+    getContents() { return(this.ACTION_CONTENTS) }
+    getCount() { return(this.ACTION_COUNT) }
+    
     // Wrapper Functions
     getIssue(id) {
         return (jira.findIssue(id))
@@ -237,9 +240,36 @@ class JiraStatusReporter {
         return (this.fields)
     }
 
+    getFilter(filterId) {
+        return (jira.getFilter(filterId))
+    }
+
     setStartAt(startAt) { this.startAt = startAt }
     getStartAt() { return (this.startAt) }
     clearStartAt() { this.startAt = null }
+
+    createBogusLink() {
+        // Test write-access to Jira
+        // Source: https://github.com/steves/node-jira
+        // create a web link to a GitHub issue
+        var linkData = {
+            "object": {
+                "url" : "https://github.com/steves/node-jira/issues/1",
+                "title": "Add getVersions and createVersion functions",
+                "icon" : {
+                    "url16x16": "https://github.com/favicon.ico"
+                }
+            }
+        };
+
+        jira.createRemoteLink("IME-2902", linkData, function (err, link) {
+            if (err) {
+                console.log("ERROR ", err)
+            } else {
+                console.log("Worked! " + link)
+            }
+        });
+    }
 
     _genericJiraSearch(jql, action) {
         return new Promise((resolve, reject) => {
