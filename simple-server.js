@@ -169,19 +169,23 @@ function buildEpicPromisesArray(epicIds) {
 function buildLegend() {
     // Legend...
     // let legendStr = "<div style='font-size: larger; float: right; position: sticky; top: 10px; z-index: -1;'>"
-    let legendStr = "<div class='sticky-bottom legend'>"
+    let legendStr = "<div class='sticky legend'>"
     backgroundColors.forEach((c, ndx) => {
-        legendStr += `<span style="background-color: ${c}; padding: 4px; border: 6px; border-color: ${c}; margin: 5px; border-style: solid; border-radius: 8px;">${states[ndx]}</span>`
+        legendStr += `<span style="background-color: ${c}; padding: 4px; border: 6px; border-color: ${c}; margin: 5px; border-style: solid; border-radius: 8px; z-index: 999;">${states[ndx]}</span>`
     })
     legendStr += "</div>"
     return(legendStr)
 }
 
-function buildHeader(title = "") {
+function buildHtmlHeader(title = "") {
     return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">`)
 }
 
-function buildFooter() {
+function buildPageHeader(h, h2 = "") {
+    return(`<h1>${h}</h1><h2>${h2}</h2>`)
+}
+
+function buildHtmlFooter() {
     return(`<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/js/bootstrap.min.js" integrity="sha384-oesi62hOLfzrys4LxRF63OJCXdXDipiYWBnvTl9Y9/TRlw5xlKIEHpNyvvDShgf/" crossorigin="anonymous"></script>`)
 }
@@ -259,9 +263,8 @@ server.get('/filter', (req, res, next) => {
     .then((data) => {
         debug(`getFilter returned...`)
         debug(data)
-        res.write(buildHeader(`Filter: ${req.query.id}`))
-        res.write(buildLegend())
-        res.write(`<H1>${data.name}</H1>`)
+        res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
+        res.write(buildPageHeader(data.name))
         jsr._genericJiraSearch(data.jql, 99)
         .then((e) => {
             let stats = { 
@@ -272,10 +275,12 @@ server.get('/filter', (req, res, next) => {
             }
         
             // Write stylesheet
-            buildStylesheet(res)
+            res.write(buildStylesheet(res))
             // Process data
 
-            let results = { Epic: [], Stories: [], Bugs: [], Subtasks: [] }
+            let results = { Epics: [], Stories: [], Bugs: [], Subtasks: [] }
+
+            let contents = []
 
             e.issues.forEach((issue, ndx) => {
                 let owner = "TBD"
@@ -294,7 +299,7 @@ server.get('/filter', (req, res, next) => {
 
                 switch (issue.fields.issuetype.name) {
                     case "Epic":
-                        results.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Epics.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Epic', statusName)
                         break
@@ -317,11 +322,14 @@ server.get('/filter', (req, res, next) => {
                         debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
                 }
             })
-            res.write('<div class="children">' + results.Stories.join('') + results.Subtasks.join('') + results.Bugs.join('') + '</div>')
-            res.write('</div>')
-            // Write charts
+            // charts
             res.write(buildPieCharts(stats))
-            res.write(buildFooter())
+            // icons
+            res.write('<hr><div class="children">' + results.Epics.join('') +  results.Stories.join('') + results.Subtasks.join('') + results.Bugs.join('') + '</div>')
+            res.write('</div>')
+            res.write('<hr>')
+            res.write(buildLegend())
+            res.write(buildHtmlFooter())
             res.end()
             return next()
         })
@@ -359,22 +367,11 @@ function buildStylesheet() {
 server.get('/epics', (req, res, next) => {
     let promises = buildEpicPromisesArray(req.query.id)
 
-    res.write(buildHeader(`Epics: ${req.query.id}`))
+    res.write(buildHtmlHeader(`Epics: ${req.query.id}`))
+    res.write(buildPageHeader('Status Page', req.query.id))
 
     Promise.all(promises)
     .then((results) => {
-        // res.write("<style>\n")
-        // res.write(".children { padding-left: 20px; }")
-        // res.write(".icon { spacing: 0px; padding: 4px; }")
-        // res.write(".Icebox { background-color: white; }")
-        // res.write(".In-Progress { background-color: green; }")
-        // res.write(".In-Review { background-color: lightgreen; }")
-        // res.write(".Done { background-color: blue; }")
-        // res.write(".Dead { background-color: black; }")
-        // res.write(".Emergency { background-color: red; }")
-        // res.write(".Blocked { background-color: red; }")
-        // res.write(".link { text-decoration: none; }")
-        // res.write("</style>")
         res.write(buildStylesheet())
 
         let stats = { 
@@ -384,7 +381,9 @@ server.get('/epics', (req, res, next) => {
             Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         }
 
-        res.write(`<ul class="list-group list-group-flush">`)
+        let details = []
+
+        details.push(`<ul class="list-group list-group-flush">`)
         results.forEach((e) => {
             // for getEpicAndChildren(x), the Epic is always the last Issue in the issues list
             let epicData = e.issues.pop()
@@ -404,14 +403,29 @@ server.get('/epics', (req, res, next) => {
                 debug(`... unrecognized status for ${epicData.key}!`)
                 statusName = "unknown"
             }
-        
-            res.write(`<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`)
-            res.write(`<a href='https://ime-ddn.atlassian.net/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanTitle(epicData.key)}: ${cleanTitle(epicData.fields.summary)} (${owner}; ${statusName})'/></a>`)
-            res.write(`${epicData.key}: ${epicData.fields.summary}`)
-            stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
 
-            // Process children
-            let results = { Epic: [], Stories: [], Bugs: [], Subtasks: [] }
+            let resultCtr = { Epics: [], Stories: [], Bugs: [], Subtasks: [] }
+
+            details.push(`<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`)
+            details.push(`<a href='https://ime-ddn.atlassian.net/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanTitle(epicData.key)}: ${cleanTitle(epicData.fields.summary)} (${owner}; ${statusName})'/></a>`)
+            details.push(`${epicData.key}: ${epicData.fields.summary}`)
+            stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
+            switch (epicData.fields.issuetype.name) {
+                case 'Epic':
+                    resultCtr.Epics.push(epicData)
+                    break
+                case 'Story':
+                    resultCtr.Stories.push(epicData)
+                    break
+                case 'Sub-Task':
+                    resultCtr.Subtasks.push(epicData)
+                    break
+                case 'Bugs':
+                    resultCtr.Subtasks.push(epicData)
+                    break
+                default:
+                    break
+            }
 
             e.issues.forEach((issue, ndx) => {
                 let owner = "TBD"
@@ -430,17 +444,17 @@ server.get('/epics', (req, res, next) => {
 
                 switch (issue.fields.issuetype.name) {
                     case "Sub-task":
-                        results.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Subtask', statusName)
                         break
                     case "Story":
-                        results.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Story ${issue.key}...`)
                         stats = updateStats(stats, 'Story', statusName)
                         break
                     case "Bugs":
-                        results.Bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr.Bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Bug ${issue.key}...`)
                         stats = updateStats(stats, 'Bug', statusName)
                         break
@@ -448,15 +462,32 @@ server.get('/epics', (req, res, next) => {
                         debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
                 }
             })
-            res.write('<div class="children">' + results.Stories.join('') + results.Subtasks.join('') + results.Bugs.join('') + `<span class="badge bg-primary rounded-pill">1</span>` + '</div>')
-            res.write(`</li>`)
-            // res.write('</div>')
+            details.push(`<div class="children">
+                ${resultCtr.Stories.join('')}
+                ${resultCtr.Subtasks.join('')}
+                ${resultCtr.Bugs.join('')}
+                <span class="badge bg-dark rounded-pill">
+                ${resultCtr.Epics.length}
+                </span>
+                <span class="badge bg-dark rounded-pill">
+                ${resultCtr.Stories.length}
+                </span>
+                <span class="badge bg-dark rounded-pill">
+                ${resultCtr.Subtasks.length}
+                </span>
+                <span class="badge bg-dark rounded-pill">
+                ${resultCtr.Bugs.length}
+                </span></div>`)
+            details.push(`</li>`)
         })
-        res.write(`</ul>`)
+        details.push(`</ul>`)
 
         res.write(buildPieCharts(stats))
+        res.write('<hr>')
         res.write(buildLegend())
-        res.write(buildFooter())
+        res.write('<hr>')
+        res.write(details.join(''))
+        res.write(buildHtmlFooter())
         res.end()
         return next()
 })
