@@ -12,6 +12,7 @@ let jdr = new JiraDataReader()
 const config = require('./config.js')
 
 const path = require('path');
+const JiraDataCache = require('./JiraDataCache');
 // const { link, write } = require('fs');
 
 const labels = ['Epic','Story', 'Task', 'Subtask','Bug']
@@ -71,44 +72,10 @@ server.use(restify.plugins.queryParser())
 
 server.get('/', report)
 
-server.get('/dir', (req, res, next) => {
+server.get('/homedir', (req, res, next) => {
     res.send(jsr.getFileManager().getHomeDir())
     return next()
 });
-
-server.get('/sampleImg', (req, res, next) => {
-    let jsrCLM = jsr.getChartLinkMaker().reset()
-
-    try {
-        res.writeHead(200, { 'Content-Type': 'text/html' })
-        jsrCLM.setCategories(['January','February','March','April', 'May'])
-        jsrCLM.addSeries("dogsY", [50,60,70,180,190])
-            .addSeries("catsX", [100,200,300,400,500])
-            .addSeries("zebras", [130,150,130,40,50])
-            // .addSeries("goats", [30,50,30,10,5])
-            .setBarChart()
-            // .setLineChart()
-            // .setFill(true)
-            .setFill(false)
-
-            .buildChartImgTag()
-            .then((link) => {
-                debug(`buildChartImgTag returned ${link}`)
-                    res.write(link)
-                })
-                .catch((err) => {
-                    debug(`Error caught in buildChartImgTag() = ${err}`)
-                    res.write(`<EM>Error</EM>: ${err}`)
-                })
-                .finally(() => {
-                    res.end()
-                })
-    } catch (err) {
-        res.write(`<EM>Error</EM>: ${err}`)
-        res.end()
-        return next()
-    }
-})
 
 server.get('/dates', (req, res, next) => {
     res.send(jdr.getDates())
@@ -688,12 +655,40 @@ server.get('/chart', (req, res, next) => {
     }
 })
 
-server.get('/reset', (req, res, next) => {
-    jdr.reset()
-    jdr.processAllFiles()
-    res.redirect('/chart', next)
+server.get('/cache', (req, res, next) => {
+    res.send(jdr.getCacheObject(false))
     return
 })
+
+server.get('/reread-cache', (req, res, next) => {
+    // res.send(jdr.getCacheObject().readCache(true, false))
+    res.send(`reread`)
+    return next()
+})
+
+server.get('/refresh-cache', (req, res, next) => {
+    jdr.reloadCache(jdr.REFRESH)
+    res.send('refreshed')
+    return next()
+})
+
+server.get('/rebuild-cache', (req, res, next) => {
+    jdr.reloadCache(jdr.REBUILD)
+    res.send('rebuilt')
+    return next()
+})
+
+// server.get('/reset', (req, res, next) => {
+    //     jdr.reloadCache(jdr.FULL_RELOAD)
+    //     res.redirect('/chart', next)
+    //     return
+// })
+
+// server.get('/update', (req, res, next) => {
+//     jdr.reloadCache(jdr.UPDATE)
+//     res.redirect('/chart', next)
+//     return
+// })
 
 server.get('/datafiles', (req, res, next) => {
     // res.writeHead(200, { 'Content-Type': 'text/plain' })

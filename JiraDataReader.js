@@ -6,6 +6,11 @@ const fs = require('fs')
 const glob = require('glob')
 const path = require('path');
 
+const JiraDataCache = require('./JiraDataCache')
+
+const REBUILD = 999
+const REFRESH = 10
+
 class JiraDataReader {
     constructor() {
         this.cache = new JiraDataCache()
@@ -13,12 +18,17 @@ class JiraDataReader {
         return(this)
     }
     
-    processAllFiles(forceRefresh = false) {
-        debug('processAllFiles() called')
-        if (!this.loaded || forceRefresh) {
-            let d = []
-            let flist = glob.sync('./data/*.json')
+    getCacheObject() { return(this.cache) }
+
+    reloadCache(reloadType = REFRESH) {
+        debug(`reloadCache() called...`)
+        let d = this.cache.getCache()
+        let flist = glob.sync('./data/*.json')
+        let updates = 0
+        if (reloadType == REBUILD) {
+            this.clearCache()
             flist.forEach((fname) => {
+                updates += 1
                 let raw = this._processFile(fname)
                 d.push({
                     fullname: fname, 
@@ -28,13 +38,27 @@ class JiraDataReader {
                     total: raw.total
                 })
             })
-            this.cache.saveCache(d)
-            this.loaded = this.cache.isActive()
-            debug(`...this.loaded = ${this.loaded}`)
+        } else {
+            flist.forEach((fname) => {
+                if (!this.cache.containsFile(fname)) {
+                    updates += 1
+                    let raw = this._processFile(fname)
+                    d.push({
+                        fullname: fname, 
+                        base: path.basename(fname, '.json'), 
+                        status: this._parseStatusName(fname),
+                        date: this._parseFileDate(fname), 
+                        total: raw.total
+                    })
+                }
+            })
         }
-        return(this)
+        debug(`...saving cache (${updates} updates)`)
+        this.cache.saveCache(d)
+        this.loaded = this.cache.isActive()
+        // debug(`...this.loaded = ${this.loaded}`)
     }
-    
+
     getDataSummary() {
         debug('getDataSummary() called...')
         if (!this.loaded) {
@@ -53,16 +77,21 @@ class JiraDataReader {
     getDates() {
         debug('getDates() called...')
         if (this.loaded) {
-            if (!this.dates) {
+            // if (!this.dates) {
                 this.dates = []
-                this.cache.readCache(true, false).forEach((el, ndx) => {
-                    if (!this.dates.includes(el.date)) {
-                        this.dates.push(el.date)
-                    }
-                })
-            }
+                try {
+                    const interimCache = this.cache.readCache(true, false)
+                    interimCache.forEach((el, ndx) => {
+                        if (!this.dates.includes(el.date)) {
+                            this.dates.push(el.date)
+                        }
+                    })
+                } catch (err) {
+                    debug(`... Error during interimCache: ${err}`)
+                }
+            // }
             debug(`... returning this.dates`)
-            return(this.dates)
+            return(this.dates.sort())
         } else {
             debug('... no data loaded')
             return([])
@@ -94,10 +123,8 @@ class JiraDataReader {
         return(this.allFiles)
     }
 
-    reset() { return(this.clearCache()) }
-
     clearCache() {
-        this.cache.reset()
+        // this.cache.reset()
         this.loaded = this.cache.isActive()
         return(this)
     }
@@ -120,82 +147,6 @@ class JiraDataReader {
         this.lastData = JSON.parse(data)
         debug(`this.lastData.total = ${this.lastData.total}`)
         return({ total: this.lastData.total, raw: this.lastData })
-    }
-}
-
-const DEFAULT_CACHE_FILENAME = '.jiraCache.json'
-
-class JiraDataCache {
-    
-    constructor(cacheFilename = DEFAULT_CACHE_FILENAME) {
-        debug('JiraDataCache created')
-        this.loaded = false
-        this.filename = cacheFilename
-        this.readCache(false, true)
-    }
-
-    saveCache(data) {
-        debug('saveCache() called')
-        fs.writeFileSync(this.filename, JSON.stringify(data))
-        this.loaded = true
-    }
-
-    _validateCache() {
-        if (fs.existsSync(this.filename)) {
-            return(true)
-        } else {
-            return(false)
-        }
-    }
-
-    readCache(returnCache = false, failSilently = false) {
-        debug('readCache() called')
-        if (this._validateCache()) {
-            this.rawCache = fs.readFileSync(this.filename)
-            this.cache = JSON.parse(this.rawCache)
-            this.loaded = true
-            if (returnCache) {
-                debug('...returning cache')
-                return(this.cache)
-            } else {
-                debug('...returning this')
-                return(this)
-            }
-        } else {
-            if (failSilently) {
-                debug('...readCache() failing silently')
-                return(this)
-            } else {
-                debug('...readCache() failing NOT silently')
-                throw new Error('No cache file found')
-            }
-        }
-    }
-
-    getCache() {
-        if (this.loaded) {
-            return(this.cache)
-        } else {
-            return(null)
-        }
-    }
-
-    isActive() { return(this.loaded) }
-
-    reset(unlinkFile = true) {
-        debug(`reset(${unlinkFile}) called...`)
-        if (unlinkFile) {
-            if (fs.existsSync(this.filename)) {
-                fs.unlinkSync(this.filename)
-            } else {
-                debug(`${this.filename} doesn't exist`)
-            }
-        }
-
-        this.loaded = false
-        this.rawCache = null
-        this.cache = null
-        return(true)
     }
 }
 
