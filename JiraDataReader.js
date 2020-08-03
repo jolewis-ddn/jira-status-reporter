@@ -183,13 +183,19 @@ class JiraDataCache {
     isActive() { return(this.loaded) }
 
     reset(unlinkFile = true) {
+        debug(`reset(${unlinkFile}) called...`)
         if (unlinkFile) {
-            fs.unlinkSync(this.filename)
+            if (fs.existsSync(this.filename)) {
+                fs.unlinkSync(this.filename)
+            } else {
+                debug(`${this.filename} doesn't exist`)
+            }
         }
 
         this.loaded = false
         this.rawCache = null
         this.cache = null
+        return(true)
     }
 }
 

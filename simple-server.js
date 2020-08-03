@@ -14,7 +14,7 @@ const config = require('./config.js')
 const path = require('path');
 // const { link, write } = require('fs');
 
-const labels = ['Epic','Story','Subtask','Bug']
+const labels = ['Epic','Story', 'Task', 'Subtask','Bug']
 const states = ['Open','Active','Closed','Stopped']
 const backgroundColors = ['SeaShell','MediumSeaGreen','CornflowerBlue','Pink']
 const backgroundColorStr = "backgroundColor:['".concat(backgroundColors.join("','")).concat("']")
@@ -196,7 +196,7 @@ function buildHtmlFooter() {
  * @param {*} stats
  */
 function buildPieCharts(stats) {
-    const w = 150
+    const w = 120
     const h = w
 
     debug(`buildPieCharts() called`)
@@ -207,6 +207,8 @@ function buildPieCharts(stats) {
             epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         }
     */
@@ -270,6 +272,7 @@ server.get('/filter', (req, res, next) => {
             let stats = { 
                 Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
                 Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+                Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
                 Subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
                 Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             }
@@ -278,7 +281,7 @@ server.get('/filter', (req, res, next) => {
             res.write(buildStylesheet(res))
             // Process data
 
-            let results = { Epics: [], Stories: [], Bugs: [], Subtasks: [] }
+            let results = { Epics: [], Stories: [], Tasks: [], Bugs: [], Subtasks: [] }
 
             let contents = []
 
@@ -308,6 +311,11 @@ server.get('/filter', (req, res, next) => {
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Subtask', statusName)
                         break
+                    case "Task":
+                        results.Tasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        debug(`Task ${issue.key}...`)
+                        stats = updateStats(stats, 'Task', statusName)
+                        break
                     case "Story":
                         results.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Story ${issue.key}...`)
@@ -325,7 +333,7 @@ server.get('/filter', (req, res, next) => {
             // charts
             res.write(buildPieCharts(stats))
             // icons
-            res.write('<hr><div class="children">' + results.Epics.join('') +  results.Stories.join('') + results.Subtasks.join('') + results.Bugs.join('') + '</div>')
+            res.write('<hr><div class="children">' + results.Epics.join('') +  results.Stories.join('') + results.Tasks.join('') + results.Subtasks.join('') + results.Bugs.join('') + '</div>')
             res.write('</div>')
             res.write('<hr>')
             res.write(buildLegend())
@@ -377,6 +385,7 @@ server.get('/epics', (req, res, next) => {
         let stats = { 
             Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             Subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         }
@@ -412,16 +421,19 @@ server.get('/epics', (req, res, next) => {
             stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
             switch (epicData.fields.issuetype.name) {
                 case 'Epic':
-                    resultCtr.Epics.push(epicData)
+                    resultCtr.Epics.push('')
                     break
                 case 'Story':
-                    resultCtr.Stories.push(epicData)
+                    resultCtr.Stories.push('')
+                    break
+                case 'Task':
+                    resultCtr.Tasks.push('')
                     break
                 case 'Sub-Task':
-                    resultCtr.Subtasks.push(epicData)
+                    resultCtr.Subtasks.push('')
                     break
                 case 'Bugs':
-                    resultCtr.Subtasks.push(epicData)
+                    resultCtr.Bugs.push('')
                     break
                 default:
                     break
@@ -447,6 +459,11 @@ server.get('/epics', (req, res, next) => {
                         resultCtr.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Subtask', statusName)
+                        break
+                    case "Task":
+                        resultCtr.Tasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        debug(`Task ${issue.key}...`)
+                        stats = updateStats(stats, 'Task', statusName)
                         break
                     case "Story":
                         resultCtr.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
