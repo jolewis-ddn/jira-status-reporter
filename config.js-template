@@ -8,5 +8,11 @@ module.exports = {
     },
     server: {
         port: 9999,
+    },
+    graphicServer: {
+        protocol: 'http',
+        server: 'QUICKCHART_SERVER',
+        port: QUICKCHART_PORT,
+        script: 'chart'
     }
 }
