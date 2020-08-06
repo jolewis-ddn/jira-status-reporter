@@ -30,6 +30,10 @@ Collection of node scripts to query, store, and report on Jira issues.
   * `debug`: For logging
   * `supports-color`: For `debug`
   * `date-fns`: For date manipulation
+* Working QuickChart server
+  * See https://quickchart.io/ for instructions
+  * Configure the server and port in the config.js file
+
 
 ## Installation and Setup
 * ```sh
