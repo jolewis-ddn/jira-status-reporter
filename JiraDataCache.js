@@ -35,11 +35,16 @@ class JiraDataCache {
         }
     }
 
+    makeCache() {
+        return(this.saveCache([]))
+    }
+
     saveCache(data) {
         debug('saveCache() called')
         fs.writeFileSync(this.filename, JSON.stringify(data))
         this.cache = data
         this.loaded = true
+        return(this.cache)
     }
 
     _validateCache() {
@@ -79,6 +84,7 @@ class JiraDataCache {
                 return(this)
             }
         } else {
+            this.makeCache()
             if (failSilently) {
                 debug('...readCache() failing silently')
                 return(this)
@@ -94,7 +100,7 @@ class JiraDataCache {
             return(this.cache)
         } else {
             if (createIfEmpty) {
-                return(this.readCache(true, false))
+                return(this.makeCache())
             } else {
                 return(null)
             }
@@ -108,6 +114,7 @@ class JiraDataCache {
         if (unlinkFile) {
             if (fs.existsSync(this.filename)) {
                 fs.unlinkSync(this.filename)
+                fs.writeFileSync(this.filename, JSON.stringify([]))
             } else {
                 debug(`${this.filename} doesn't exist`)
             }

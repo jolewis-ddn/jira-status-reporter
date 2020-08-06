@@ -22,7 +22,7 @@ class JiraDataReader {
 
     reloadCache(reloadType = REFRESH) {
         debug(`reloadCache() called...`)
-        let d = this.cache.getCache()
+        let d = this.cache.getCache(true)
         let flist = glob.sync('./data/*.json')
         let updates = 0
         if (reloadType == REBUILD) {

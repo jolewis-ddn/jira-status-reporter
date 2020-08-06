@@ -13,7 +13,6 @@ const config = require('./config.js')
 
 const path = require('path');
 const JiraDataCache = require('./JiraDataCache');
-// const { link, write } = require('fs');
 
 const labels = ['Epic','Story', 'Task', 'Subtask','Bug']
 const states = ['Open','Active','Closed','Stopped']
@@ -67,8 +66,6 @@ function report(req, res, next) {
 
 var server = restify.createServer()
 server.use(restify.plugins.queryParser())
-
-// **************** 
 
 server.get('/', report)
 
@@ -134,8 +131,6 @@ function buildEpicPromisesArray(epicIds) {
 }
 
 function buildLegend() {
-    // Legend...
-    // let legendStr = "<div style='font-size: larger; float: right; position: sticky; top: 10px; z-index: -1;'>"
     let legendStr = "<div class='sticky legend'>"
     backgroundColors.forEach((c, ndx) => {
         legendStr += `<span style="background-color: ${c}; padding: 4px; border: 6px; border-color: ${c}; margin: 5px; border-style: solid; border-radius: 8px; z-index: 999;">${states[ndx]}</span>`
@@ -169,29 +164,11 @@ function buildPieCharts(stats) {
     debug(`buildPieCharts() called`)
     debug(stats)
     let results = []
-    /**
-        let stats = { 
-            epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-        }
-    */
-
-    /** Output sample:
-     %27 == '
-     http://prog-mgmt-apps:9000/chart
-     ?width=300
-     &height=300
-     &c={type:%27pie%27,data:{labels:[%27January%27,%27February%27,%27March%27,%27April%27,%20%27May%27],%20datasets:[{data:[100,200,300,400,500]}]}}
-     */
 
     // Charts...
     labels.forEach((i, ndx) => {
         debug(`labels forEach => ${i} @ ${ndx} = ${stats[i]}`)
-        let linktext = `<!-- ${i} --><img src="http://prog-mgmt-apps:9000/chart?width=${w}&height=${h}&c={type:%27pie%27,data:{labels:['${states.join("','")}'],datasets:[{data:[${stats[i]['Open']},${stats[i]['Active']},${stats[i]['Closed']},${stats[i]['Stopped']}],` + backgroundColorStr + `}]},options:{title:{display:true,text:'${i}',fontSize:18},legend:{display:false,position:'bottom'}}}"/>`
+        let linktext = `<!-- ${i} --><img src="${config.graphicServer.protocol}://${config.graphicServer.server}:${config.graphicServer.port}/${config.graphicServer.script}?width=${w}&height=${h}&c={type:%27pie%27,data:{labels:['${states.join("','")}'],datasets:[{data:[${stats[i]['Open']},${stats[i]['Active']},${stats[i]['Closed']},${stats[i]['Stopped']}],` + backgroundColorStr + `}]},options:{title:{display:true,text:'${i}',fontSize:18},legend:{display:false,position:'bottom'}}}"/>`
         debug(linktext)
         results.push(linktext)
     })
@@ -269,27 +246,27 @@ server.get('/filter', (req, res, next) => {
 
                 switch (issue.fields.issuetype.name) {
                     case "Epic":
-                        results.Epics.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Epics.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Epic', statusName)
                         break
                     case "Sub-task":
-                        results.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Subtasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Subtask', statusName)
                         break
                     case "Task":
-                        results.Tasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Tasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Task ${issue.key}...`)
                         stats = updateStats(stats, 'Task', statusName)
                         break
                     case "Story":
-                        results.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Stories.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Story ${issue.key}...`)
                         stats = updateStats(stats, 'Story', statusName)
                         break
                     case "Bug":
-                        results.Bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Bugs.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Bug ${issue.key}...`)
                         stats = updateStats(stats, 'Bug', statusName)
                         break
@@ -383,7 +360,7 @@ server.get('/epics', (req, res, next) => {
             let resultCtr = { Epics: [], Stories: [], Bugs: [], Subtasks: [] }
 
             details.push(`<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`)
-            details.push(`<a href='https://ime-ddn.atlassian.net/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanTitle(epicData.key)}: ${cleanTitle(epicData.fields.summary)} (${owner}; ${statusName})'/></a>`)
+            details.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanTitle(epicData.key)}: ${cleanTitle(epicData.fields.summary)} (${owner}; ${statusName})'/></a>`)
             details.push(`${epicData.key}: ${epicData.fields.summary}`)
             stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
             switch (epicData.fields.issuetype.name) {
@@ -423,22 +400,22 @@ server.get('/epics', (req, res, next) => {
 
                 switch (issue.fields.issuetype.name) {
                     case "Sub-task":
-                        resultCtr.Subtasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr.Subtasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Subtask', statusName)
                         break
                     case "Task":
-                        resultCtr.Tasks.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr.Tasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Task ${issue.key}...`)
                         stats = updateStats(stats, 'Task', statusName)
                         break
                     case "Story":
-                        resultCtr.Stories.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr.Stories.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Story ${issue.key}...`)
                         stats = updateStats(stats, 'Story', statusName)
                         break
                     case "Bugs":
-                        resultCtr.Bugs.push(`<a href='https://ime-ddn.atlassian.net/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr.Bugs.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Bug ${issue.key}...`)
                         stats = updateStats(stats, 'Bug', statusName)
                         break
@@ -525,7 +502,6 @@ server.get('/epic-old', (req, res, next) => {
                     statusName = "unknown"
                 }
             
-                // res.write(`<img class='${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${epicData.key}: ${epicData.fields.summary} (${owner}; ${statusName})')/>\n`)
                 res.write(`${epicData.key}: ${epicData.fields.summary}`)
 
                 // Process children
