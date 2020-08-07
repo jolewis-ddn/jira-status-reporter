@@ -10,18 +10,18 @@ let jsr = new JSR()
 const JiraDataReader = require('./JiraDataReader')
 let jdr = new JiraDataReader()
 
-const config = require('./config.js')
+const config = require('./config')
 
 const path = require('path');
-const JiraDataCache = require('./JiraDataCache');
+// const JiraDataCache = require('./JiraDataCache');
 
-const labels = ['Epic','Story', 'Task', 'Subtask','Bug']
+const labels = ['Epic','Story', 'Task', 'Sub-task','Bug']
 const states = ['Open','Active','Closed','Stopped']
 const backgroundColors = ['SeaShell','MediumSeaGreen','CornflowerBlue','Pink']
 const backgroundColorStr = "backgroundColor:['".concat(backgroundColors.join("','")).concat("']")
 
 var server = restify.createServer()
-// server.use(restify.plugins.queryParser())
+server.use(restify.plugins.queryParser())
 
 const cors = corsMiddleware({
     origins: ['*'],
@@ -32,11 +32,7 @@ const cors = corsMiddleware({
 server.use(cors.preflight)
 server.use(cors.actual)
 
-// server.use(restify.CORS({
-//     // origins: ['*'],
-//     credentials: true,
-//     headers: ['x-JSS']
-// }))
+server.get('/docs/*', restify.plugins.serveStatic({ directory: './static', default: 'charts.html' }))
 
 function report(req, res, next) {
     Promise.all([
@@ -479,127 +475,32 @@ server.get('/epics', (req, res, next) => {
     })
 })
 
-server.get('/epic-old', (req, res, next) => {
-    if (req.query.id) {
-        debug(typeof req.query.id)
-        debug(`/epic called: ${req.query.id}`)
-        // let epicIds = req.query.id
-        req.query.id.forEach((epicId) => {
-
-            res.write("<style>\n")
-            res.write(".Icebox { background-color: white; }")
-            res.write(".In-Progress { background-color: green; }")
-            res.write(".In-Review { background-color: lightgreen; }")
-            res.write(".Done { background-color: blue; }")
-            res.write(".Dead { background-color: black; }")
-            res.write(".Emergency { background-color: red; }")
-            res.write(".Blocked { background-color: red; }")
-            res.write("</style>")
-
-            jsr.getEpicAndChildren(epicId)
-            // jsr.getIssue(epicId)
-            .then((e) => {
-                debug(e.issues.length)
-                debug(`processing ${e.issues[e.issues.length-1].key}...`)
-
-                // for getEpicAndChildren(x), the Epic is always the last Issue in the issues list
-                let epicData = e.issues.pop()
-
-                let owner = "TBD"
-                try {
-                    owner = epicData.fields.assignee.displayName
-                } catch (err) {
-                    owner = "unassigned"
-                }
-
-                let statusName = "unknown"
-                try {
-                    statusName = epicData.fields.status.name
-                } catch (err) {
-                    debug(`... unrecognized status for ${epicData.key}!`)
-                    statusName = "unknown"
-                }
-            
-                res.write(`${epicData.key}: ${epicData.fields.summary}`)
-
-                // Process children
-                let results = { epic: [], stories: [], bugs: [], subtasks: [] }
-                e.issues.forEach((issue, ndx) => {
-                    debug(issue)
-                    let owner = "TBD"
-                    try {
-                        owner = issue.fields.assignee.displayName
-                    } catch (err) {
-                        owner = "unassigned"
-                    }
-
-                    let statusName = "unknown"
-                    try {
-                        statusName = issue.fields.status.name
-                    } catch (err) {
-                        statusName = "unknown"
-                    }
-
-                    switch (issue.fields.issuetype.name) {
-                        case "Sub-task":
-                            results.subtasks.push(`<img class='${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/>\n`)
-                            debug(`Sub-task ${issue.key}...`)
-                            break
-                        case "Story":
-                            results.stories.push(`<img class='${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/>\n`)
-                            debug(`Story ${issue.key}...`)
-                            break
-                        case "Bugs":
-                            results.bugs.push(`<img class='${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/>\n`)
-                            debug(`Bug ${issue.key}...`)
-                            break
-                        default:
-                            debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
-                    }
-                })
-                res.write(results.stories.join(''))
-                res.write(results.subtasks.join(''))
-                res.write(results.bugs.join(''))
-            })
-            .catch((err) => {
-                debug(err)
-                res.write(err)
-                res.end()
-                return
-            })
-            .finally(() => {
-                res.end()
-                return next()
-            })
-        })
-        // res.end()
-        // res.send(e)
-        // return next()
-    } else {
-        res.redirect('/?error=epic%20not%20specified', next)
-        return
-    }
-})
-
 server.get('/chart', (req, res, next) => {
     let jsrCLM = jsr.getChartLinkMaker().reset()
-    
+    res.writeHead(200, { 'Content-Type': 'text/html' })
+    const typeFilter = req.query.type || false
+    if (typeFilter) {
+        res.write(`<H1>${typeFilter}</H1>`)
+    } else {
+        res.write(`Status Chart (no filter)`)
+    }
+ 
+    debug(`typeFilter: ${typeFilter}`)
+
     let dates = jdr.getDates()
     // Don't modify the original data
     // let series = JSON.parse(JSON.stringify(jdr.getSeriesData()))
     // n.b. es9 ... is much faster (10x) than JSON.parse/stringify
-    let series = {...jdr.getSeriesData()}
+    let series = {...jdr.getSeriesData(typeFilter)}
     let statuses = Object.keys(series)
     
     let reZero = false
     let reZeroData = []
 
     try {
-        res.writeHead(200, { 'Content-Type': 'text/html' })
         jsrCLM.setCategories(dates)
         
         debug('...in /temp about to go through all statuses')
-        debug(statuses)
         if (req.query.rezero) {
             debug(`reset = ${req.query.rezero}`)
             reZero = req.query.rezero
@@ -655,20 +556,19 @@ server.get('/cache', (req, res, next) => {
 })
 
 server.get('/reread-cache', (req, res, next) => {
-    // res.send(jdr.getCacheObject().readCache(true, false))
     res.send(`reread`)
     return next()
 })
 
 server.get('/refresh-cache', (req, res, next) => {
-    jdr.reloadCache(jdr.REFRESH)
-    res.send('refreshed')
+    const updates = jdr.reloadCache(jdr.refresh())
+    res.send(`refreshed ${updates}`)
     return next()
 })
 
 server.get('/rebuild-cache', (req, res, next) => {
-    jdr.reloadCache(jdr.REBUILD)
-    res.send('rebuilt')
+    const updates = jdr.reloadCache(jdr.rebuild())
+    res.send(`rebuilt ${updates}`)
     return next()
 })
 
@@ -677,6 +577,12 @@ server.get('/reset', (req, res, next) => {
     jdr = new JiraDataReader()
     res.redirect('/chart', next)
     return
+})
+
+server.get('/wipe-cache', (req, res, next) => {
+    jdr.getCacheObject().wipe(true)
+    res.send(`wiped`)
+    return next()
 })
 
 server.get('/datafiles', (req, res, next) => {

@@ -8,26 +8,30 @@ const path = require('path');
 
 const JiraDataCache = require('./JiraDataCache')
 
-const REBUILD = 999
-const REFRESH = 10
-
 class JiraDataReader {
     constructor() {
         this.cache = new JiraDataCache()
         this.loaded = this.cache.isActive()
+        this.REBUILD = 999
+        this.REFRESH = 10
         return(this)
     }
     
     getCacheObject() { return(this.cache) }
 
-    reloadCache(reloadType = REFRESH) {
+    rebuild() { return(this.REBUILD) }
+    refresh() { return(this.REFRESH) }
+
+    reloadCache(reloadType = this.REFRESH) {
         debug(`reloadCache() called...`)
         let d = this.cache.getCache(true)
         let flist = glob.sync('./data/*.json')
         let updates = 0
-        if (reloadType == REBUILD) {
+        if (reloadType == this.REBUILD) {
             this.clearCache()
-            flist.forEach((fname) => {
+        }
+        flist.forEach((fname) => {
+            if (reloadType == this.REBUILD || !this.cache.containsFile(fname)) {
                 updates += 1
                 let raw = this._processFile(fname)
                 d.push({
@@ -35,28 +39,16 @@ class JiraDataReader {
                     base: path.basename(fname, '.json'), 
                     status: this._parseStatusName(fname),
                     date: this._parseFileDate(fname), 
-                    total: raw.total
+                    total: raw.total,
+                    summary: raw.summary
                 })
-            })
-        } else {
-            flist.forEach((fname) => {
-                if (!this.cache.containsFile(fname)) {
-                    updates += 1
-                    let raw = this._processFile(fname)
-                    d.push({
-                        fullname: fname, 
-                        base: path.basename(fname, '.json'), 
-                        status: this._parseStatusName(fname),
-                        date: this._parseFileDate(fname), 
-                        total: raw.total
-                    })
-                }
-            })
-        }
+            }
+        })
+
         debug(`...saving cache (${updates} updates)`)
         this.cache.saveCache(d)
         this.loaded = this.cache.isActive()
-        // debug(`...this.loaded = ${this.loaded}`)
+        return(updates)
     }
 
     getDataSummary() {
@@ -98,17 +90,20 @@ class JiraDataReader {
         }
     }
 
-    getSeriesData() {
+    getSeriesData(typeFilter = false) {
+        debug(`getSeriesData(${typeFilter}) called...`)
         if (this.loaded) {
-            if (!this.seriesData) {
-                this.seriesData = {}
-                this.cache.readCache(true, false).forEach((el, ndx) => {
-                    if (!(el.status in this.seriesData)) {
-                        this.seriesData[el.status] = []
-                    }
+            this.seriesData = {}
+            this.cache.readCache(true, false).forEach((el, ndx) => {
+                if (!(el.status in this.seriesData)) {
+                    this.seriesData[el.status] = []
+                }
+                if (typeFilter) {
+                    this.seriesData[el.status].push(el['summary'][typeFilter]['count'])
+                } else {
                     this.seriesData[el.status].push(el.total)
-                })
-            }
+                }
+            })
             return(this.seriesData)
         } else {
             debug('... no data loaded')
@@ -124,7 +119,7 @@ class JiraDataReader {
     }
 
     clearCache() {
-        // this.cache.reset()
+        this.cache.makeCache()
         this.loaded = this.cache.isActive()
         return(this)
     }
@@ -146,7 +141,18 @@ class JiraDataReader {
         let data = fs.readFileSync(fname)
         this.lastData = JSON.parse(data)
         debug(`this.lastData.total = ${this.lastData.total}`)
-        return({ total: this.lastData.total, raw: this.lastData })
+        // Summarize data
+        let summary = { Story: { count: 0, issues: [] }, 
+            Bug: { count: 0, issues: [] }, 
+            Task: { count: 0, issues: [] }, 
+            'Sub-task': { count: 0, issues: [] }, 
+            Epic: { count: 0, issues: [] }, 
+            Test: { count: 0, issues: [] } }
+        this.lastData.issues.forEach((i) => {
+            summary[i.fields.issuetype.name]['count'] += 1
+            summary[i.fields.issuetype.name]['issues'].push(i.key)
+        })
+        return({ total: this.lastData.total, raw: this.lastData, summary: summary })
     }
 }
 

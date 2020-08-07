@@ -16,13 +16,11 @@ class JiraDataCache {
     }
 
     containsFile(filename) {
-        // debug(`containsFile(${filename}) called... ${this.cache} ${this.cache.cache}`)
         debug(`containsFile(${filename}) called...`)
         if (this.cache) {
             let containsFilename = false
             debug(`...checking cache...`)
             this.cache.forEach((el) => {
-                // debug(el)
                 if (el.fullname == filename || el.base == filename || (el.base + ".json") == filename) {
                     containsFilename = true
                 }
