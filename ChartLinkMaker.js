@@ -1,11 +1,13 @@
 "use strict";
 
 const debug = require('debug')('chart-link-maker')
+const config = require('./config.js');
 
 const BAR_CHART_TYPE = 'bar'
 const LINE_CHART_TYPE = 'line'
 
-const BASE_URL = "http://prog-mgmt-apps:9000"
+const BASE_URL = config.graphicServer.protocol + "://" + config.graphicServer.server + ":" + config.graphicServer.port
+
 const DEFAULT_CHART_TYPE = BAR_CHART_TYPE
 const DEFAULT_WIDTH = 500
 const DEFAULT_HEIGHT = 300
@@ -124,9 +126,6 @@ class ChartLinkMaker {
     buildChartImgTag() {
         debug('buildChartImgTag() called...')
         return new Promise((resolve, reject) => {
-            // Working tag:
-            //  <img src="http://prog-mgmt-apps:9000/chart?width=500&height=300&c={type:'bar',data:{labels:['January','February','March','April','May'], datasets:[{label:'dogsY',data:[50,60,70,180,190]},{label:'catsX',data:[100,200,300,400,500]}]}}">
-
             let imgTag = `<img src="${BASE_URL}/chart?width=${this.width}&height=${this.height}&c={type:'${this.chartType}',data:{labels:['${this.dataCategories.join("','")}'], datasets:${this._buildDatasets()}}}">`
             resolve(imgTag)
         })
