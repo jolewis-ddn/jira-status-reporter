@@ -2,6 +2,7 @@
 const debug = require('debug')('simple-server')
 const restify = require('restify')
 const restifyErrors = require('restify-errors')
+const corsMiddleware = require('restify-cors-middleware')
 
 const JSR = require('./JiraStatusReporter')
 let jsr = new JSR()
@@ -18,6 +19,24 @@ const labels = ['Epic','Story', 'Task', 'Subtask','Bug']
 const states = ['Open','Active','Closed','Stopped']
 const backgroundColors = ['SeaShell','MediumSeaGreen','CornflowerBlue','Pink']
 const backgroundColorStr = "backgroundColor:['".concat(backgroundColors.join("','")).concat("']")
+
+var server = restify.createServer()
+// server.use(restify.plugins.queryParser())
+
+const cors = corsMiddleware({
+    origins: ['*'],
+    allowHeaders: [],
+    exposeHeaders: []
+})
+
+server.use(cors.preflight)
+server.use(cors.actual)
+
+// server.use(restify.CORS({
+//     // origins: ['*'],
+//     credentials: true,
+//     headers: ['x-JSS']
+// }))
 
 function report(req, res, next) {
     Promise.all([
@@ -64,10 +83,9 @@ function report(req, res, next) {
     })
 }
 
-var server = restify.createServer()
-server.use(restify.plugins.queryParser())
+server.get('/', (req, res, next) => { res.send('ok'); return next(); })
 
-server.get('/', report)
+server.get('/report', report)
 
 server.get('/homedir', (req, res, next) => {
     res.send(jsr.getFileManager().getHomeDir())
