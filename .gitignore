@@ -1,4 +1,4 @@
-node_modules/*
+node_modules
 auth*.js
 config*.js
 data/*
