@@ -654,22 +654,14 @@ server.get('/rebuild-cache', (req, res, next) => {
     return next()
 })
 
-// server.get('/reset', (req, res, next) => {
-    //     jdr.reloadCache(jdr.FULL_RELOAD)
-    //     res.redirect('/chart', next)
-    //     return
-// })
-
-// server.get('/update', (req, res, next) => {
-//     jdr.reloadCache(jdr.UPDATE)
-//     res.redirect('/chart', next)
-//     return
-// })
+server.get('/reset', (req, res, next) => {
+    jsr = new JSR()
+    jdr = new JiraDataReader()
+    res.redirect('/chart', next)
+    return
+})
 
 server.get('/datafiles', (req, res, next) => {
-    // res.writeHead(200, { 'Content-Type': 'text/plain' })
-    // res.send(jdr.getNewestFile())
-    // jdr.processAllFiles()
     try {
         let summary = jdr.getDataSummary()
         res.send(summary)
