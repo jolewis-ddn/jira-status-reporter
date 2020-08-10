@@ -34,6 +34,7 @@ class JiraDataCache {
     }
 
     makeCache() {
+        debug('makeCache() called')
         return(this.saveCache([]))
     }
 
@@ -42,6 +43,7 @@ class JiraDataCache {
         fs.writeFileSync(this.filename, JSON.stringify(data))
         this.cache = data
         this.loaded = true
+        debug(` ... loaded? ${this.loaded}`)
         return(this.cache)
     }
 

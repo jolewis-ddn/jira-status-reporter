@@ -573,7 +573,7 @@ server.get('/chart', (req, res, next) => {
                     res.end()
                 })
     } catch (err) {
-        res.write(`<EM>Error</EM>: ${err}`)
+        res.write(`${err}`)
         res.end()
         return next()
     }

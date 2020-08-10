@@ -23,7 +23,7 @@ class JiraDataReader {
     refresh() { return(this.REFRESH) }
 
     reloadCache(reloadType = this.REFRESH) {
-        debug(`reloadCache() called...`)
+        debug(`reloadCache(${reloadType}) called...`)
         let d = this.cache.getCache(true)
         let flist = glob.sync('./data/*.json')
         let updates = 0
@@ -79,13 +79,13 @@ class JiraDataReader {
                         }
                     })
                 } catch (err) {
-                    debug(`... Error during interimCache: ${err}`)
+                    debug(`... getDates() == Error during interimCache: ${err}`)
                 }
             // }
-            debug(`... returning this.dates`)
+            debug(`... getDates() == returning ${this.dates}`)
             return(this.dates.sort())
         } else {
-            debug('... no data loaded')
+            debug('... getDates() == no data loaded')
             return([])
         }
     }
@@ -104,9 +104,10 @@ class JiraDataReader {
                     this.seriesData[el.status].push(el.total)
                 }
             })
+            debug(`... getSeriesData() returning ok`)
             return(this.seriesData)
         } else {
-            debug('... no data loaded')
+            debug('... getSeriesData() == no data loaded')
             return({})
         }
     }
@@ -142,12 +143,13 @@ class JiraDataReader {
         this.lastData = JSON.parse(data)
         debug(`this.lastData.total = ${this.lastData.total}`)
         // Summarize data
-        let summary = { Story: { count: 0, issues: [] }, 
-            Bug: { count: 0, issues: [] }, 
-            Task: { count: 0, issues: [] }, 
+        let summary = { 
+            'Epic': { count: 0, issues: [] }, 
+            'Story': { count: 0, issues: [] }, 
+            'Task': { count: 0, issues: [] }, 
             'Sub-task': { count: 0, issues: [] }, 
-            Epic: { count: 0, issues: [] }, 
-            Test: { count: 0, issues: [] } }
+            'Bug': { count: 0, issues: [] }, 
+            'Test': { count: 0, issues: [] } }
         this.lastData.issues.forEach((i) => {
             summary[i.fields.issuetype.name]['count'] += 1
             summary[i.fields.issuetype.name]['issues'].push(i.key)

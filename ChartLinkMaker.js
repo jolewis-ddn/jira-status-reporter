@@ -97,7 +97,9 @@ class ChartLinkMaker {
             if (this.dataCategories.length == seriesSize) {
                 return(true)
             } else {
-                throw new Error(`invalid data series provided: length mismatch. Received ${seriesSize} elements, but expected ${this.dataCategories.length}`)
+                debug(`_validateCategories() failing...`)
+                debug(this.dataCategories)
+                throw new Error(`invalid data series provided: length mismatch. Received ${seriesSize} elements, but expected ${this.dataCategories.length}. Suggest wiping and rebuilding the cache`)
             }
         } else {
             throw new Error("Must set categories using setCategories() call before adding series")
@@ -106,10 +108,14 @@ class ChartLinkMaker {
 
     addSeries(newLabel, newData) {
         debug(`addSeries(${newLabel}, ${newData}) called...`)
-        if (this._validateCategories(newData.length)) {
-            this.dataSeries.push({'label': newLabel, 'data': newData})
+        try {
+            if (this._validateCategories(newData.length)) {
+                this.dataSeries.push({'label': newLabel, 'data': newData})
+            }
+            // debug(`... this.dataSeries now == ${JSON.stringify(this.dataSeries)}`)
+        } catch (ex) {
+            debug(`Exception caught: ${ex}`)
         }
-        debug(`... this.dataSeries now == ${JSON.stringify(this.dataSeries)}`)
         return(this)
     }
 
