@@ -1,5 +1,5 @@
 "use strict";
-const debug = require('debug')('simple-server')
+const debug = require('debug')('jira-status-server')
 const restify = require('restify')
 const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
@@ -231,7 +231,7 @@ server.get('/filter', (req, res, next) => {
                 Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
                 Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
                 Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-                Subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+                'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
                 Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             }
         
@@ -239,7 +239,7 @@ server.get('/filter', (req, res, next) => {
             res.write(buildStylesheet(res))
             // Process data
 
-            let results = { Epics: [], Stories: [], Tasks: [], Bugs: [], Subtasks: [] }
+            let results = { Epics: [], Stories: [], Tasks: [], Bugs: [], 'Sub-tasks': [] }
 
             let contents = []
 
@@ -265,9 +265,9 @@ server.get('/filter', (req, res, next) => {
                         stats = updateStats(stats, 'Epic', statusName)
                         break
                     case "Sub-task":
-                        results.Subtasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results['Sub-tasks'].push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
                         debug(`Sub-task ${issue.key}...`)
-                        stats = updateStats(stats, 'Subtask', statusName)
+                        stats = updateStats(stats, 'Sub-task', statusName)
                         break
                     case "Task":
                         results.Tasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
@@ -291,7 +291,7 @@ server.get('/filter', (req, res, next) => {
             // charts
             res.write(buildPieCharts(stats))
             // icons
-            res.write('<hr><div class="children">' + results.Epics.join('') +  results.Stories.join('') + results.Tasks.join('') + results.Subtasks.join('') + results.Bugs.join('') + '</div>')
+            res.write('<hr><div class="children">' + results.Epics.join('') +  results.Stories.join('') + results.Tasks.join('') + results['Sub-tasks'].join('') + results.Bugs.join('') + '</div>')
             res.write('</div>')
             res.write('<hr>')
             res.write(buildLegend())
@@ -482,7 +482,7 @@ server.get('/chart', (req, res, next) => {
     if (typeFilter) {
         res.write(`<H1>${typeFilter}</H1>`)
     } else {
-        res.write(`Status Chart (no filter)`)
+        res.write(`<H1>Status Chart (no filter)</H1>`)
     }
  
     debug(`typeFilter: ${typeFilter}`)
