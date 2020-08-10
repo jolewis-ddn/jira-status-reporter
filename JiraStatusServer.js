@@ -181,7 +181,7 @@ function buildPieCharts(stats) {
 
     // Charts...
     labels.forEach((i, ndx) => {
-        debug(`labels forEach => ${i} @ ${ndx} = ${stats[i]}`)
+        debug(`labels forEach => ${i} @ ${ndx} = `, stats[i])
         let linktext = `<!-- ${i} --><img src="${config.graphicServer.protocol}://${config.graphicServer.server}:${config.graphicServer.port}/${config.graphicServer.script}?width=${w}&height=${h}&c={type:%27pie%27,data:{labels:['${states.join("','")}'],datasets:[{data:[${stats[i]['Open']},${stats[i]['Active']},${stats[i]['Closed']},${stats[i]['Stopped']}],` + backgroundColorStr + `}]},options:{title:{display:true,text:'${i}',fontSize:18},legend:{display:false,position:'bottom'}}}"/>`
         debug(linktext)
         results.push(linktext)
@@ -331,21 +331,24 @@ function buildStylesheet() {
 }
 
 server.get('/epics', (req, res, next) => {
-    let promises = buildEpicPromisesArray(req.query.id)
+    let epicIdRequested = req.query.id
+    let promises = buildEpicPromisesArray(epicIdRequested)
 
-    res.write(buildHtmlHeader(`Epics: ${req.query.id}`))
-    res.write(buildPageHeader('Status Page', req.query.id))
+    res.write(buildHtmlHeader(`Epics: ${epicIdRequested}`))
+    res.write(buildPageHeader('Status Page', epicIdRequested))
 
     Promise.all(promises)
     .then((results) => {
         res.write(buildStylesheet())
 
+        debug(results)
+        
         let stats = { 
-            Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            'Epic': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            'Story': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            'Task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            'Bug': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         }
 
         let details = []
@@ -353,7 +356,15 @@ server.get('/epics', (req, res, next) => {
         details.push(`<ul class="list-group list-group-flush">`)
         results.forEach((e) => {
             // for getEpicAndChildren(x), the Epic is always the last Issue in the issues list
-            let epicData = e.issues.pop()
+
+            // TODO: Fix this hack
+            let epicData = {}
+            if (e.issues[0].key == epicIdRequested) {
+                epicData = e.issues.shift()
+            } else {
+                epicData = e.issues.pop()
+            }
+
             debug(`processing ${epicData.key}...`)
 
             let owner = "TBD"
@@ -371,7 +382,13 @@ server.get('/epics', (req, res, next) => {
                 statusName = "unknown"
             }
 
-            let resultCtr = { Epics: [], Stories: [], Bugs: [], Subtasks: [] }
+            let resultCtr = { 
+                'Epics': [], 
+                'Stories': [], 
+                'Tasks': [],
+                'Sub-tasks': [],
+                'Bugs': [] 
+            }
 
             details.push(`<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`)
             details.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${epicData.key}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanTitle(epicData.key)}: ${cleanTitle(epicData.fields.summary)} (${owner}; ${statusName})'/></a>`)
@@ -379,19 +396,19 @@ server.get('/epics', (req, res, next) => {
             stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
             switch (epicData.fields.issuetype.name) {
                 case 'Epic':
-                    resultCtr.Epics.push('')
+                    resultCtr['Epics'].push('')
                     break
                 case 'Story':
-                    resultCtr.Stories.push('')
+                    resultCtr['Stories'].push('')
                     break
                 case 'Task':
-                    resultCtr.Tasks.push('')
+                    resultCtr['Tasks'].push('')
                     break
                 case 'Sub-Task':
-                    resultCtr.Subtasks.push('')
+                    resultCtr['Sub-tasks'].push('')
                     break
                 case 'Bugs':
-                    resultCtr.Bugs.push('')
+                    resultCtr['Bugs'].push('')
                     break
                 default:
                     break
@@ -413,23 +430,28 @@ server.get('/epics', (req, res, next) => {
                 }
 
                 switch (issue.fields.issuetype.name) {
-                    case "Sub-task":
-                        resultCtr.Subtasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
-                        debug(`Sub-task ${issue.key}...`)
-                        stats = updateStats(stats, 'Sub-task', statusName)
-                        break
-                    case "Task":
-                        resultCtr.Tasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
-                        debug(`Task ${issue.key}...`)
-                        stats = updateStats(stats, 'Task', statusName)
+                    case "Epic":
+                        resultCtr['Epics'].push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        debug(`Epic ${issue.key}...`)
+                        stats = updateStats(stats, 'Epic', statusName)
                         break
                     case "Story":
-                        resultCtr.Stories.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        resultCtr['Stories'].push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Story ${issue.key}...`)
                         stats = updateStats(stats, 'Story', statusName)
                         break
-                    case "Bugs":
-                        resultCtr.Bugs.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                    case "Task":
+                        resultCtr['Tasks'].push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        debug(`Task ${issue.key}...`)
+                        stats = updateStats(stats, 'Task', statusName)
+                        break
+                    case "Sub-task":
+                        resultCtr['Sub-tasks'].push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
+                        debug(`Sub-task ${issue.key}...`)
+                        stats = updateStats(stats, 'Sub-task', statusName)
+                        break
+                    case "Bug":
+                        resultCtr['Bugs'].push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Bug ${issue.key}...`)
                         stats = updateStats(stats, 'Bug', statusName)
                         break
@@ -438,20 +460,25 @@ server.get('/epics', (req, res, next) => {
                 }
             })
             details.push(`<div class="children">
-                ${resultCtr.Stories.join('')}
-                ${resultCtr.Subtasks.join('')}
-                ${resultCtr.Bugs.join('')}
+                ${resultCtr['Epics'].join('')}
+                ${resultCtr['Stories'].join('')}
+                ${resultCtr['Tasks'].join('')}
+                ${resultCtr['Sub-tasks'].join('')}
+                ${resultCtr['Bugs'].join('')}
                 <span class="badge bg-dark rounded-pill">
-                ${resultCtr.Epics.length}
+                    ${resultCtr['Epics'].length}
                 </span>
                 <span class="badge bg-dark rounded-pill">
-                ${resultCtr.Stories.length}
+                    ${resultCtr['Stories'].length}
                 </span>
                 <span class="badge bg-dark rounded-pill">
-                ${resultCtr.Subtasks.length}
+                    ${resultCtr['Tasks'].length}
                 </span>
                 <span class="badge bg-dark rounded-pill">
-                ${resultCtr.Bugs.length}
+                    ${resultCtr['Sub-tasks'].length}
+                </span>
+                <span class="badge bg-dark rounded-pill">
+                    ${resultCtr['Bugs'].length}
                 </span></div>`)
             details.push(`</li>`)
         })
