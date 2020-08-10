@@ -11,7 +11,7 @@ const JSR = require('./JiraStatusReporter')
 
 // Parse command line parameters
 function status(value, previous) { return previous.concat([value]) }
-program.requiredOption('-s, --status <value>', 'RED Status(es)', status, [])
+program.option('-s, --status <value>', 'RED Status(es)', status, [])
 program.option('-y, --year <value>', 'Year to process. Defaults to year of yesterday.')
 program.option('-m, --month <value>', 'Month to process. Defaults to month of yesterday.')
 program.option('-d, --day <value>', 'Day to process. Defaults to day of yesterday.')

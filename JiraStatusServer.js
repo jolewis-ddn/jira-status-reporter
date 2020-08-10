@@ -344,7 +344,7 @@ server.get('/epics', (req, res, next) => {
             Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            Subtask: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+            'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         }
 
@@ -416,7 +416,7 @@ server.get('/epics', (req, res, next) => {
                     case "Sub-task":
                         resultCtr.Subtasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
                         debug(`Sub-task ${issue.key}...`)
-                        stats = updateStats(stats, 'Subtask', statusName)
+                        stats = updateStats(stats, 'Sub-task', statusName)
                         break
                     case "Task":
                         resultCtr.Tasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${cleanTitle(issue.key)}: ${cleanTitle(issue.fields.summary)} (${owner}; ${statusName})'/></a>`)
@@ -456,6 +456,8 @@ server.get('/epics', (req, res, next) => {
             details.push(`</li>`)
         })
         details.push(`</ul>`)
+
+        debug(`buildPieCharts() called with ${stats}`)
 
         res.write(buildPieCharts(stats))
         res.write('<hr>')
