@@ -59,6 +59,11 @@ Collection of node scripts to query, store, and report on Jira issues.
 1. Collect stats for a specific status and month: `node getIssueCountsByStatusAndMonth.js -s ICEBOX -m 6`
 1. Pull all Jira issue data for all statuses from yesterday and store as JSON files in `./data/`: `./pullDataForYesterday.sh`
     * ** Warning ** This can result in significant data storage, depending on your Jira project size
+1. Run the status server: 
+  * Production: `npm run server`
+  * Debug (nodemon - _recommended_): `set DEBUG=*,-nodemon* && npm run server-debug`
+  * Debug: `set DEBUG=* && node JiraStatusServer.js`
+1. Open http://localhost:9999/chart to see the default chart (use server.port as set in `config.js`)
 
 ## Getting help
 1. All node scripts have a help page: `node script.js --help`
