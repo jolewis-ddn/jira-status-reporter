@@ -222,7 +222,7 @@ server.get('/filter', (req, res, next) => {
     jsr.getFilter(req.query.id)
     .then((data) => {
         debug(`getFilter returned...`)
-        debug(data)
+        // debug(data)
         res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
         res.write(buildPageHeader(data.name))
         jsr._genericJiraSearch(data.jql, 99)
@@ -306,9 +306,10 @@ server.get('/filter', (req, res, next) => {
         })
     })
     .catch((err) => {
-        debug(`getFilter errored out...`)
+        debug(`getFilter error...`)
         debug(err)
-        res.send(err)
+        res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
+        res.write(`<em>Error</em> ${err}`)
         res.end()
         return
     })

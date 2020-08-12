@@ -1,11 +1,12 @@
 node_modules
 auth*.js
-config*.js
 data/*
 .vscode/*
 *.json
 
 scratch.js
+jiraConfig.js
+
 *.mmd
 
 static/*
