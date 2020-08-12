@@ -1,12 +1,18 @@
-node_modules
-auth*.js
-data/*
 .vscode/*
-*.json
+node_modules
+
+data/*
+.jiraCache.json
+output.json
 
 scratch.js
-jiraConfig.js
+
+jiraConfig.json
+auth*.js
 
 *.mmd
+vite-app/*
 
 static/*
+
+JiraStatusServer-*
