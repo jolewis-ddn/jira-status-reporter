@@ -99,7 +99,7 @@ server.get('/series', (req, res, next) => {
 })
 
 function formatCssClassName(jiraName) {
-    return(jiraName.replace(/\s/g, '-'))
+    return(jiraName.replace(/\s/g, ''))
 }
 
 function cleanTitle(title) {
@@ -154,16 +154,83 @@ function buildLegend() {
 }
 
 function buildHtmlHeader(title = "") {
-    return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">`)
+    // Bootstrap 5 alpha
+    // return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">${buildStylesheet()}</head>`)
+
+    // Bootstrap 4.5
+    return(`<!doctype html><html lang="en"><head><title>${title}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <!-- Bootstrap CSS -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+        ${buildStylesheet()}
+        ${buildButtonJs()}
+        </head>
+        <body>
+        <button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>
+        <button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>
+        <button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>
+        `)
 }
 
 function buildPageHeader(h, h2 = "") {
     return(`<h1>${h}</h1><h2>${h2}</h2>`)
 }
 
+function buildStylesheet() {
+    return(`<style>
+    .children { padding-left: 20px; }
+    .icon { padding: 4px; margin: -2px 4px -2px 4px; }
+    .Icebox { background-color: white; }
+    .InProgress { background-color: green; }
+    .InReview { background-color: lightgreen; }
+    .Done { background-color: blue; }
+    .Dead { background-color: black; }
+    .Emergency { background-color: pink; }
+    .Blocked { background-color: pink; }
+    .link { text-decoration: none; }
+    .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
+    .issueComboLink { display: grid; }
+    .issueName { display: inline; }
+    </style>`)
+}
+
+function buildButtonJs() {
+    return(`<script>
+    let showNames = true;
+    let showCharts = true;
+    let showLegend = true;
+    const tog = function() { console.log('in tog') }
+    $(document).ready(function(){
+        $('#toggleButton').click(function(){
+            if (showNames) {
+                $('.issueName').css('display', 'none');
+                $('.issueComboLink').css({'display': 'inline', 'margin':'-4px' });
+            } else {
+                $('.issueName').css('display', 'inline');
+                $('.issueComboLink').css({ 'display': 'grid', 'margin':'0px' });
+            }
+            showNames = !showNames;
+        });
+        $('#toggleCharts').click(function(){
+            (showCharts) ? $('.pieCharts').css('display', 'none') : $('.pieCharts').css('display', 'contents');
+            showCharts = !showCharts;
+        });
+        $('#toggleLegend').click(function(){
+            (showLegend) ? $('.legend').css('display', 'none') : $('.legend').css('display', 'block');
+            showLegend = !showLegend;
+        })
+    });
+    </script>`)
+}
+
 function buildHtmlFooter() {
-    return(`<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/js/bootstrap.min.js" integrity="sha384-oesi62hOLfzrys4LxRF63OJCXdXDipiYWBnvTl9Y9/TRlw5xlKIEHpNyvvDShgf/" crossorigin="anonymous"></script>`)
+    // Bootstrap 5 alpha
+    // return(`<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+
+    // Bootstrap 4.5
+    return(`<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>`)
 }
 
 /**
@@ -179,6 +246,8 @@ function buildPieCharts(stats) {
     debug(stats)
     let results = []
 
+    results.push("<span id='pieCharts' class='pieCharts'>")
+
     // Charts...
     labels.forEach((i, ndx) => {
         debug(`labels forEach => ${i} @ ${ndx} = `, stats[i])
@@ -186,6 +255,8 @@ function buildPieCharts(stats) {
         debug(linktext)
         results.push(linktext)
     })
+    results.push("</span>")
+
     return(results.join(''))
 }
 
@@ -218,13 +289,19 @@ server.get('/bogus', (req, res, next) => {
     return next()
 })
 
+function buildLink(issueKey, statusName, issueTypeIconUrl, issueSummary, issueOwner, issueStatus) {
+    const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
+    return(`<span class='issueComboLink'><a href='${config.jira.protocol}://${config.jira.host}/browse/${issueKey}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${issueTypeIconUrl}' title='${title}')/><span class='issueName'/>${title}</span></a></span>`)
+}
+
 server.get('/filter', (req, res, next) => {
     jsr.getFilter(req.query.id)
     .then((data) => {
         debug(`getFilter returned...`)
         // debug(data)
-        res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
-        res.write(buildPageHeader(data.name))
+        const newHeader = `${data.name}: Filter #${req.query.id}`
+        res.write(buildHtmlHeader(newHeader))
+        res.write(buildPageHeader(data.name, `Filter: ${req.query.id}`))
         jsr._genericJiraSearch(data.jql, 99)
         .then((e) => {
             let stats = { 
@@ -234,13 +311,8 @@ server.get('/filter', (req, res, next) => {
                 'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
                 Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
             }
-        
-            // Write stylesheet
-            res.write(buildStylesheet(res))
-            // Process data
 
             let results = { Epics: [], Stories: [], Tasks: [], Bugs: [], 'Sub-tasks': [] }
-
             let contents = []
 
             e.issues.forEach((issue, ndx) => {
@@ -260,27 +332,27 @@ server.get('/filter', (req, res, next) => {
 
                 switch (issue.fields.issuetype.name) {
                     case "Epic":
-                        results.Epics.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Epics.push(buildLink(issue.key, issue.fields.status.name, issue.fields.issuetype.iconUrl, issue.fields.summary, owner, statusName))
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Epic', statusName)
                         break
                     case "Sub-task":
-                        results['Sub-tasks'].push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results['Sub-tasks'].push(buildLink(issue.key, issue.fields.status.name, issue.fields.issuetype.iconUrl, issue.fields.summary, owner, statusName))
                         debug(`Sub-task ${issue.key}...`)
                         stats = updateStats(stats, 'Sub-task', statusName)
                         break
                     case "Task":
-                        results.Tasks.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Tasks.push(buildLink(issue.key, issue.fields.status.name, issue.fields.issuetype.iconUrl, issue.fields.summary, owner, statusName))
                         debug(`Task ${issue.key}...`)
                         stats = updateStats(stats, 'Task', statusName)
                         break
                     case "Story":
-                        results.Stories.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Stories.push(buildLink(issue.key, issue.fields.status.name, issue.fields.issuetype.iconUrl, issue.fields.summary, owner, statusName))
                         debug(`Story ${issue.key}...`)
                         stats = updateStats(stats, 'Story', statusName)
                         break
                     case "Bug":
-                        results.Bugs.push(`<a href='${config.jira.protocol}://${config.jira.host}/browse/${issue.key}' target='_blank'><img class='icon ${formatCssClassName(issue.fields.status.name)}' src='${issue.fields.issuetype.iconUrl}' title='${issue.key}: ${issue.fields.summary} (${owner}; ${statusName})')/></a>`)
+                        results.Bugs.push(buildLink(issue.key, issue.fields.status.name, issue.fields.issuetype.iconUrl, issue.fields.summary, owner, statusName))
                         debug(`Bug ${issue.key}...`)
                         stats = updateStats(stats, 'Bug', statusName)
                         break
@@ -288,8 +360,10 @@ server.get('/filter', (req, res, next) => {
                         debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
                 }
             })
+
             // charts
             res.write(buildPieCharts(stats))
+            
             // icons
             res.write('<hr><div class="children">' + results.Epics.join('') +  results.Stories.join('') + results.Tasks.join('') + results['Sub-tasks'].join('') + results.Bugs.join('') + '</div>')
             res.write('</div>')
@@ -314,22 +388,6 @@ server.get('/filter', (req, res, next) => {
         return
     })
 })
-
-function buildStylesheet() {
-    return(`<style>
-    .children { padding-left: 20px; }
-    .icon { spacing: 0px; padding: 4px; }
-    .Icebox { background-color: white; }
-    .In-Progress { background-color: green; }
-    .In-Review { background-color: lightgreen; }
-    .Done { background-color: blue; }
-    .Dead { background-color: black; }
-    .Emergency { background-color: red; }
-    .Blocked { background-color: red; }
-    .link { text-decoration: none; }
-    .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
-    </style>`)
-}
 
 server.get('/epics', (req, res, next) => {
     let epicIdRequested = req.query.id
