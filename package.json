@@ -1,0 +1,32 @@
+{
+  "name": "jira-status-reporter",
+  "version": "0.0.1",
+  "description": "Collection of node scripts to query, store, and report on Jira issues.",
+  "main": "JiraStatusServer.js",
+  "dependencies": {
+    "date-fns": "^2.15.0",
+    "debug": "^4.1.1",
+    "jira-client": "^6.18.0",
+    "restify": "^8.5.1",
+    "restify-cors-middleware": "^1.1.1",
+    "sqlite3": "^4.2.0",
+    "supports-color": "^7.1.0",
+    "lodash": "^4.17.20"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "server-debug": "set DEBUG=*,-nodemon* && nodemon JiraStatusServer.js",
+    "server": "nodemon JiraStatusServer.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jolewis-ddn/jira-status-reporter.git"
+  },
+  "author": "John D. Lewis <31732476+jolewis-ddn@users.noreply.github.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jolewis-ddn/jira-status-reporter/issues"
+  },
+  "homepage": "https://github.com/jolewis-ddn/jira-status-reporter#readme"
+}
