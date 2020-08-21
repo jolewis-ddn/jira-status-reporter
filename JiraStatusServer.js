@@ -728,5 +728,5 @@ server.get('/datafiles', (req, res, next) => {
 })
 
 server.listen(config().server.port, function() {
-    console.log('%s listening at %s', server.name, server.url);
+    console.log(`${server.name} listening at ${server.url} [Jira Server: ${config().jira.username} @ ${config().jira.host}]`);
 });
