@@ -317,6 +317,7 @@ server.get('/fields', (req, res, next) => {
         if (req.query && req.query.format == "html") {
             res.writeHead(200, { 'Content-Type': 'text/html' })
             res.write(buildHtmlHeader("Field List", false))
+            res.write(`<H1>Field List</H1><p><sm>${config().jira.host}</sm></p>`)
             res.write(`<table style="width: auto;" class="table table-striped table-hover table-sm"><thead class="thead-dark"><tr><th scope="col">${['ID', 'Name', 'Custom', 'Navigable', 'Searchable', 'Clause Names'].join('</th><th scope="col">')}</th></tr></thead><tbody>`)
             data.forEach((d) => {
                 res.write(`<tr><th scope="row">${d.id}</th><td>${[d.name, d.custom, d.navigable, d.searchable, d.clauseNames.join('<br>')].join('</td><td>')}</td></tr>`)
