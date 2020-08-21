@@ -40,6 +40,8 @@ class JiraStatusReporter {
     getContents() { return(this.ACTION_CONTENTS) }
     getCount() { return(this.ACTION_COUNT) }
     
+    get(endpoint) { return(jira.genericGet(endpoint)) }
+    
     // Wrapper Functions
     getIssue(id) {
         return (jira.findIssue(id))

@@ -149,9 +149,15 @@ function buildLegend() {
     return(legendStr)
 }
 
-function buildHtmlHeader(title = "") {
+function buildHtmlHeader(title = "", showButtons = true) {
     // Bootstrap 5 alpha
     // return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">${buildStylesheet()}</head>`)
+
+    let buttons = `<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>
+    <button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>
+    <button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`
+
+    if (!showButtons) { buttons = `` }
 
     // Bootstrap 4.5
     return(`<!doctype html><html lang="en"><head><title>${title}</title>
@@ -163,9 +169,7 @@ function buildHtmlHeader(title = "") {
         ${buildButtonJs()}
         </head>
         <body>
-        <button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>
-        <button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>
-        <button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>
+        ${buttons}
         `)
 }
 
@@ -304,6 +308,27 @@ function buildLink(issueKey, statusName, issueTypeIconUrl, issueSummary, issueOw
     const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
     return(`<span class='issueComboLink'><a href='${config().jira.protocol}://${config().jira.host}/browse/${issueKey}' target='_blank'><img class='icon ${formatCssClassName(statusName)}' src='${issueTypeIconUrl}' title='${cleanText(title)}')/><span class='issueName'/>${title}</span></a></span>`)
 }
+
+server.get('/fields', (req, res, next) => {
+    debug('/fields called...')
+    jsr.get('field')
+    .then((data) => {
+        debug(req.query)
+        if (req.query && req.query.format == "html") {
+            res.writeHead(200, { 'Content-Type': 'text/html' })
+            res.write(buildHtmlHeader("Field List", false))
+            res.write(`<table style="width: auto;" class="table table-striped table-hover table-sm"><thead class="thead-dark"><tr><th scope="col">${['ID', 'Name', 'Custom', 'Navigable', 'Searchable', 'Clause Names'].join('</th><th scope="col">')}</th></tr></thead><tbody>`)
+            data.forEach((d) => {
+                res.write(`<tr><th scope="row">${d.id}</th><td>${[d.name, d.custom, d.navigable, d.searchable, d.clauseNames.join('<br>')].join('</td><td>')}</td></tr>`)
+            })
+            res.write(`</tbody></table>`)
+            res.write(buildHtmlFooter())
+        } else {
+            res.send(data)
+        }
+        return next()
+    })
+})
 
 server.get('/filter', (req, res, next) => {
     debug('/filter called...')
