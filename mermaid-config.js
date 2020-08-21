@@ -8,5 +8,9 @@ module.exports = {
         "Dead":        "fill:#000,color:#fff",
         "Emergency":   "fill:#95190c,color:#fff",
         "Blocked":     "fill:#e3b505,color:#fff",
+    },
+    links: {
+        "blocks": "stroke:#f00,stroke-width:4px,color:red;",
+        "is blocked by": "stroke:#f00,stroke-width:4px,color:red;"
     }
 }

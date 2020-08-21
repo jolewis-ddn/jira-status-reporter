@@ -6,6 +6,8 @@ const corsMiddleware = require('restify-cors-middleware')
 
 const config = require('./config')
 
+const mermaidConfig = require('./mermaid-config')
+
 const JSR = require('./JiraStatusReporter')
 let jsr = new JSR()
 
@@ -13,6 +15,7 @@ const JiraDataReader = require('./JiraDataReader')
 let jdr = new JiraDataReader()
 
 const path = require('path');
+const { link } = require('fs');
 // const JiraDataCache = require('./JiraDataCache');
 
 const labels = ['Epic','Story', 'Task', 'Sub-task','Bug']
@@ -169,6 +172,8 @@ function buildHtmlHeader(title = "", showButtons = true) {
         ${buildButtonJs()}
         </head>
         <body>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>mermaid.initialize({startOnLoad:true});</script>
         ${buttons}
         `)
 }
@@ -680,6 +685,76 @@ server.get('/chart', (req, res, next) => {
         res.end()
         return next()
     }
+})
+
+function buildMermaidLinkChart(issueResult) {
+    // issueResult is the response from JSR.getLinks(id)
+    
+    const htmlOutput = []
+    const links = issueResult.issuelinks
+    const id = issueResult.id
+
+    htmlOutput.push(buildHtmlHeader(`Links for ${id}`, false))
+    debug(`writing to HTML/mermaid`)
+    htmlOutput.push(`<div class="mermaid">
+    graph LR
+    `)
+    let linkStyles = []
+    let clicks = []
+    clicks.push(issueResult.id)
+    const issueLabel = `${issueResult.id}["${issueResult.id} ${issueResult.name}"]:::${formatCssClassName(issueResult.status)}`
+    links.forEach((link) => {
+        if (link.inwardIssue) {
+            linkStyles.push(mermaidConfig.links[link.type.inward])
+            debug(`inwardIssue: ${link.inwardIssue.key}`)
+            htmlOutput.push(`${link.inwardIssue.key}("${link.inwardIssue.key} ${link.inwardIssue.fields.summary}"):::${formatCssClassName(link.inwardIssue.fields.status.name)} -->|${link.type.outward}| ${issueLabel}\n`)
+            clicks.push(link.inwardIssue.key)
+        } else if (link.outwardIssue) {
+            debug(`NOT inwardIssue...`)
+            linkStyles.push(mermaidConfig.links[link.type.outward])
+            htmlOutput.push(`${issueLabel} -->|${link.type.outward}| ${link.outwardIssue.key}("${link.outwardIssue.key} ${link.outwardIssue.fields.summary}"):::${formatCssClassName(link.outwardIssue.fields.status.name)}\n`)
+            clicks.push(link.outwardIssue.key)
+        } else {
+            htmlOutput.push(`unrecognized issue type`)
+        }
+    })
+    clicks.forEach((c) => {
+        htmlOutput.push(`click ${c} "${config().jira.protocol}://${config().jira.host}/browse/${c}" _blank\n`)
+    })
+    linkStyles.forEach((ls, ndx) => {
+        htmlOutput.push(`linkStyle ${ndx} ${ls}\n`)
+    })
+    htmlOutput.push(`
+    classDef Icebox fill:#ccc,color:#000;
+    classDef InProgress fill:#84a98c,color:#000;
+    classDef InReview fill:#b4d9bc,color:#000;
+    classDef Defined fill:#fff,color:#000;
+    classDef Done fill:#00f,color:#fff;
+    classDef Dead fill:#000,color:#fff;
+    classDef Emergency fill:#95190c,color:#fff;
+    classDef Blocked fill:#e3b505,color:#fff;
+    `)
+    htmlOutput.push(`</div><!-- end mermaid div -->`)
+    htmlOutput.push(buildHtmlFooter())
+    return(htmlOutput.join(''))
+}
+
+server.get('/links', (req, res, next) => {
+    debug(`/links called w/ ID of ${req.query.id}`)
+    jsr.getLinks(req.query.id)
+    .then((issueResult) => {
+        if (req.query.format && req.query.format == "html") {
+            res.writeHead(200, { 'Content-Type': 'text/html' })
+            res.write(buildMermaidLinkChart(issueResult))
+        } else {
+            debug(`writing to json`)
+            res.send(issueResult.issuelinks)
+        }
+        res.end()
+    })
+    .finally(() => {
+        return next()
+    })
 })
 
 server.get('/cache', (req, res, next) => {

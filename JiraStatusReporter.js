@@ -236,6 +236,12 @@ class JiraStatusReporter {
         return (this._genericJiraSearch(jql, ACTION_CONTENTS))
     }
 
+    async getLinks(issueId) {
+        const issue = await this.getIssue(issueId)
+        debug(`getLinks(${issueId} ==> issue/summary: `, issue.fields.summary)
+        return({ name: issue.fields.summary, id: issueId, status: issue.fields.status.name, issuelinks: issue.fields.issuelinks})
+    }
+
     setFields(fields) {
         this.fields = fields
     }
