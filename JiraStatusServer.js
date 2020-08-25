@@ -16,6 +16,7 @@ let jdr = new JiraDataReader()
 
 const path = require('path');
 const { link } = require('fs');
+const { resolve } = require('path');
 // const JiraDataCache = require('./JiraDataCache');
 
 const labels = ['Epic','Story', 'Task', 'Sub-task','Bug']
@@ -687,14 +688,57 @@ server.get('/chart', (req, res, next) => {
     }
 })
 
-function buildMermaidLinkChart(issueResult) {
-    // issueResult is the response from JSR.getLinks(id)
-    
+function buildMermaidLinkIn(inKey, inSummary, inStatus, linkOutward, issueLabel) {
+    return(`${inKey}("${inKey} ${inSummary}"):::${formatCssClassName(inStatus)} -->|${linkOutward}| ${issueLabel}`)
+}
+
+function buildMermaidLinkOut(outKey, outSummary, outStatus, linkOutward, issueLabel) {
+    return(`${issueLabel} -->|${linkOutward}| ${outKey}("${outKey} ${outSummary}"):::${formatCssClassName(outStatus)}`)
+}
+
+function buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLabel) {
+    debug(`build...DataBlock(...) called for ${issueLabel}`)
+    let htmlOutput = []
+    if (issueResult.issuelinks) {
+        for (let x = 0; x < issueResult.issuelinks.length; x++) {
+            const link = issueResult.issuelinks[x]
+            if (link.inwardIssue) {
+                linkStyles.push(mermaidConfig.links[link.type.inward])
+                clicks.push(link.inwardIssue.key)
+                debug(`inwardIssue: ${link.inwardIssue.key}`)
+                htmlOutput.push(`${buildMermaidLinkIn(link.inwardIssue.key, link.inwardIssue.fields.summary, link.inwardIssue.fields.status.name, link.type.outward, issueLabel)}\n`)
+            } else if (link.outwardIssue) {
+                const outKey = link.outwardIssue.key
+                let outLink = link.type.outward
+
+                debug(`link.outwardIssue.key: ${outKey} / ${outLink}`)
+
+                clicks.push(outKey)
+                linkStyles.push(mermaidConfig.links[link.type.outward])
+                htmlOutput.push(`${buildMermaidLinkOut(outKey, link.outwardIssue.fields.summary, link.outwardIssue.fields.status.name, outLink, issueLabel)}\n`)
+                
+            } else {
+                htmlOutput.push(`unrecognized issue type`)
+            }
+        }
+
+        debug(clicks.join(`\n`))
+        return({ html: htmlOutput.join(''), linkStyles: linkStyles, clicks: clicks })
+    } else {
+        debug(`ERR 734`)
+        debug(issueResult)
+        return(false)
+    }
+}
+
+function buildMermaidLinkChart(issueResult, urlScript = false) {
     const htmlOutput = []
     const links = issueResult.issuelinks
     const id = issueResult.id
 
-    htmlOutput.push(buildHtmlHeader(`Links for ${id}`, false))
+    const title = `Links for ${id}`
+    htmlOutput.push(buildHtmlHeader(title, false))
+    htmlOutput.push(buildPageHeader(title))
     debug(`writing to HTML/mermaid`)
     htmlOutput.push(`<div class="mermaid">
     graph LR
@@ -703,23 +747,18 @@ function buildMermaidLinkChart(issueResult) {
     let clicks = []
     clicks.push(issueResult.id)
     const issueLabel = `${issueResult.id}["${issueResult.id} ${issueResult.name}"]:::${formatCssClassName(issueResult.status)}`
-    links.forEach((link) => {
-        if (link.inwardIssue) {
-            linkStyles.push(mermaidConfig.links[link.type.inward])
-            debug(`inwardIssue: ${link.inwardIssue.key}`)
-            htmlOutput.push(`${link.inwardIssue.key}("${link.inwardIssue.key} ${link.inwardIssue.fields.summary}"):::${formatCssClassName(link.inwardIssue.fields.status.name)} -->|${link.type.outward}| ${issueLabel}\n`)
-            clicks.push(link.inwardIssue.key)
-        } else if (link.outwardIssue) {
-            debug(`NOT inwardIssue...`)
-            linkStyles.push(mermaidConfig.links[link.type.outward])
-            htmlOutput.push(`${issueLabel} -->|${link.type.outward}| ${link.outwardIssue.key}("${link.outwardIssue.key} ${link.outwardIssue.fields.summary}"):::${formatCssClassName(link.outwardIssue.fields.status.name)}\n`)
-            clicks.push(link.outwardIssue.key)
-        } else {
-            htmlOutput.push(`unrecognized issue type`)
-        }
-    })
+    
+    const results = buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLabel, urlScript)
+    htmlOutput.push(results.html)
+    clicks.concat(results.clicks)
+    linkStyles.concat(results.linkStyles)
+
     clicks.forEach((c) => {
-        htmlOutput.push(`click ${c} "${config().jira.protocol}://${config().jira.host}/browse/${c}" _blank\n`)
+        if (urlScript) {
+            htmlOutput.push(`click ${c} "${urlScript}${c}"\n`)
+        } else {
+            htmlOutput.push(`click ${c} "${config().jira.protocol}://${config().jira.host}/browse/${c}" _blank\n`)
+        }
     })
     linkStyles.forEach((ls, ndx) => {
         htmlOutput.push(`linkStyle ${ndx} ${ls}\n`)
@@ -745,7 +784,7 @@ server.get('/links', (req, res, next) => {
     .then((issueResult) => {
         if (req.query.format && req.query.format == "html") {
             res.writeHead(200, { 'Content-Type': 'text/html' })
-            res.write(buildMermaidLinkChart(issueResult))
+            res.write(buildMermaidLinkChart(issueResult, `/links?format=html&id=`))
         } else {
             debug(`writing to json`)
             res.send(issueResult.issuelinks)
