@@ -346,6 +346,15 @@ class JiraStatusReporter {
         })
     }
 
+    async bareQuery(jql) {
+        let result = await jira.searchJira(jql)
+        return await result
+    }
+
+    async bareQueryCount(jql) {
+        return await jira.searchJira(jql, { maxResults: 1, fields: ['key'] }).then((r) => { return(r.total) })
+    }
+
     // Utility functions
     search(jql, queryParams) {
         debug(`search(${jql},`, queryParams, `) called`)
