@@ -252,6 +252,15 @@ function getFontawesomeJsLink() {
     }
 }
 
+function getFontawesomeIcon(issueType) {
+    if (useFontawesome) {
+        debug(`getFaIcon(${issueType}) returning ${faIcons[issueType]}`)
+        return(`${faIcons[issueType]} `)
+    } else {
+        return('')
+    }
+}
+
 function buildPageHeader(h, h2 = "") {
     return(`<h1>${h}</h1><h2>${h2}</h2>`)
 }
@@ -761,21 +770,12 @@ server.get('/chart', (req, res, next) => {
     }
 })
 
-function getFaIcon(issueType) {
-    if (useFontawesome) {
-        debug(`getFaIcon(${issueType}) returning ${faIcons[issueType]}`)
-        return(`${faIcons[issueType]} `)
-    } else {
-        return('')
-    }
-}
-
 function buildMermaidLinkIn(inKey, inSummary, inStatus, linkOutward, issueLabel, issueType) {
-    return(`${inKey}("${getFaIcon(issueType)}${inKey} ${inSummary}"):::${formatCssClassName(inStatus)} -->|${linkOutward}| ${issueLabel}`)
+    return(`${inKey}("${getFontawesomeIcon(issueType)}${inKey} ${inSummary}"):::${formatCssClassName(inStatus)} -->|${linkOutward}| ${issueLabel}`)
 }
 
 function buildMermaidLinkOut(outKey, outSummary, outStatus, linkOutward, issueLabel, issueType) {
-    return(`${issueLabel} -->|${linkOutward}| ${outKey}("${getFaIcon(issueType)}${outKey} ${outSummary}"):::${formatCssClassName(outStatus)}`)
+    return(`${issueLabel} -->|${linkOutward}| ${outKey}("${getFontawesomeIcon(issueType)}${outKey} ${outSummary}"):::${formatCssClassName(outStatus)}`)
 }
 
 function buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLabel) {
@@ -828,7 +828,7 @@ function buildMermaidLinkChart(issueResult, urlScript = false) {
     let linkStyles = []
     let clicks = []
     clicks.push(issueResult.id)
-    const issueLabel = `${issueResult.id}["${getFaIcon(issueResult.type)} ${issueResult.id} ${issueResult.name}"]:::${formatCssClassName(issueResult.status)}`
+    const issueLabel = `${issueResult.id}["${getFontawesomeIcon(issueResult.type)} ${issueResult.id} ${issueResult.name}"]:::${formatCssClassName(issueResult.status)}`
     
     const results = buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLabel, urlScript)
     htmlOutput.push(results.html)
