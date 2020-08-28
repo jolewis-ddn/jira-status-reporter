@@ -45,6 +45,9 @@ Collection of node scripts to query, store, and report on Jira issues.
 * Copy (or rename) `config.js-template` to `config.js`
 * Update the values in `config.js` as appropriate
   * The `server.port` setting is only required if you run the local server
+  * `fa` is optional and must include the full URL to your FontAwesome JavaScript kit - e.g. ,
+    `"fa": "https://kit.fontawesome.com/0123456789.js"`
+    * If you enable FontAwesome, you may wish to adjust the faIcons object to point to different icons.
   * All others are required
 * Create the database
   * ```

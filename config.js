@@ -38,7 +38,8 @@ module.exports = function () {
                 port: cfg.graphicServer.port,
                 script: cfg.graphicServer.script
             },
-            project: 'RED'
+            project: cfg.project,
+            fa: cfg.fa
         }
         return config
     } catch (err) {

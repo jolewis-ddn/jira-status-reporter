@@ -239,7 +239,7 @@ class JiraStatusReporter {
     async getLinks(issueId) {
         const issue = await this.getIssue(issueId)
         debug(`getLinks(${issueId} ==> issue/summary: `, issue.fields.summary)
-        return({ name: issue.fields.summary, id: issueId, status: issue.fields.status.name, issuelinks: issue.fields.issuelinks})
+        return({ name: issue.fields.summary, id: issueId, status: issue.fields.status.name, type: issue.fields.issuetype.name, issuelinks: issue.fields.issuelinks})
     }
 
     setFields(fields) {
@@ -257,29 +257,6 @@ class JiraStatusReporter {
     setStartAt(startAt) { this.startAt = startAt }
     getStartAt() { return (this.startAt) }
     clearStartAt() { this.startAt = null }
-
-    createBogusLink() {
-        // Test write-access to Jira
-        // Source: https://github.com/steves/node-jira
-        // create a web link to a GitHub issue
-        var linkData = {
-            "object": {
-                "url" : "https://github.com/steves/node-jira/issues/1",
-                "title": "Add getVersions and createVersion functions",
-                "icon" : {
-                    "url16x16": "https://github.com/favicon.ico"
-                }
-            }
-        };
-
-        jira.createRemoteLink("IME-2902", linkData, function (err, link) {
-            if (err) {
-                console.log("ERROR ", err)
-            } else {
-                console.log("Worked! " + link)
-            }
-        });
-    }
 
     _genericJiraSearch(jql, action) {
         return new Promise((resolve, reject) => {

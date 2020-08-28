@@ -24,6 +24,16 @@ const states = ['Open','Active','Closed','Stopped']
 const backgroundColors = ['SeaShell','MediumSeaGreen','CornflowerBlue','Pink']
 const backgroundColorStr = "backgroundColor:['".concat(backgroundColors.join("','")).concat("']")
 
+const faIcons = {
+    'Epic': 'fa:fa-fort-awesome',
+    'Story': 'fa:fa-book-reader',
+    'Task': 'fa:fa-tasks',
+    'Sub-task': 'fa:fa-subscript',
+    'Bug': 'fa:fa-bug'
+}
+
+const useFontawesome = 'fa' in config() && config().fa
+
 var server = restify.createServer()
 server.use(restify.plugins.queryParser())
 
@@ -90,7 +100,61 @@ server.get('/report', report)
 server.get('/homedir', (req, res, next) => {
     res.send(jsr.getFileManager().getHomeDir())
     return next()
-});
+})
+
+server.get('/config', (req, res, next) => {
+    const configDetails = config()
+    configDetails.jira.password = "***REMOVED***"
+    if (req.query.format && req.query.format == "html") {
+        // TODO: Create automatic formatter
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.write(`
+            ${buildHtmlHeader('Config', false)}
+            ${buildPageHeader('Config')}
+            <dl class="row">
+            <dt class="col-sm-3">
+            Jira Username
+            </dt>
+            <dd class="col-sm-9">
+            ${config().jira.username}
+            </dd>
+            <dt class="col-sm-3">
+            Jira URL
+            </dt>
+            <dd class="col-sm-9">
+            ${config().jira.protocol}://${config().jira.host}
+            </dd>
+            <dt class="col-sm-3">
+            API
+            </dt>
+            <dd class="col-sm-9">
+            ${config().jira.apiVersion}
+            </dd>
+            <dt class="col-sm-3">
+            Server: Port
+            </dt>
+            <dd class="col-sm-9">
+            ${config().server.port.port}
+            </dd>
+            <dt class="col-sm-3">
+            Graphic Server
+            </dt>
+            <dd class="col-sm-9">
+            ${config().graphicServer.protocol}://${config().graphicServer.server}:${config().graphicServer.port}/${config().graphicServer.script}
+            </dd>
+            <dt class="col-sm-3">
+            Project
+            </dt>
+            <dd class="col-sm-9">
+            ${config().project}
+            ${buildHtmlFooter()}
+            </dd>
+            </dl>`)
+    } else {
+        res.send(configDetails)
+    }
+    return next()
+})
 
 server.get('/dates', (req, res, next) => {
     res.send(jdr.getDates())
@@ -166,6 +230,7 @@ function buildHtmlHeader(title = "", showButtons = true) {
     // Bootstrap 4.5
     return(`<!doctype html><html lang="en"><head><title>${title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        ${getFontawesomeJsLink()}
         <!-- Bootstrap CSS -->
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
         <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
@@ -177,6 +242,14 @@ function buildHtmlHeader(title = "", showButtons = true) {
         <script>mermaid.initialize({startOnLoad:true});</script>
         ${buttons}
         `)
+}
+
+function getFontawesomeJsLink() {
+    if (useFontawesome) {
+        return(`<script src="${config().fa}" crossorigin="anonymous"></script>`)
+    } else {
+        return('')
+    }
 }
 
 function buildPageHeader(h, h2 = "") {
@@ -688,12 +761,21 @@ server.get('/chart', (req, res, next) => {
     }
 })
 
-function buildMermaidLinkIn(inKey, inSummary, inStatus, linkOutward, issueLabel) {
-    return(`${inKey}("${inKey} ${inSummary}"):::${formatCssClassName(inStatus)} -->|${linkOutward}| ${issueLabel}`)
+function getFaIcon(issueType) {
+    if (useFontawesome) {
+        debug(`getFaIcon(${issueType}) returning ${faIcons[issueType]}`)
+        return(`${faIcons[issueType]} `)
+    } else {
+        return('')
+    }
 }
 
-function buildMermaidLinkOut(outKey, outSummary, outStatus, linkOutward, issueLabel) {
-    return(`${issueLabel} -->|${linkOutward}| ${outKey}("${outKey} ${outSummary}"):::${formatCssClassName(outStatus)}`)
+function buildMermaidLinkIn(inKey, inSummary, inStatus, linkOutward, issueLabel, issueType) {
+    return(`${inKey}("${getFaIcon(issueType)}${inKey} ${inSummary}"):::${formatCssClassName(inStatus)} -->|${linkOutward}| ${issueLabel}`)
+}
+
+function buildMermaidLinkOut(outKey, outSummary, outStatus, linkOutward, issueLabel, issueType) {
+    return(`${issueLabel} -->|${linkOutward}| ${outKey}("${getFaIcon(issueType)}${outKey} ${outSummary}"):::${formatCssClassName(outStatus)}`)
 }
 
 function buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLabel) {
@@ -706,7 +788,7 @@ function buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLa
                 linkStyles.push(mermaidConfig.links[link.type.inward])
                 clicks.push(link.inwardIssue.key)
                 debug(`inwardIssue: ${link.inwardIssue.key}`)
-                htmlOutput.push(`${buildMermaidLinkIn(link.inwardIssue.key, link.inwardIssue.fields.summary, link.inwardIssue.fields.status.name, link.type.outward, issueLabel)}\n`)
+                htmlOutput.push(`${buildMermaidLinkIn(link.inwardIssue.key, link.inwardIssue.fields.summary, link.inwardIssue.fields.status.name, link.type.outward, issueLabel, link.inwardIssue.fields.issuetype.name)}\n`)
             } else if (link.outwardIssue) {
                 const outKey = link.outwardIssue.key
                 let outLink = link.type.outward
@@ -715,7 +797,7 @@ function buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLa
 
                 clicks.push(outKey)
                 linkStyles.push(mermaidConfig.links[link.type.outward])
-                htmlOutput.push(`${buildMermaidLinkOut(outKey, link.outwardIssue.fields.summary, link.outwardIssue.fields.status.name, outLink, issueLabel)}\n`)
+                htmlOutput.push(`${buildMermaidLinkOut(outKey, link.outwardIssue.fields.summary, link.outwardIssue.fields.status.name, outLink, issueLabel, link.outwardIssue.fields.issuetype.name)}\n`)
                 
             } else {
                 htmlOutput.push(`unrecognized issue type`)
@@ -746,7 +828,7 @@ function buildMermaidLinkChart(issueResult, urlScript = false) {
     let linkStyles = []
     let clicks = []
     clicks.push(issueResult.id)
-    const issueLabel = `${issueResult.id}["${issueResult.id} ${issueResult.name}"]:::${formatCssClassName(issueResult.status)}`
+    const issueLabel = `${issueResult.id}["${getFaIcon(issueResult.type)} ${issueResult.id} ${issueResult.name}"]:::${formatCssClassName(issueResult.status)}`
     
     const results = buildMermaidLinkChartDataBlock(issueResult, linkStyles, clicks, issueLabel, urlScript)
     htmlOutput.push(results.html)
