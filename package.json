@@ -13,9 +13,12 @@
     "supports-color": "^7.1.0",
     "lodash": "^4.17.20"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "ava": "^3.12.1",
+    "nyc": "^15.1.0"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "nyc ava",
     "server-debug": "set DEBUG=*,-nodemon* && nodemon JiraStatusServer.js",
     "server": "nodemon JiraStatusServer.js"
   },

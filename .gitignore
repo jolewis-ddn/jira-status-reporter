@@ -1,6 +1,9 @@
 .vscode/*
 node_modules
 
+.nyc_output
+coverage
+
 data/*
 .jiraCache.json
 *.json
