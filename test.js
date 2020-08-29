@@ -61,7 +61,23 @@ test('config.js loads (alternate config file)', t => {
     if (!altExists) { fs.unlinkSync(ALT_CONFIG_FILE) }
 })
 
-test.todo('Verify config.js default config file format')
+test('Verify config.js default config file format', t => {
+    let defExists = fs.existsSync(DEFAULT_CONFIG_FILE)
+    if (!defExists) { t.pass('No default config file found') }
+
+    const cfg = JSON.parse(fs.readFileSync(DEFAULT_CONFIG_FILE))
+    t.true('jira' in cfg &&
+            'protocol' in cfg.jira &&
+            'host' in cfg.jira &&
+            'username' in cfg.jira &&
+            'password' in cfg.jira &&
+            'apiVersion' in cfg.jira &&
+            'server' in cfg &&
+            'port' in cfg.server &&
+            'project' in cfg
+        )
+    // Note: "fa" is optional
+})
 
 test('Exception thrown if at least one required config file does not exist', t => {
     let defExists = fs.existsSync(DEFAULT_CONFIG_FILE)
@@ -76,7 +92,25 @@ test('Exception thrown if at least one required config file does not exist', t =
     if (altExists) { fs.renameSync(ALT_CONFIG_FILE_RENAMED, ALT_CONFIG_FILE) }
 })
 
-test.todo('Verify config.js custom config format if file exists')
+test('Verify config.js custom config format if file exists', t => {
+    let altExists = fs.existsSync(ALT_CONFIG_FILE)
+    if (!altExists) { t.pass('No alternate config file found') }
+
+    const alt = JSON.parse(fs.readFileSync(ALT_CONFIG_FILE))
+    const altCfgFilename = alt.config
+    const cfg = JSON.parse(fs.readFileSync(altCfgFilename))
+
+    t.true('jira' in cfg &&
+            'protocol' in cfg.jira &&
+            'host' in cfg.jira &&
+            'username' in cfg.jira &&
+            'password' in cfg.jira &&
+            'apiVersion' in cfg.jira &&
+            'server' in cfg &&
+            'port' in cfg.server &&
+            'project' in cfg
+        )
+})
 
 /*-----------------------------------
    Jira
