@@ -32,6 +32,7 @@ Collection of node scripts to query, store, and report on Jira issues.
   * `date-fns`: For date manipulation
   * `ava`: For testing
   * `istanbul`: For test coverage
+  * `rando.js`: For random chart IDs
 * Working QuickChart server
   * See https://quickchart.io/ for instructions
   * Configure the server and port in the config.js file
