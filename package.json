@@ -18,7 +18,8 @@
     "nyc": "^15.1.0"
   },
   "scripts": {
-    "test": "nyc ava",
+    "test": "nyc --reporter=html --reporter=text ava",
+    "test-watch": "npm run test -- --watch",
     "server-debug": "set DEBUG=*,-nodemon* && nodemon JiraStatusServer.js",
     "server": "nodemon JiraStatusServer.js"
   },
