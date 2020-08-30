@@ -4,14 +4,15 @@
   "description": "Collection of node scripts to query, store, and report on Jira issues.",
   "main": "JiraStatusServer.js",
   "dependencies": {
+    "@nastyox/rando.js": "^2.0.2",
     "date-fns": "^2.15.0",
     "debug": "^4.1.1",
     "jira-client": "^6.18.0",
+    "lodash": "^4.17.20",
     "restify": "^8.5.1",
     "restify-cors-middleware": "^1.1.1",
     "sqlite3": "^4.2.0",
-    "supports-color": "^7.1.0",
-    "lodash": "^4.17.20"
+    "supports-color": "^7.1.0"
   },
   "devDependencies": {
     "ava": "^3.12.1",

@@ -3,6 +3,8 @@
 const debug = require('debug')('chart-link-maker')
 const config = require('./config.js')
 
+const randojs = require('@nastyox/rando.js'), rando = randojs.rando, randoSequence = randojs.randoSequence
+
 const BAR_CHART_TYPE = 'bar'
 const LINE_CHART_TYPE = 'line'
 
@@ -97,6 +99,12 @@ class ChartLinkMaker {
     return this
   }
 
+  setSize(hw) {
+    this.h = hw
+    this.w = hw
+    return this
+  }
+
   setFill(newFill) {
     this.fill = newFill
     return this
@@ -155,15 +163,26 @@ class ChartLinkMaker {
       .replace(/"/g, "'")
   }
 
-  buildChartImgTag() {
-    debug('buildChartImgTag() called...')
+  async buildChartImgTag(title, data) {
+    debug(`buildChartImgTag(${title}) called with data: `, data)
     return new Promise((resolve, reject) => {
-      let imgTag = `<img src="${BASE_URL}/chart?width=${this.width}&height=${
-        this.height
-      }&c={type:'${this.chartType}',data:{labels:['${this.dataCategories.join(
-        "','"
-      )}'], datasets:${this._buildDatasets()}}}">`
-      resolve(imgTag)
+        const id = rando(99999)
+        let chartHtml = `<span id='chart-${id}' class='miniJSRChart'></span><script>
+          var chart = bb.generate({
+            bindto: "#chart-${id}",
+            x: "x",
+            size: { height: ${this.h}, width: ${this.w} },
+            title: { text: '${title}' },
+            data: {
+              type: "pie",
+              columns: [ ['Open', ${data.Open}], ['Active', ${data.Active}], ['Closed', ${data.Closed}], ['Stopped', ${data.Stopped} ] ],
+              labels: { colors: { 'Open': 'black', 'Active': 'white', 'Closed': 'black', 'Stopped': 'black' } }
+            },
+            pie: { label: { format: function(value, ratio, id) { return value; }}},
+            color: { pattern: [ 'SeaShell', 'MediumSeaGreen', 'CornflowerBlue', 'Pink' ] },
+          });
+        </script>`
+        resolve(chartHtml)
     })
   }
 }

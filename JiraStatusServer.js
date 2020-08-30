@@ -255,11 +255,15 @@ function buildHtmlHeader(title = '', showButtons = true) {
   return `<!doctype html><html lang="en"><head><title>${title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         ${getFontawesomeJsLink()}
+
         <!-- Bootstrap CSS -->
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
         <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
         ${buildStylesheet()}
         ${buildButtonJs()}
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/billboard.js/2.0.3/billboard.pkgd.min.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/billboard.js/2.0.3/theme/graph.min.css"></link>
         </head>
         <body>
         <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
@@ -292,7 +296,7 @@ function buildPageHeader(h, h2 = '') {
 function buildStylesheet() {
   return `<style>
     .children { padding-left: 20px; }
-    .icon { padding: 4px; margin: -2px 4px -2px 4px; }
+    .icon { padding: 4px; }
     .Icebox, .New, .Open { background-color: white; }
     .InProgress { background-color: green; }
     .InReview { background-color: lightgreen; }
@@ -304,6 +308,13 @@ function buildStylesheet() {
     .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
     .issueComboLink { display: grid; }
     .issueName { display: inline; }
+    .miniJSRChart { display: table-cell; }
+    .miniJSRChartTable { display: table; }
+    .hidden { display: none; }
+    .bb-title { font-size: 17px !important; font-weight: bold; }
+    .wraparound { display: contents; }
+    .bundledicon { margin: -2px 4px -2px 4px; }
+    .lineicon { margin: -2px 4px 0px 0px; }
     </style>`
 }
 
@@ -315,22 +326,16 @@ function buildButtonJs() {
     const tog = function() { console.log('in tog') }
     $(document).ready(function(){
         $('#toggleButton').click(function(){
-            if (showNames) {
-                $('.issueName').css('display', 'none');
-                $('.issueComboLink').css({'display': 'inline', 'margin':'-4px' });
-            } else {
-                $('.issueName').css('display', 'inline');
-                $('.issueComboLink').css({ 'display': 'grid', 'margin':'0px' });
-            }
-            showNames = !showNames;
+              $('.issueName').toggleClass('hidden');
+              $('.issueComboLink').toggleClass('wraparound')
+              $('.issueComboLink').toggleClass('bundledicon')
+              $('.issueComboLink').toggleClass('lineicon')
         });
         $('#toggleCharts').click(function(){
-            (showCharts) ? $('.pieCharts').css('display', 'none') : $('.pieCharts').css('display', 'contents');
-            showCharts = !showCharts;
+            $('.pieCharts').toggleClass('hidden')
         });
         $('#toggleLegend').click(function(){
-            (showLegend) ? $('.legend').css('display', 'none') : $('.legend').css('display', 'block');
-            showLegend = !showLegend;
+            $('.legend').toggleClass('hidden')
         })
     });
     </script>`
@@ -342,7 +347,7 @@ function buildHtmlFooter() {
 
   // Bootstrap 4.5
   return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>`
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>`
 }
 
 /**
@@ -350,7 +355,7 @@ function buildHtmlFooter() {
  *
  * @param {*} stats
  */
-function buildPieCharts(stats) {
+async function buildPieCharts(stats) {
   const w = 120
   const h = w
 
@@ -358,31 +363,23 @@ function buildPieCharts(stats) {
   debug(stats)
   let results = []
 
-  results.push("<span id='pieCharts' class='pieCharts'>")
+  results.push("<span id='pieCharts' class='pieCharts miniJSRChartTable'>")
 
+  let jsrCLM = jsr.getChartLinkMaker(config).reset()
+  jsrCLM.setCategories(['a','b']).reset().setSize(250)
+
+  let promiseList = []
   // Charts...
   labels.forEach((i, ndx) => {
-    debug(`labels forEach => ${i} @ ${ndx} = `, stats[i])
-    let linktext =
-      `<!-- ${i} --><img src="${config().graphicServer.protocol}://${
-        config().graphicServer.server
-      }:${config().graphicServer.port}/${
-        config().graphicServer.script
-      }?width=${w}&height=${h}&c={type:%27pie%27,data:{labels:['${states.join(
-        "','"
-      )}'],datasets:[{data:[${stats[i]['Open']},${stats[i]['Active']},${
-        stats[i]['Closed']
-      },${stats[i]['Stopped']}],` +
-      backgroundColorStr +
-      `}]},options:{title:{display:true,text:'${cleanText(
-        i
-      )}',fontSize:18},legend:{display:false,position:'bottom'}}}"/>`
-    debug(linktext)
-    results.push(linktext)
+    debug(`stats[${i}] = `, stats[i])
+    promiseList.push(jsrCLM.buildChartImgTag(i, stats[i]))
   })
-  results.push('</span>')
 
-  return results.join('')
+  const charts = await Promise.all(promiseList)
+    results.push(charts)
+    results.push('</span>')
+    debug('returning from buildPieCharts(stats)...')
+    return results.join('')
 }
 
 // Clean out " from string - for use with Title attribute values
@@ -611,7 +608,7 @@ function buildLink(
   issueStatus
 ) {
   const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
-  return `<span class='issueComboLink'><a href='${config().jira.protocol}://${
+  return `<span class='issueComboLink lineicon'><a href='${config().jira.protocol}://${
     config().jira.host
   }/browse/${issueKey}' target='_blank'><img class='icon ${formatCssClassName(
     statusName
@@ -790,24 +787,25 @@ server.get('/filter', (req, res, next) => {
           debug(`stats: `, stats)
 
           // charts
-          res.write(buildPieCharts(stats))
-
-          // icons
-          res.write(
-            '<hr><div class="children">' +
-              results.Epics.join('') +
-              results.Stories.join('') +
-              results.Tasks.join('') +
-              results['Sub-tasks'].join('') +
-              results.Bugs.join('') +
-              '</div>'
-          )
-          res.write('</div>')
-          res.write('<hr>')
-          res.write(buildLegend())
-          res.write(buildHtmlFooter())
-          res.end()
-          return next()
+          buildPieCharts(stats).then((charts) => {
+            res.write(charts)
+            // icons
+            res.write(
+              '<hr><div class="children">' +
+                results.Epics.join('') +
+                results.Stories.join('') +
+                results.Tasks.join('') +
+                results['Sub-tasks'].join('') +
+                results.Bugs.join('') +
+                '</div>'
+            )
+            res.write('</div>')
+            res.write('<hr>')
+            res.write(buildLegend())
+            res.write(buildHtmlFooter())
+            res.end()
+            return next()
+          })
         })
         .catch((err) => {
           debug(`error in generic search: ${err}`)
@@ -899,7 +897,7 @@ server.get('/epics', (req, res, next) => {
             epicData.fields.summary
           )} (${owner}; ${statusName})'/></a>`
         )
-        details.push(`${epicData.key}: ${epicData.fields.summary}`)
+        details.push(`<span class='issueName'>${epicData.key}: ${epicData.fields.summary}</span>`)
         stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
         switch (epicData.fields.issuetype.name) {
           case 'Epic':
@@ -1032,19 +1030,19 @@ server.get('/epics', (req, res, next) => {
                 ${resultCtr['Tasks'].join('')}
                 ${resultCtr['Sub-tasks'].join('')}
                 ${resultCtr['Bugs'].join('')}
-                <span class="badge bg-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill">
                     ${resultCtr['Epics'].length}
                 </span>
-                <span class="badge bg-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill">
                     ${resultCtr['Stories'].length}
                 </span>
-                <span class="badge bg-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill">
                     ${resultCtr['Tasks'].length}
                 </span>
-                <span class="badge bg-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill">
                     ${resultCtr['Sub-tasks'].length}
                 </span>
-                <span class="badge bg-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill">
                     ${resultCtr['Bugs'].length}
                 </span></div>`)
         details.push(`</li>`)
@@ -1053,14 +1051,16 @@ server.get('/epics', (req, res, next) => {
 
       debug(`buildPieCharts() called with ${stats}`)
 
-      res.write(buildPieCharts(stats))
-      res.write('<hr>')
-      res.write(buildLegend())
-      res.write('<hr>')
-      res.write(details.join(''))
-      res.write(buildHtmlFooter())
-      res.end()
-      return next()
+      buildPieCharts(stats).then((charts) => {
+        res.write(charts)
+        res.write('<hr>')
+        res.write(buildLegend())
+        res.write('<hr>')
+        res.write(details.join(''))
+        res.write(buildHtmlFooter())
+        res.end()
+        return next()
+      })
     })
     .catch((err) => {
       debug(`error`)
@@ -1315,6 +1315,7 @@ server.get('/links', (req, res, next) => {
       return next()
     })
 })
+
 
 /*
  ************** CACHE-RELATED ENDPOINTS **************
