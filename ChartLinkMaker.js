@@ -1,4 +1,4 @@
-"use strict";
+'use strict'
 
 const debug = require('debug')('chart-link-maker')
 const config = require('./config.js')
@@ -6,7 +6,12 @@ const config = require('./config.js')
 const BAR_CHART_TYPE = 'bar'
 const LINE_CHART_TYPE = 'line'
 
-const BASE_URL = config().graphicServer.protocol + "://" + config().graphicServer.server + ":" + config().graphicServer.port
+const BASE_URL =
+  config().graphicServer.protocol +
+  '://' +
+  config().graphicServer.server +
+  ':' +
+  config().graphicServer.port
 
 const DEFAULT_CHART_TYPE = BAR_CHART_TYPE
 const DEFAULT_WIDTH = 500
@@ -20,7 +25,7 @@ const DEFAULT_FILL = false
  *  }
  * ]
  * labels = []
- * 
+ *
  * Size of labels must match # of data elements in data.data
  */
 
@@ -30,112 +35,137 @@ const DEFAULT_FILL = false
  * @class ChartLinkMaker
  */
 class ChartLinkMaker {
-    constructor(newDataSeries, newDataCategories, chartType = DEFAULT_CHART_TYPE, w = DEFAULT_WIDTH, h = DEFAULT_HEIGHT, fill = DEFAULT_FILL) {
-        debug(`newDataSeries: ${newDataSeries}, newDataCateogries: ${newDataCategories}, w: ${w}, h: ${h}`)
-        if (newDataSeries) { 
-            this.dataSeries = newDataSeries
-        } else {
-            this.dataSeries = []
-        }
-        
-        if (newDataCategories) { 
-            this.dataCategories = newDataCategories 
-        } else {
-            this.dataCategories = []
-        }
-
-        this.chartType = chartType
-        this.width = w
-        this.height = h
-        this.fill = fill
-        debug(`dataSeries: ${this.dataSeries}, dataCategories: ${this.dataCategories}, width: ${this.width}, height: ${this.height}, fill: ${this.fill}`)
-        return(this)
+  constructor(
+    newDataSeries,
+    newDataCategories,
+    chartType = DEFAULT_CHART_TYPE,
+    w = DEFAULT_WIDTH,
+    h = DEFAULT_HEIGHT,
+    fill = DEFAULT_FILL
+  ) {
+    debug(
+      `newDataSeries: ${newDataSeries}, newDataCateogries: ${newDataCategories}, w: ${w}, h: ${h}`
+    )
+    if (newDataSeries) {
+      this.dataSeries = newDataSeries
+    } else {
+      this.dataSeries = []
     }
 
-    reset() {
-        debug('reset() called')
-        this.dataSeries = []        
-        this.dataCategories = []
-        this.chartType = DEFAULT_CHART_TYPE
-        this.width = DEFAULT_WIDTH
-        this.height = DEFAULT_HEIGHT
-        this.fill = DEFAULT_FILL
-        return(this)
+    if (newDataCategories) {
+      this.dataCategories = newDataCategories
+    } else {
+      this.dataCategories = []
     }
 
-    setBarChart() { 
-        debug('setBarChart() called')
-        this.chartType = BAR_CHART_TYPE 
-        return(this)
-    }
-    
-    setLineChart() { 
-        debug('setLineChart() called')
-        this.chartType = LINE_CHART_TYPE 
-        return(this)
-    }
+    this.chartType = chartType
+    this.width = w
+    this.height = h
+    this.fill = fill
+    debug(
+      `dataSeries: ${this.dataSeries}, dataCategories: ${this.dataCategories}, width: ${this.width}, height: ${this.height}, fill: ${this.fill}`
+    )
+    return this
+  }
 
-    setChartType(newType) { 
-        debug(`setChartType(${newType}) called`)
-        this.chartType = newType 
-        return(this)
-    }
+  reset() {
+    debug('reset() called')
+    this.dataSeries = []
+    this.dataCategories = []
+    this.chartType = DEFAULT_CHART_TYPE
+    this.width = DEFAULT_WIDTH
+    this.height = DEFAULT_HEIGHT
+    this.fill = DEFAULT_FILL
+    return this
+  }
 
-    setFill(newFill) {
-        this.fill = newFill 
-        return(this)
-    }
+  setBarChart() {
+    debug('setBarChart() called')
+    this.chartType = BAR_CHART_TYPE
+    return this
+  }
 
-    setCategories(cats) {
-        debug(`setCategories(${cats}) called...`)
-        this.dataCategories = cats
-        return(this)
-    }
+  setLineChart() {
+    debug('setLineChart() called')
+    this.chartType = LINE_CHART_TYPE
+    return this
+  }
 
-    _validateCategories(seriesSize = -1) {
-        if (this.dataCategories) {
-            if (this.dataCategories.length == seriesSize) {
-                return(true)
-            } else {
-                debug(`_validateCategories() failing...`)
-                debug(this.dataCategories)
-                throw new Error(`invalid data series provided: length mismatch. Received ${seriesSize} elements, but expected ${this.dataCategories.length}. Suggest wiping and rebuilding the cache`)
-            }
-        } else {
-            throw new Error("Must set categories using setCategories() call before adding series")
-        }
-    }
+  setChartType(newType) {
+    debug(`setChartType(${newType}) called`)
+    this.chartType = newType
+    return this
+  }
 
-    addSeries(newLabel, newData) {
-        debug(`addSeries(${newLabel}, ${newData}) called...`)
-        try {
-            if (this._validateCategories(newData.length)) {
-                this.dataSeries.push({'label': newLabel, 'data': newData})
-            }
-            // debug(`... this.dataSeries now == ${JSON.stringify(this.dataSeries)}`)
-        } catch (ex) {
-            debug(`Exception caught: ${ex}`)
-        }
-        return(this)
-    }
+  setFill(newFill) {
+    this.fill = newFill
+    return this
+  }
 
-    _buildDatasets() {
-        debug(`_buildDatasets() called...`)
-        let datasets = []
-        this.dataSeries.forEach((cat, ndx) => {
-            debug(`...in forEach(${JSON.stringify(cat)}, ${ndx})...`)
-            datasets.push({ label: this.dataSeries[ndx]['label'], data: this.dataSeries[ndx]['data'], fill: this.fill })
-        })
-        return(JSON.stringify(datasets).replace(/"([^"]+)":/g, '$1:').replace(/"/g, "'"))
-    }
+  setCategories(cats) {
+    debug(`setCategories(${cats}) called...`)
+    this.dataCategories = cats
+    return this
+  }
 
-    buildChartImgTag() {
-        debug('buildChartImgTag() called...')
-        return new Promise((resolve, reject) => {
-            let imgTag = `<img src="${BASE_URL}/chart?width=${this.width}&height=${this.height}&c={type:'${this.chartType}',data:{labels:['${this.dataCategories.join("','")}'], datasets:${this._buildDatasets()}}}">`
-            resolve(imgTag)
-        })
+  _validateCategories(seriesSize = -1) {
+    if (this.dataCategories) {
+      if (this.dataCategories.length == seriesSize) {
+        return true
+      } else {
+        debug(`_validateCategories() failing...`)
+        debug(this.dataCategories)
+        throw new Error(
+          `invalid data series provided: length mismatch. Received ${seriesSize} elements, but expected ${this.dataCategories.length}. Suggest wiping and rebuilding the cache`
+        )
+      }
+    } else {
+      throw new Error(
+        'Must set categories using setCategories() call before adding series'
+      )
     }
+  }
+
+  addSeries(newLabel, newData) {
+    debug(`addSeries(${newLabel}, ${newData}) called...`)
+    try {
+      if (this._validateCategories(newData.length)) {
+        this.dataSeries.push({ label: newLabel, data: newData })
+      }
+      // debug(`... this.dataSeries now == ${JSON.stringify(this.dataSeries)}`)
+    } catch (ex) {
+      debug(`Exception caught: ${ex}`)
+    }
+    return this
+  }
+
+  _buildDatasets() {
+    debug(`_buildDatasets() called...`)
+    let datasets = []
+    this.dataSeries.forEach((cat, ndx) => {
+      debug(`...in forEach(${JSON.stringify(cat)}, ${ndx})...`)
+      datasets.push({
+        label: this.dataSeries[ndx]['label'],
+        data: this.dataSeries[ndx]['data'],
+        fill: this.fill
+      })
+    })
+    return JSON.stringify(datasets)
+      .replace(/"([^"]+)":/g, '$1:')
+      .replace(/"/g, "'")
+  }
+
+  buildChartImgTag() {
+    debug('buildChartImgTag() called...')
+    return new Promise((resolve, reject) => {
+      let imgTag = `<img src="${BASE_URL}/chart?width=${this.width}&height=${
+        this.height
+      }&c={type:'${this.chartType}',data:{labels:['${this.dataCategories.join(
+        "','"
+      )}'], datasets:${this._buildDatasets()}}}">`
+      resolve(imgTag)
+    })
+  }
 }
 
 module.exports = ChartLinkMaker
