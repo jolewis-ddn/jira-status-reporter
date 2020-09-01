@@ -27,6 +27,7 @@ const backgroundColors = [
   'CornflowerBlue',
   'Pink'
 ]
+
 const backgroundColorStr = "backgroundColor:['"
   .concat(backgroundColors.join("','"))
   .concat("']")

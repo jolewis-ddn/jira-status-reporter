@@ -176,7 +176,8 @@ class ChartLinkMaker {
             data: {
               type: "pie",
               columns: [ ['Open', ${data.Open}], ['Active', ${data.Active}], ['Closed', ${data.Closed}], ['Stopped', ${data.Stopped} ] ],
-              labels: { colors: { 'Open': 'black', 'Active': 'white', 'Closed': 'black', 'Stopped': 'black' } }
+              labels: { colors: { 'Open': 'black', 'Active': 'white', 'Closed': 'black', 'Stopped': 'black' } },
+              order: "null"
             },
             pie: { label: { format: function(value, ratio, id) { return value; }}},
             color: { pattern: [ 'SeaShell', 'MediumSeaGreen', 'CornflowerBlue', 'Pink' ] },
