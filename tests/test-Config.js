@@ -1,11 +1,9 @@
 const test = require('ava')
-const debug = require('debug')('ava-tests')
+const debug = require('debug')('ava-tests-Config')
 
 const fs = require('fs')
 
 const JSR = require('../JiraStatusReporter')
-const ChartLinkMaker = require('../ChartLinkMaker')
-const JiraStatusReporterFileManager = require('../JiraStatusReporterFileManager')
 const jsr = new JSR()
 
 const CONFIG_JS = '../config'
@@ -145,118 +143,3 @@ test.skip('Verify config.js custom config format if file exists', (t) => {
             'project' in cfg
     )
 })
-
-/*-----------------------------------
-   ChartLinkMaker
-/------------------------------------*/
-
-test('Confirm CLM load', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.pass()
-})
-
-test('Reset', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.reset() == clm)
-})
-
-test('Set Bar chart', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.setBarChart() == clm)
-})
-
-test('Set Line chart', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.setLineChart() == clm)
-})
-
-test('Set Chart type', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.setChartType('Doughnut') == clm)
-})
-
-test('Set Fill', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.setFill('#ff0000') == clm)
-})
-
-test('Validate Categories: Fails (pre setCategories())', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    clm.dataCategories = false
-    t.throws(() => {
-        clm._validateCategories(3)
-    })
-})
-
-test('Set Categories', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.setCategories(categories) == clm)
-})
-
-test('Validate Categories: Good', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.notThrows(() => {
-        clm._validateCategories(3)
-    })
-})
-
-test('Validate Categories: Invalid category size', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.throws(() => {
-        clm._validateCategories(2)
-    })
-})
-
-test('Add series: Good', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.addSeries('more data', [10, 20, 30]) == clm)
-})
-
-test('Add series: Bad', (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    t.assert(clm.addSeries('more data', [30]) == clm)
-})
-
-test('Confirm bar chart content', async (t) => {
-    const clm = new ChartLinkMaker(data, categories)
-    const config = require(CONFIG_JS)
-
-    const chart = await clm.buildChartImgTag()
-    debug(`chart: ${chart}`)
-    t.true(typeof chart == 'string') // chart == `<img src="${config().protocol}://${config().server}:${config().port}/chart?width=500&height=300&c={type:'bar',data:{labels:['a','b','c'], datasets:[{fill:false},{fill:false},{fill:false}]}}">`)
-})
-
-test.todo('Validate response string contents')
-
-/*-----------------------------------
-   JiraStatusReporterFileManager
-/------------------------------------*/
-
-test('Create JSRFM', (t) => {
-    const JSRFM = new JiraStatusReporterFileManager('TEST')
-    t.true(typeof JSRFM == 'object')
-})
-
-test('JSRFM: getHomeDir', (t) => {
-    const HOME_DIR = 'BOGUS_HOME_DIR'
-    const JSRFM = new JiraStatusReporterFileManager(HOME_DIR)
-    t.true(JSRFM.getHomeDir() == HOME_DIR)
-})
-
-test('JSRFM: buildChartUrl', async (t) => {
-    const JSRFM = new JiraStatusReporterFileManager('TEST')
-    const url = await JSRFM.buildChartUrl()
-    t.assert(url)
-})
-
-/*-----------------------------------
-   Jira
-/------------------------------------*/
-
-// Jira: Connection
-
-test.todo('Verify Jira connection')
-
-// Jira: Query
-
-test.todo('Verify simple JQL results')
