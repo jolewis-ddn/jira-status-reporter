@@ -1,5 +1,5 @@
 'use strict'
-const debug = require('debug')('jira-status-server')
+const debug = require('debug')('JiraStatusServer')
 const restify = require('restify')
 const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
@@ -501,7 +501,7 @@ function buildLink(
   const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
   return `<span class='issueComboLink lineicon'><a href='${config().jira.protocol}://${
     config().jira.host
-  }/browse/${issueKey}' target='_blank'><img class='icon ${formatCssClassName(
+  }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
     statusName
   )}' src='${issueTypeIconUrl}' title='${cleanText(
     title
@@ -527,18 +527,17 @@ server.get('/fields', async (req, res, next) => {
   return next()
 })
 
-server.get('/filter', (req, res, next) => {
+server.get('/filter', async (req, res, next) => {
   debug('/filter called...')
-  jsr
-    .getFilter(req.query.id)
-    .then((data) => {
+  const data = await jsr.getFilter(req.query.id)
+    // .then((data) => {
       debug(`getFilter returned...`)
 
       const newHeader = `${data.name}: Filter #${req.query.id}`
       res.write(buildHtmlHeader(newHeader))
       res.write(buildPageHeader(data.name, `Filter: ${req.query.id}`))
-      jsr
-        ._genericJiraSearch(data.jql, 99)
+      debug(`about to run genericJiraSearch(${data.jql}, 99)`)
+      jsr._genericJiraSearch(data.jql, 99)
         .then((e) => {
           let stats = {
             Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
@@ -684,15 +683,15 @@ server.get('/filter', (req, res, next) => {
           res.end()
           return
         })
-    })
-    .catch((err) => {
-      debug(`getFilter error...`)
-      debug(err)
-      res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
-      res.write(`<em>Error</em> ${err}`)
-      res.end()
-      return
-    })
+    // })
+    // .catch((err) => {
+    //   debug(`getFilter error...`)
+    //   debug(err)
+    //   res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
+    //   res.write(`<em>Error</em> ${err}`)
+    //   res.end()
+    //   return
+    // })
 })
 
 server.get('/epics', (req, res, next) => {
