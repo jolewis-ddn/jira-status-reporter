@@ -8,6 +8,11 @@ const config = require('./config')
 
 const mermaidConfig = require('./mermaid-config')
 
+const MermaidNodes = require('./MermaidNodes')
+const mermaid = new MermaidNodes()
+
+const JiraStatus = require('./JiraStatus')
+
 const JSR = require('./JiraStatusReporter')
 let jsr = new JSR()
 
@@ -31,16 +36,6 @@ const backgroundColors = [
 const backgroundColorStr = "backgroundColor:['"
   .concat(backgroundColors.join("','"))
   .concat("']")
-
-const faIcons = {
-  Epic: 'fa:fa-fort-awesome',
-  Story: 'fa:fa-book-reader',
-  Task: 'fa:fa-tasks',
-  'Sub-task': 'fa:fa-subscript',
-  Bug: 'fa:fa-bug'
-}
-
-const useFontawesome = 'fa' in config() && config().fa
 
 var server = restify.createServer()
 server.use(restify.plugins.queryParser())
@@ -123,56 +118,15 @@ server.get('/homedir', (req, res, next) => {
   return next()
 })
 
-server.get('/config', (req, res, next) => {
-  const configDetails = config()
-  configDetails.jira.password = '***REMOVED***'
+server.get('/config', async (req, res, next) => {
+  const configDetails = await JiraStatus.getConfig()
   if (req.query.format && req.query.format == 'html') {
     // TODO: Create automatic formatter
     res.writeHead(200, { 'Content-Type': 'text/html' })
-    res.write(`
-            ${buildHtmlHeader('Config', false)}
-            ${buildPageHeader('Config')}
-            <dl class="row">
-            <dt class="col-sm-3">
-            Jira Username
-            </dt>
-            <dd class="col-sm-9">
-            ${config().jira.username}
-            </dd>
-            <dt class="col-sm-3">
-            Jira URL
-            </dt>
-            <dd class="col-sm-9">
-            ${config().jira.protocol}://${config().jira.host}
-            </dd>
-            <dt class="col-sm-3">
-            API
-            </dt>
-            <dd class="col-sm-9">
-            ${config().jira.apiVersion}
-            </dd>
-            <dt class="col-sm-3">
-            Server: Port
-            </dt>
-            <dd class="col-sm-9">
-            ${config().server.port.port}
-            </dd>
-            <dt class="col-sm-3">
-            Graphic Server
-            </dt>
-            <dd class="col-sm-9">
-            ${config().graphicServer.protocol}://${
-      config().graphicServer.server
-    }:${config().graphicServer.port}/${config().graphicServer.script}
-            </dd>
-            <dt class="col-sm-3">
-            Project
-            </dt>
-            <dd class="col-sm-9">
-            ${config().project}
-            ${buildHtmlFooter()}
-            </dd>
-            </dl>`)
+    res.write(buildHtmlHeader('Config', false))
+    res.write(buildPageHeader('Config'))
+    res.write(await JiraStatus.formatConfigHtml(configDetails))
+    res.write(buildHtmlFooter())
   } else {
     res.send(configDetails)
   }
@@ -188,10 +142,6 @@ server.get('/series', (req, res, next) => {
   res.send(jdr.getSeriesData())
   return next()
 })
-
-function formatCssClassName(jiraName) {
-  return jiraName.replace(/\s/g, '')
-}
 
 function buildEpicPromisesArray(epicIds) {
   debug(`buildEpicPromisesArray(${epicIds}) called...`)
@@ -255,7 +205,7 @@ function buildHtmlHeader(title = '', showButtons = true) {
   // Bootstrap 4.5
   return `<!doctype html><html lang="en"><head><title>${title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        ${getFontawesomeJsLink()}
+        ${JiraStatus.getFontawesomeJsLink()}
 
         <!-- Bootstrap CSS -->
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
@@ -271,23 +221,6 @@ function buildHtmlHeader(title = '', showButtons = true) {
         <script>mermaid.initialize({startOnLoad:true});</script>
         ${buttons}
         `
-}
-
-function getFontawesomeJsLink() {
-  if (useFontawesome) {
-    return `<script src="${config().fa}" crossorigin="anonymous"></script>`
-  } else {
-    return ''
-  }
-}
-
-function getFontawesomeIcon(issueType) {
-  if (useFontawesome) {
-    debug(`getFaIcon(${issueType}) returning ${faIcons[issueType]}`)
-    return `${faIcons[issueType]} `
-  } else {
-    return ''
-  }
 }
 
 function buildPageHeader(h, h2 = '') {
@@ -618,42 +551,23 @@ function buildLink(
   )}')/><span class='issueName'/>${title}</span></a></span>`
 }
 
-server.get('/fields', (req, res, next) => {
+function startHtml(res) {
+  res.writeHead(200, { 'Content-Type': 'text/html' })
+}
+
+server.get('/fields', async (req, res, next) => {
   debug('/fields called...')
-  jsr.get('field').then((data) => {
-    debug(req.query)
-    if (req.query && req.query.format == 'html') {
-      res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.write(buildHtmlHeader('Field List', false))
-      res.write(`<H1>Field List</H1><p><sm>${config().jira.host}</sm></p>`)
-      res.write(
-        `<table style="width: auto;" class="table table-striped table-hover table-sm"><thead class="thead-dark"><tr><th scope="col">${[
-          'ID',
-          'Name',
-          'Custom',
-          'Navigable',
-          'Searchable',
-          'Clause Names'
-        ].join('</th><th scope="col">')}</th></tr></thead><tbody>`
-      )
-      data.forEach((d) => {
-        res.write(
-          `<tr><th scope="row">${d.id}</th><td>${[
-            d.name,
-            d.custom,
-            d.navigable,
-            d.searchable,
-            d.clauseNames.join('<br>')
-          ].join('</td><td>')}</td></tr>`
-        )
-      })
-      res.write(`</tbody></table>`)
-      res.write(buildHtmlFooter())
-    } else {
-      res.send(data)
-    }
-    return next()
-  })
+  const data = await JiraStatus.getFields()
+  if (req.query && req.query.format == 'html') {
+    startHtml(res)
+    res.write(buildHtmlHeader('Field List', false))
+    res.write(buildPageHeader('Field List', config().jira.host))
+    res.write(await JiraStatus.formatFieldsHtml(data))
+    res.write(buildHtmlFooter())
+  } else {
+    res.send(data)
+  }
+  return next()
 })
 
 server.get('/filter', (req, res, next) => {
@@ -1148,164 +1062,19 @@ server.get('/chart', (req, res, next) => {
   }
 })
 
-/*
- ************** MERMAID/LINK-RELATED FUNCTIONS & ENDPOINTS **************
- */
-
-function buildMermaidLinkIn(
-  inKey,
-  inSummary,
-  inStatus,
-  linkOutward,
-  issueLabel,
-  issueType
-) {
-  return `${inKey}("${getFontawesomeIcon(
-    issueType
-  )}${inKey} ${inSummary}"):::${formatCssClassName(
-    inStatus
-  )} -->|${linkOutward}| ${issueLabel}`
-}
-
-function buildMermaidLinkOut(
-  outKey,
-  outSummary,
-  outStatus,
-  linkOutward,
-  issueLabel,
-  issueType
-) {
-  return `${issueLabel} -->|${linkOutward}| ${outKey}("${getFontawesomeIcon(
-    issueType
-  )}${outKey} ${outSummary}"):::${formatCssClassName(outStatus)}`
-}
-
-function buildMermaidLinkChartDataBlock(
-  issueResult,
-  linkStyles,
-  clicks,
-  issueLabel
-) {
-  debug(`build...DataBlock(...) called for ${issueLabel}`)
-  let htmlOutput = []
-  if (issueResult.issuelinks) {
-    for (let x = 0; x < issueResult.issuelinks.length; x++) {
-      const link = issueResult.issuelinks[x]
-      if (link.inwardIssue) {
-        linkStyles.push(mermaidConfig.links[link.type.inward])
-        clicks.push(link.inwardIssue.key)
-        debug(`inwardIssue: ${link.inwardIssue.key}`)
-        htmlOutput.push(
-          `${buildMermaidLinkIn(
-            link.inwardIssue.key,
-            link.inwardIssue.fields.summary,
-            link.inwardIssue.fields.status.name,
-            link.type.outward,
-            issueLabel,
-            link.inwardIssue.fields.issuetype.name
-          )}\n`
-        )
-      } else if (link.outwardIssue) {
-        const outKey = link.outwardIssue.key
-        let outLink = link.type.outward
-
-        debug(`link.outwardIssue.key: ${outKey} / ${outLink}`)
-
-        clicks.push(outKey)
-        linkStyles.push(mermaidConfig.links[link.type.outward])
-        htmlOutput.push(
-          `${buildMermaidLinkOut(
-            outKey,
-            link.outwardIssue.fields.summary,
-            link.outwardIssue.fields.status.name,
-            outLink,
-            issueLabel,
-            link.outwardIssue.fields.issuetype.name
-          )}\n`
-        )
-      } else {
-        htmlOutput.push(`unrecognized issue type`)
-      }
-    }
-
-    debug(clicks.join(`\n`))
-    return { html: htmlOutput.join(''), linkStyles: linkStyles, clicks: clicks }
-  } else {
-    debug(`ERR 734`)
-    debug(issueResult)
-    return false
-  }
-}
-
-function buildMermaidLinkChart(issueResult, urlScript = false) {
-  const htmlOutput = []
-  const links = issueResult.issuelinks
-  const id = issueResult.id
-
-  const title = `Links for ${id}`
-  htmlOutput.push(buildHtmlHeader(title, false))
-  htmlOutput.push(buildPageHeader(title))
-  debug(`writing to HTML/mermaid`)
-  htmlOutput.push(`<div class="mermaid">
-    graph LR
-    `)
-  let linkStyles = []
-  let clicks = []
-  clicks.push(issueResult.id)
-  const issueLabel = `${issueResult.id}["${getFontawesomeIcon(
-    issueResult.type
-  )} ${issueResult.id} ${issueResult.name}"]:::${formatCssClassName(
-    issueResult.status
-  )}`
-
-  const results = buildMermaidLinkChartDataBlock(
-    issueResult,
-    linkStyles,
-    clicks,
-    issueLabel,
-    urlScript
-  )
-  htmlOutput.push(results.html)
-  clicks.concat(results.clicks)
-  linkStyles.concat(results.linkStyles)
-
-  clicks.forEach((c) => {
-    if (urlScript) {
-      htmlOutput.push(`click ${c} "${urlScript}${c}"\n`)
-    } else {
-      htmlOutput.push(
-        `click ${c} "${config().jira.protocol}://${
-          config().jira.host
-        }/browse/${c}" _blank\n`
-      )
-    }
-  })
-  linkStyles.forEach((ls, ndx) => {
-    htmlOutput.push(`linkStyle ${ndx} ${ls}\n`)
-  })
-  htmlOutput.push(`
-    classDef Icebox fill:#ccc,color:#000;
-    classDef InProgress fill:#84a98c,color:#000;
-    classDef InReview fill:#b4d9bc,color:#000;
-    classDef Defined fill:#fff,color:#000;
-    classDef Done fill:#00f,color:#fff;
-    classDef Dead fill:#000,color:#fff;
-    classDef Emergency fill:#95190c,color:#fff;
-    classDef Blocked fill:#e3b505,color:#fff;
-    `)
-  htmlOutput.push(`</div><!-- end mermaid div -->`)
-  htmlOutput.push(buildHtmlFooter())
-  return htmlOutput.join('')
-}
-
 server.get('/links', (req, res, next) => {
   debug(`/links called w/ ID of ${req.query.id}`)
   jsr
     .getLinks(req.query.id)
     .then((issueResult) => {
       if (req.query.format && req.query.format == 'html') {
+
+        const title = `Links for ${req.query.id}`
         res.writeHead(200, { 'Content-Type': 'text/html' })
-        res.write(buildMermaidLinkChart(issueResult, `/links?format=html&id=`))
+        res.write(buildHtmlHeader(title, false))
+        res.write(buildPageHeader(title))
+        res.write(MermaidNodes.buildMermaidLinkChart(issueResult, `/links?format=html&id=`))
+        res.write(buildHtmlFooter())
       } else {
         debug(`writing to json`)
         res.send(issueResult.issuelinks)
