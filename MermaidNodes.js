@@ -1,6 +1,6 @@
 "use strict";
 const debug = require('debug')('MermaidNodes')
-const mermaidConfig = require('./mermaid-config')
+const mermaidConfig = require('./config/mermaid-config')
 
 const JiraStatus = require('./JiraStatus')
 

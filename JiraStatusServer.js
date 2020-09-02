@@ -6,7 +6,7 @@ const corsMiddleware = require('restify-cors-middleware')
 
 const config = require('./config')
 
-const mermaidConfig = require('./mermaid-config')
+const mermaidConfig = require('./config/mermaid-config')
 
 const MermaidNodes = require('./MermaidNodes')
 const mermaid = new MermaidNodes()
