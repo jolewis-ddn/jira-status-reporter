@@ -761,7 +761,7 @@ server.get('/epics', (req, res, next) => {
         details.push(
           `<a href='${config().jira.protocol}://${config().jira.host}/browse/${
             epicData.key
-          }' target='_blank'><img class='icon ${formatCssClassName(
+          }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
             statusName
           )}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanText(
             epicData.key
@@ -813,7 +813,7 @@ server.get('/epics', (req, res, next) => {
                   config().jira.host
                 }/browse/${
                   issue.key
-                }' target='_blank'><img class='icon ${formatCssClassName(
+                }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
                   issue.key
@@ -830,7 +830,7 @@ server.get('/epics', (req, res, next) => {
                   config().jira.host
                 }/browse/${
                   issue.key
-                }' target='_blank'><img class='icon ${formatCssClassName(
+                }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
                   issue.key
@@ -847,7 +847,7 @@ server.get('/epics', (req, res, next) => {
                   config().jira.host
                 }/browse/${
                   issue.key
-                }' target='_blank'><img class='icon ${formatCssClassName(
+                }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
                   issue.key
@@ -864,7 +864,7 @@ server.get('/epics', (req, res, next) => {
                   config().jira.host
                 }/browse/${
                   issue.key
-                }' target='_blank'><img class='icon ${formatCssClassName(
+                }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
                   issue.key
@@ -881,7 +881,7 @@ server.get('/epics', (req, res, next) => {
                   config().jira.host
                 }/browse/${
                   issue.key
-                }' target='_blank'><img class='icon ${formatCssClassName(
+                }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
                   issue.key
