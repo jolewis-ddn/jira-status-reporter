@@ -10,7 +10,7 @@ const chartLinkMaker = require('./ChartLinkMaker')
 const ACTION_CONTENTS = 99
 const ACTION_COUNT = 1
 
-const PROJECT_NAME = config.project
+const PROJECT_NAME = config().project
 
 const jira = new JiraApi({
   protocol: config().jira.protocol,
@@ -170,10 +170,11 @@ class JiraStatusReporter {
   }
 
   _redEpics(action) {
+    debug(`_redEpics(${action}) called`)
     return this._genericJiraSearch(
       this.jqlAppendProject(PROJECT_NAME, JQL_EPIC),
       action
-    )
+      )
   }
 
   countDeadIssues(project) {
@@ -240,6 +241,7 @@ class JiraStatusReporter {
   }
 
   getIssuesChangedThisWeekByProjectAndStatus(project, field) {
+    debug(`getIssuesChangedThisWeekByProjectAndStatus(${project}, ${field}) called...`)
     return this._issuesChangedThisWeekByProjectAndStatus(
       project,
       field,

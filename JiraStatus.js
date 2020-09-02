@@ -129,6 +129,63 @@ async function formatConfigHtml(configDetails) {
             </dl>`)
 }
 
+async function report() {
+    let response = []
+
+    return new Promise((resolve, reject) => {
+        Promise.all([
+            jsr.countRedEpics(),
+            jsr.countDeadIssues(),
+            jsr.countOpenIssuesByProject(config().project),
+            jsr.countIssuesDoneThisMonth(config().project),
+            jsr.getIssuesDoneThisMonth(config().project),
+            jsr.countIssuesChangedThisMonthByProjectAndStatus(config().project, 'Status'),
+            jsr.getIssuesChangedThisWeekByProjectAndStatus(config().project, 'Status')
+        ])
+            .then((values) => {
+                const doneData = values[4].issues
+                const doneKeys = []
+                doneData.forEach((data) => {
+                    debug(`doneKeys - adding ${data.key}`)
+                    doneKeys.push(data.key)
+                })
+
+                const statusChangesThisWeek = []
+                values[6].issues.forEach((data) => {
+                    debug(`values[6] pushing ${data.key}`)
+                    let assigneeName = ''
+                    if (data.fields.assignee) {
+                        assigneeName = data.fields.assignee.displayName
+                    }
+                    statusChangesThisWeek.push({
+                        key: data.key,
+                        type: data.fields.issuetype.name,
+                        owner: assigneeName,
+                        updated: data.fields.updated,
+                        status: data.fields.status.name,
+                        summary: data.fields.summary
+                    })
+                })
+
+                response.push({
+                    'Epic Count': values[0],
+                    'Dead Issue Count': values[1],
+                    'Open Issues (Count)': values[2],
+                    'Issue Status updates this Month (Count)': values[5],
+                    'Issue Status updates this Week (Count)': values[5],
+                    'Issue Status updates this Week (List)': statusChangesThisWeek,
+                    'Issues Done this Month (Count)': values[3],
+                    'Issues Done this Month (List)': doneKeys.join(',')
+                    // 'Issues Done this Month (Data)': values[4],
+                })
+                resolve(response)
+            })
+            .catch((err) => {
+                reject(err)
+            })
+    })
+}
+
 module.exports = {
     getConfig,
     getFields,
@@ -139,4 +196,5 @@ module.exports = {
     getFontawesomeIcon,
     getFontawesomeJsLink,
     formatCssClassName,
+    report,
 }

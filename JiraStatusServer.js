@@ -54,64 +54,21 @@ server.get(
   restify.plugins.serveStatic({ directory: './static', default: 'charts.html' })
 )
 
-function report(req, res, next) {
-  Promise.all([
-    jsr.countRedEpics(),
-    jsr.countDeadIssues(),
-    jsr.countOpenIssuesByProject('RED'),
-    jsr.countIssuesDoneThisMonth('RED'),
-    jsr.getIssuesDoneThisMonth('RED'),
-    jsr.countIssuesChangedThisMonthByProjectAndStatus('RED', 'Status'),
-    jsr.getIssuesChangedThisWeekByProjectAndStatus('RED', 'Status')
-  ])
-    .then((values) => {
-      const doneData = values[4].issues
-      const doneKeys = []
-      doneData.forEach((data) => {
-        debug(`doneKeys - adding ${data.key}`)
-        doneKeys.push(data.key)
-      })
-
-      const statusChangesThisWeek = []
-      values[6].issues.forEach((data) => {
-        let assigneeName = ''
-        if (data.fields.assignee) {
-          assigneeName = data.fields.assignee.displayName
-        }
-        statusChangesThisWeek.push({
-          key: data.key,
-          type: data.fields.issuetype.name,
-          owner: assigneeName,
-          updated: data.fields.updated,
-          status: data.fields.status.name,
-          summary: data.fields.summary
-        })
-      })
-
-      res.send({
-        'RED Epic Count': values[0],
-        'Dead Issue Count': values[1],
-        'Open Issues (Count)': values[2],
-        'Issue Status updates this Month (Count)': values[5],
-        'Issue Status updates this Week (Count)': values[5],
-        'Issue Status updates this Week (List)': statusChangesThisWeek,
-        'Issues Done this Month (Count)': values[3],
-        'Issues Done this Month (List)': doneKeys.join(',')
-        // 'Issues Done this Month (Data)': values[4],
-      })
-      return next()
-    })
-    .catch((err) => {
-      return next(new restifyErrors.InternalServerError(err))
-    })
-}
-
 server.get('/', (req, res, next) => {
   res.send('ok')
   return next()
 })
 
-server.get('/report', report)
+server.get('/report', (req, res, next) => {
+  JiraStatus.report()
+  .then((response) => {
+
+    debug(`report response = `, response)
+    res.send(response)
+    res.end()
+    return next()
+  })
+})
 
 server.get('/homedir', (req, res, next) => {
   res.send(jsr.getFileManager().getHomeDir())
