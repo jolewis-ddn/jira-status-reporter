@@ -392,6 +392,10 @@ class JiraStatusReporter {
     this.startAt = null
   }
 
+  async getProjects() {
+    return(await jira.listProjects())
+  }
+
   _genericJiraSearch(jql, action) {
     return new Promise((resolve, reject) => {
       debug(`_genericJiraSearch(${jql}) called...`)

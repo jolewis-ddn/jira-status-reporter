@@ -5,10 +5,17 @@ const config = require('./config.js')
 const JSR = require('./JiraStatusReporter')
 const jsr = new JSR()
 
+const JiraStatus = require('./JiraStatus')
+
 let data = {}
 
 class Dashboard {
     constructor() { }
+
+    async getFieldCount() {
+        const fields = await JiraStatus.getFields()
+        return(fields.length)
+    }
 
     async build() {
         const results = await Promise.all([
@@ -135,6 +142,7 @@ class Dashboard {
         ])
 
         debug(`dashboard results: ${results}`)
+        
         this.data = {
             meta: {
                 Categories: [
@@ -145,6 +153,7 @@ class Dashboard {
                     'Last 90 days'
                 ]
             },
+            Fields: { Count: await this.getFieldCount() },
             Total: {
                 Created: [results[0], results[1], results[2], results[3], results[4]],
                 Updated: [results[5], results[6], results[7], results[8], results[9]],
@@ -168,26 +177,37 @@ class Dashboard {
                     results[22] - results[23],
                     results[23] - results[24],
                     results[24] - results[25]
-                ],
-                ClosedBugsRaw: [
-                    results[20],
-                    results[21],
-                    results[22],
-                    results[23],
-                    results[24],
-                    results[25]
                 ]
             }
         }
         return (this)
     }
 
+    buildCard(title, text) {
+        return(`<div class='row'><div class='col-sm-3'><div class='card'><div class='card-body'><h5 class='card-title'>${title}</h5><p class='card-text'>${text}</p></div></div></div></div>`)
+    }
+
     fetch(format) {
         if (format == "html") {
-            return(`<em>HTML formatted data</em>`)
+            let response = []
+            response.push(this.buildCard('Field Count', this.data.Fields.Count))
+            response.push(this.buildTable(this.data.meta.Categories, this.data.Total))
+            return(response.join(''))
         } else {
             return(this.data)
         }
+    }
+
+    buildTable(titles, data) {
+        let response = []
+        response.push(`<table class='table table-responsive-md table-sm table-hover table-striped'><thead class='thead-dark'><tr><th></th>`)
+        titles.forEach(t => { response.push(`<th>${t}</th>`) })
+        response.push('</tr></thead><tbody>')
+        for (const [key, val] of Object.entries(data)) {
+            response.push(`<tr><th scope='row'>${key}</th><td>${val.join('</td><td>')}</td></tr>`)
+        }
+        response.push('</tbody></table>')
+        return(response.join(''))
     }
 }
 

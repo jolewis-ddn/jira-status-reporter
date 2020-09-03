@@ -3,6 +3,7 @@ const JSR = require('./JiraStatusReporter')
 let jsr = new JSR()
 
 const config = require('./config')
+const { result } = require('lodash')
 
 const faIcons = {
     Epic: 'fa:fa-fort-awesome',
@@ -13,19 +14,6 @@ const faIcons = {
 }
 
 const useFontawesome = 'fa' in config() && config().fa
-
-async function getA(x) {
-    const r = await getB(x)
-    console.log(`A: x = ${x} and r = ${r}`)
-    return (`A ${r}`)
-}
-
-function getB(x) {
-    return new Promise((resolve, reject) => {
-        console.log(`B: x = ${x}`)
-        resolve(`B ${x}`)
-    })
-}
 
 async function getFields() {
     debug(`getFields() called`)
@@ -42,6 +30,7 @@ async function formatFieldsHtml(fields) {
         'Searchable',
         'Clause Names'
     ].join('</th><th scope="col">')}</th></tr></thead><tbody>`)
+    response.push(`<em>${fields.length} fields as of ${new Date()}`)
     fields.forEach((f) => {
         response.push(
             `<tr><th scope="row">${f.id}</th><td>${[
@@ -84,7 +73,7 @@ async function getConfig() {
     return cfg
 }
 
-async function formatConfigHtml(configDetails) {
+function formatConfigHtml(configDetails) {
     let response = []
     response.push(`
             <dl class="row">
@@ -127,6 +116,7 @@ async function formatConfigHtml(configDetails) {
             ${config().project}
             </dd>
             </dl>`)
+    return(response.join(''))
 }
 
 async function report() {
@@ -186,6 +176,32 @@ async function report() {
     })
 }
 
+function printList(data, key = false, numbered = false, format = "html") {
+    if (typeof data == typeof []) { // List of objects
+        if (key) {
+            let results = []
+            results.push(numbered ? `<ol>` : `<ul>`)
+            data.forEach(d => {
+                results.push(`<li>${d[key]}</li>`)
+            })
+            results.push(`</ul>`)
+            return(results.join(''))
+        } else {
+            if (format == "html") {
+                return(`${ numbered ? '<ol>' : '<ul>' }<li>${data.join('</li></li>')}</li></ul>`)
+            } else {
+                return(data.join(`\n`))
+            }
+        }
+    } else {
+        return('unknown data type')
+    }
+}
+
+async function getProjects() {
+    return(await jsr.getProjects())    
+}
+
 module.exports = {
     getConfig,
     getFields,
@@ -197,4 +213,6 @@ module.exports = {
     getFontawesomeJsLink,
     formatCssClassName,
     report,
+    getProjects,
+    printList
 }

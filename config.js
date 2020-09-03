@@ -12,13 +12,13 @@ module.exports = function () {
     try {
         let newCfg = JSON.parse(fs.readFileSync(ALT_FILENAME))
         configFilename = newCfg.config
-        debug(`custom config filename found: ${configFilename}`)
+        // debug(`custom config filename found: ${configFilename}`)
     }
     catch (err) {
-        debug(`custom config filename not found, so using default: ${configFilename}`)
+        // debug(`custom config filename not found, so using default: ${configFilename}`)
     }
 
-    debug(`config created... ${configFilename}...`)
+    // debug(`config created... ${configFilename}...`)
 
     try {
         let cfg = JSON.parse(fs.readFileSync(configFilename))

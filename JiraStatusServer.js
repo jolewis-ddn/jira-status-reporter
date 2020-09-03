@@ -80,12 +80,13 @@ server.get('/homedir', (req, res, next) => {
 
 server.get('/config', async (req, res, next) => {
   const configDetails = await JiraStatus.getConfig()
+  debug(configDetails)
   if (req.query.format && req.query.format == 'html') {
     // TODO: Create automatic formatter
     res.writeHead(200, { 'Content-Type': 'text/html' })
     res.write(buildHtmlHeader('Config', false))
     res.write(buildPageHeader('Config'))
-    res.write(await JiraStatus.formatConfigHtml(configDetails))
+    res.write(JiraStatus.formatConfigHtml(configDetails))
     res.write(buildHtmlFooter())
   } else {
     res.send(configDetails)
@@ -320,15 +321,30 @@ function updateStats(stats, issueType, issueStatusName) {
 
 server.get('/dashboard', async (req, res, next) => {
   await dashboard.build()
-  // debug(results)
   if (req.query && req.query.format == 'html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' })
     res.write(buildHtmlHeader('Dashboard', false))
     res.write(buildPageHeader('Dashboard'))
-    res.write(JSON.stringify(dashboard.fetch("html")))
+    res.write(dashboard.fetch("html"))
     res.write(buildHtmlFooter())
     res.end()
   } else {
     res.send(dashboard.fetch())
+  }
+  return next()
+})
+
+server.get('/projects', async (req, res, next) => {
+  const projects = await jsr.getProjects()
+  if (req.query && req.query.format == 'html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' })
+    res.write(buildHtmlHeader('Projects', false))
+    res.write(buildPageHeader('Projects'))
+    res.write(JiraStatus.printList(projects, 'name', true))
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send(projects)
   }
   return next()
 })
