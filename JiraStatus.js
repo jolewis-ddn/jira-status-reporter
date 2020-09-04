@@ -46,6 +46,21 @@ async function formatFieldsHtml(fields) {
     return (response.join(''))
 }
 
+async function formatProjectDataHtml(projectData) {
+    const types = ['epic', 'story', 'task', 'sub-task', 'bug']
+    let response = []
+    response.push(`<table style="width: auto;" class="table table-striped table-hover table-sm"><thead class="thead-dark"><tr><th scope="col">Project Name</th><th>${types.join('</th><th scope="col">')}</th></tr></thead><tbody>`)
+    response.push(`<em>${Object.keys(projectData).length} projects as of ${new Date()}`)
+    Object.keys(projectData).forEach((key) => {
+        // debug(`projectData[${key}]`, projectData[key], projectData.key)
+        response.push(
+            `<tr><th scope="row">${key}</th><td>${projectData[key].counts.join('</td><td>')}</td></tr>`
+        )
+    })
+    response.push('</tbody></table>')
+    return (response.join(''))
+}
+
 function getFontawesomeJsLink() {
     if (useFontawesome) {
         return `<script src="${config().fa}" crossorigin="anonymous"></script>`
@@ -199,7 +214,7 @@ function printList(data, key = false, numbered = false, format = "html") {
 }
 
 async function getProjects() {
-    return(await jsr.getProjects())    
+    return(await jsr.getProjects(true))    
 }
 
 module.exports = {
@@ -207,6 +222,7 @@ module.exports = {
     getFields,
     formatConfigHtml,
     formatFieldsHtml,
+    formatProjectDataHtml,
     useFontawesome,
     faIcons,
     getFontawesomeIcon,

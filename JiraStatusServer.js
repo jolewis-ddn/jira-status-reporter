@@ -334,20 +334,20 @@ server.get('/dashboard', async (req, res, next) => {
   return next()
 })
 
-server.get('/projects', async (req, res, next) => {
-  const projects = await jsr.getProjects()
-  if (req.query && req.query.format == 'html') {
-    res.writeHead(200, { 'Content-Type': 'text/html' })
-    res.write(buildHtmlHeader('Projects', false))
-    res.write(buildPageHeader('Projects'))
-    res.write(JiraStatus.printList(projects, 'name', true))
-    res.write(buildHtmlFooter())
-    res.end()
-  } else {
-    res.send(projects)
-  }
-  return next()
-})
+// server.get('/projects', async (req, res, next) => {
+//   const projects = await jsr.getProjects()
+//   if (req.query && req.query.format == 'html') {
+//     res.writeHead(200, { 'Content-Type': 'text/html' })
+//     res.write(buildHtmlHeader('Projects', false))
+//     res.write(buildPageHeader('Projects'))
+//     res.write(JiraStatus.printList(projects, 'name', true))
+//     res.write(buildHtmlFooter())
+//     res.end()
+//   } else {
+//     res.send(projects)
+//   }
+//   return next()
+// })
 
 function buildLink(
   issueKey,
@@ -370,6 +370,29 @@ function buildLink(
 function startHtml(res) {
   res.writeHead(200, { 'Content-Type': 'text/html' })
 }
+
+server.get('/projects', async (req, res, next) => {
+  const fullView = req.query && req.query.full && req.query.full == 'true'
+  const projectData = await jsr.getProjects(fullView)
+  if (req.query && req.query.format == 'html') {
+    startHtml(res)
+    const title = `Project Data (${fullView ? 'Expanded' : 'Simple'})`
+    res.write(buildHtmlHeader(title, false))
+    res.write(buildPageHeader(title, config().jira.host))
+    if (fullView) {
+      res.write(await JiraStatus.formatProjectDataHtml(projectData))
+    } else {
+      debug(projectData)
+      res.write(JiraStatus.printList(projectData, 'key', true))
+    }
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send(projectData)
+    res.end()
+  }
+  return next()
+})
 
 server.get('/fields', async (req, res, next) => {
   debug('/fields called...')
