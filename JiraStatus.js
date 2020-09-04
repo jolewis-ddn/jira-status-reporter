@@ -3,7 +3,6 @@ const JSR = require('./JiraStatusReporter')
 let jsr = new JSR()
 
 const config = require('./config')
-const { result } = require('lodash')
 
 const faIcons = {
     Epic: 'fa:fa-fort-awesome',

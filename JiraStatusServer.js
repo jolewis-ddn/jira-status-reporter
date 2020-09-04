@@ -22,9 +22,10 @@ let jdr = new JiraDataReader()
 const Dashboard = require('./Dashboard')
 const dashboard = new Dashboard()
 
-const path = require('path')
-const { link } = require('fs')
-const { resolve } = require('path')
+const LocalStorage = require('node-localstorage').LocalStorage
+let ls = new LocalStorage('./.cache')
+
+// const path = require('path')
 // const JiraDataCache = require('./JiraDataCache');
 
 const labels = ['Epic', 'Story', 'Task', 'Sub-task', 'Bug']
@@ -319,6 +320,20 @@ function updateStats(stats, issueType, issueStatusName) {
  ************** ENDPOINTS **************
  */
 
+server.get('/testStorage', async (req, res, next) => {
+  const data = { key: 'status', first: 'working', second: [ 'a','b','c'] }
+  // var store = require('store')
+  // store.set('test 1', data)
+  // const d2 = store.get('test 1')
+  // res.send(d2)
+  var ls = require('node-localstorage').LocalStorage
+  ls = new ls('./scratch')
+  // ls.setItem('test 2', JSON.stringify(data))
+  // debug(ls.getItem('test 2'))
+  res.send(JSON.parse(ls.getItem('test 2')))
+  return next()
+})
+
 server.get('/dashboard', async (req, res, next) => {
   await dashboard.build()
   if (req.query && req.query.format == 'html') {
@@ -374,6 +389,11 @@ function startHtml(res) {
 server.get('/projects', async (req, res, next) => {
   const fullView = req.query && req.query.full && req.query.full == 'true'
   const projectData = await jsr.getProjects(fullView)
+
+  // Save project data locally
+  const nowMs = new Date().getTime()
+  ls.setItem(`projectData-${nowMs}`, JSON.stringify(projectData))
+
   if (req.query && req.query.format == 'html') {
     startHtml(res)
     const title = `Project Data (${fullView ? 'Expanded' : 'Simple'})`
