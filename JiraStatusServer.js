@@ -383,6 +383,8 @@ server.get('/projects', async (req, res, next) => {
       res.write(await JiraStatus.formatProjectDataHtml(projectData))
     } else {
       debug(projectData)
+      // TODO: Fix this URL
+      // res.write(JiraStatus.printList(projectData, 'key', true, "html", '/projects/'))
       res.write(JiraStatus.printList(projectData, 'key', true))
     }
     res.write(buildHtmlFooter())

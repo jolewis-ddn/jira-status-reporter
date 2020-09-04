@@ -191,13 +191,23 @@ async function report() {
     })
 }
 
-function printList(data, key = false, numbered = false, format = "html") {
+function printList(data, key = false, numbered = false, format = "html", link = false, linkPrefix = false) {
     if (typeof data == typeof []) { // List of objects
         if (key) {
             let results = []
             results.push(numbered ? `<ol>` : `<ul>`)
             data.forEach(d => {
-                results.push(`<li>${d[key]}</li>`)
+                let printedName = d[key]
+                debug(printedName, numbered, format, link, linkPrefix)
+                if (link) {
+                    // Make the name a link
+                    if (linkPrefix) {
+                        printedName = `<a href='${link}/${linkPrefix}'>${d[key]}</a> [${name}]`
+                    } else {
+                        printedName = `<a href='${link}/${d[key]}'>${d.name}</a> [${d[key]}]`
+                    }
+                }
+                results.push(`<li>${printedName}</li>`)
             })
             results.push(`</ul>`)
             return(results.join(''))
