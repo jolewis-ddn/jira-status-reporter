@@ -1,6 +1,6 @@
 const debug = require('debug')('Dashboard')
 
-const config = require('./config.js')
+const config = require('config')
 
 const JSR = require('./JiraStatusReporter')
 const jsr = new JSR()
@@ -20,122 +20,122 @@ class Dashboard {
     async build() {
         const results = await Promise.all([
             jsr.bareQueryCount(
-                `project = ${config().project} AND createdDate > -1d`,
+                `project = ${config.get('project')} AND createdDate > -1d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND createdDate > -7d`,
+                `project = ${config.get('project')} AND createdDate > -7d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND createdDate > -30d`,
+                `project = ${config.get('project')} AND createdDate > -30d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND createdDate > -60d`,
+                `project = ${config.get('project')} AND createdDate > -60d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND createdDate > -90d`,
-                1
-            ),
-
-            jsr.bareQueryCount(
-                `project = ${config().project} AND updatedDate > -1d`,
-                1
-            ),
-            jsr.bareQueryCount(
-                `project = ${config().project} AND updatedDate > -7d`,
-                1
-            ),
-            jsr.bareQueryCount(
-                `project = ${config().project} AND updatedDate > -30d`,
-                1
-            ),
-            jsr.bareQueryCount(
-                `project = ${config().project} AND updatedDate > -60d`,
-                1
-            ),
-            jsr.bareQueryCount(
-                `project = ${config().project} AND updatedDate > -90d`,
+                `project = ${config.get('project')} AND createdDate > -90d`,
                 1
             ),
 
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND createdDate > -1d`,
+                `project = ${config.get('project')} AND updatedDate > -1d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND createdDate > -7d`,
+                `project = ${config.get('project')} AND updatedDate > -7d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND createdDate > -30d`,
+                `project = ${config.get('project')} AND updatedDate > -30d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND createdDate > -60d`,
+                `project = ${config.get('project')} AND updatedDate > -60d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND createdDate > -90d`,
+                `project = ${config.get('project')} AND updatedDate > -90d`,
                 1
             ),
 
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND updatedDate > -1d`,
+                `project = ${config.get('project')} AND issuetype=bug AND createdDate > -1d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND updatedDate > -7d`,
+                `project = ${config.get('project')} AND issuetype=bug AND createdDate > -7d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND updatedDate > -30d`,
+                `project = ${config.get('project')} AND issuetype=bug AND createdDate > -30d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND updatedDate > -60d`,
+                `project = ${config.get('project')} AND issuetype=bug AND createdDate > -60d`,
                 1
             ),
             jsr.bareQueryCount(
-                `project = ${config().project} AND issuetype=bug AND updatedDate > -90d`,
+                `project = ${config.get('project')} AND issuetype=bug AND createdDate > -90d`,
+                1
+            ),
+
+            jsr.bareQueryCount(
+                `project = ${config.get('project')} AND issuetype=bug AND updatedDate > -1d`,
+                1
+            ),
+            jsr.bareQueryCount(
+                `project = ${config.get('project')} AND issuetype=bug AND updatedDate > -7d`,
+                1
+            ),
+            jsr.bareQueryCount(
+                `project = ${config.get('project')} AND issuetype=bug AND updatedDate > -30d`,
+                1
+            ),
+            jsr.bareQueryCount(
+                `project = ${config.get('project')} AND issuetype=bug AND updatedDate > -60d`,
+                1
+            ),
+            jsr.bareQueryCount(
+                `project = ${config.get('project')} AND issuetype=bug AND updatedDate > -90d`,
                 1
             ),
 
             jsr.bareQueryCount(
                 `project = ${
-                config().project
+                config.get('project')
                 } AND issuetype=bug AND status was in (DONE) DURING ("2020/08/27", "2020/08/28")`,
                 1
             ),
             jsr.bareQueryCount(
                 `project = ${
-                config().project
+                config.get('project')
                 } AND issuetype=bug AND status was in (DONE) DURING ("2020/08/20", "2020/08/21")`,
                 1
             ),
             jsr.bareQueryCount(
                 `project = ${
-                config().project
+                config.get('project')
                 } AND issuetype=bug AND status was in (DONE) DURING ("2020/07/27", "2020/07/28")`,
                 1
             ),
             jsr.bareQueryCount(
                 `project = ${
-                config().project
+                config.get('project')
                 } AND issuetype=bug AND status was in (DONE) DURING ("2020/06/27", "2020/06/28")`,
                 1
             ),
             jsr.bareQueryCount(
                 `project = ${
-                config().project
+                config.get('project')
                 } AND issuetype=bug AND status was in (DONE) DURING ("2020/05/27", "2020/05/28")`,
                 1
             ),
             jsr.bareQueryCount(
                 `project = ${
-                config().project
+                config.get('project')
                 } AND issuetype=bug AND status was in (DONE) DURING ("2020/05/26", "2020/05/27")`,
                 1
             )

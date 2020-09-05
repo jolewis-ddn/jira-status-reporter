@@ -4,7 +4,7 @@ const restify = require('restify')
 const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
 
-const config = require('./config')
+const config = require('config')
 
 const mermaidConfig = require('./config/mermaid-config')
 
@@ -373,8 +373,8 @@ function buildLink(
   issueStatus
 ) {
   const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
-  return `<span class='issueComboLink lineicon'><a href='${config().jira.protocol}://${
-    config().jira.host
+  return `<span class='issueComboLink lineicon'><a href='${config.get('jira.protocol')}://${
+    config.get('jira.host')
   }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
     statusName
   )}' src='${issueTypeIconUrl}' title='${cleanText(
@@ -398,7 +398,7 @@ server.get('/projects', async (req, res, next) => {
     startHtml(res)
     const title = `Project Data (${fullView ? 'Expanded' : 'Simple'})`
     res.write(buildHtmlHeader(title, false))
-    res.write(buildPageHeader(title, config().jira.host))
+    res.write(buildPageHeader(title, config.get('jira.host')))
     if (fullView) {
       res.write(await JiraStatus.formatProjectDataHtml(projectData))
     } else {
@@ -422,7 +422,7 @@ server.get('/fields', async (req, res, next) => {
   if (req.query && req.query.format == 'html') {
     startHtml(res)
     res.write(buildHtmlHeader('Field List', false))
-    res.write(buildPageHeader('Field List', config().jira.host))
+    res.write(buildPageHeader('Field List', config.get('jira.host')))
     res.write(await JiraStatus.formatFieldsHtml(data))
     res.write(buildHtmlFooter())
   } else {
@@ -662,7 +662,7 @@ server.get('/epics', (req, res, next) => {
           `<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`
         )
         details.push(
-          `<a href='${config().jira.protocol}://${config().jira.host}/browse/${
+          `<a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${
             epicData.key
           }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
             statusName
@@ -712,8 +712,8 @@ server.get('/epics', (req, res, next) => {
           switch (issue.fields.issuetype.name) {
             case 'Epic':
               resultCtr['Epics'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -729,8 +729,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Story':
               resultCtr['Stories'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -746,8 +746,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Task':
               resultCtr['Tasks'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -763,8 +763,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Sub-task':
               resultCtr['Sub-tasks'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -780,8 +780,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Bug':
               resultCtr['Bugs'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -996,10 +996,10 @@ server.get('/datafiles', (req, res, next) => {
   return next()
 })
 
-server.listen(config().server.port, function () {
+server.listen(config.get('server.port'), function () {
   console.log(
     `${server.name} listening at ${server.url} [Jira Server: ${
-      config().jira.username
-    } @ ${config().jira.host}]`
+      config.get('jira.username')
+    } @ ${config.get('jira.host')}]`
   )
 })

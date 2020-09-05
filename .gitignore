@@ -12,7 +12,7 @@ data/*
 
 scratch.js
 
-jiraConfig.json
+./*/jiraConfig.json
 auth*.js
 
 *.mmd

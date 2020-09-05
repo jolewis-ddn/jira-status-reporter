@@ -1,7 +1,7 @@
 'use strict'
 const debug = require('debug')('JSR')
 const JiraApi = require('jira-client')
-const config = require('./config.js')
+const config = require('config')
 const datefns = require('date-fns')
 
 const jsrFileMgr = require('./JiraStatusReporterFileManager')
@@ -10,14 +10,14 @@ const chartLinkMaker = require('./ChartLinkMaker')
 const ACTION_CONTENTS = 99
 const ACTION_COUNT = 1
 
-const PROJECT_NAME = config().project
+const PROJECT_NAME = config.has('project') ? config.get('project') : 'UNSET'
 
 const jira = new JiraApi({
-  protocol: config().jira.protocol,
-  host: config().jira.host,
-  username: config().jira.username,
-  password: config().jira.password,
-  apiVersion: config().jira.apiVersion,
+  protocol: config.get('jira.protocol'),
+  host: config.get('jira.host'),
+  username: config.get('jira.username'),
+  password: config.get('jira.password'),
+  apiVersion: config.get('jira.apiVersion'),
   strictSSL: true
 })
 

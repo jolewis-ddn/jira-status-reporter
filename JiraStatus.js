@@ -2,7 +2,7 @@ const debug = require('debug')('JiraStatus')
 const JSR = require('./JiraStatusReporter')
 let jsr = new JSR()
 
-const config = require('./config')
+const config = require('config')
 
 const faIcons = {
     Epic: 'fa:fa-fort-awesome',
@@ -12,7 +12,7 @@ const faIcons = {
     Bug: 'fa:fa-bug'
 }
 
-const useFontawesome = 'fa' in config() && config().fa
+const useFontawesome = config.has('fa')
 
 async function getFields() {
     debug(`getFields() called`)
@@ -62,7 +62,7 @@ async function formatProjectDataHtml(projectData) {
 
 function getFontawesomeJsLink() {
     if (useFontawesome) {
-        return `<script src="${config().fa}" crossorigin="anonymous"></script>`
+        return `<script src="${config.get('fa')}" crossorigin="anonymous"></script>`
     } else {
         return ''
     }
@@ -82,7 +82,7 @@ function formatCssClassName(jiraName) {
 }
 
 async function getConfig() {
-    const cfg = config()
+    const cfg = config.util.toObject()
     cfg.jira.password = '***REMOVED***'
     return cfg
 }
@@ -95,39 +95,39 @@ function formatConfigHtml(configDetails) {
             Jira Username
             </dt>
             <dd class="col-sm-9">
-            ${config().jira.username}
+            ${config.get('jira.username')}
             </dd>
             <dt class="col-sm-3">
             Jira URL
             </dt>
             <dd class="col-sm-9">
-            ${config().jira.protocol}://${config().jira.host}
+            ${config.get('jira.protocol')}://${config.get('jira.host')}
             </dd>
             <dt class="col-sm-3">
             API
             </dt>
             <dd class="col-sm-9">
-            ${config().jira.apiVersion}
+            ${config.get('jira.apiVersion')}
             </dd>
             <dt class="col-sm-3">
             Server: Port
             </dt>
             <dd class="col-sm-9">
-            ${config().server.port.port}
+            ${config.get('server.port.port')}
             </dd>
             <dt class="col-sm-3">
             Graphic Server
             </dt>
             <dd class="col-sm-9">
-            ${config().graphicServer.protocol}://${
-        config().graphicServer.server
-        }:${config().graphicServer.port}/${config().graphicServer.script}
+            ${config.get('graphicServer.protocol')}://${
+        config.get('graphicServer.server')
+        }:${config.get('graphicServer.port')}/${config.get('graphicServer.script')}
             </dd>
             <dt class="col-sm-3">
             Project
             </dt>
             <dd class="col-sm-9">
-            ${config().project}
+            ${config.has('project') ? config.get('project') : 'not set'}
             </dd>
             </dl>`)
     return(response.join(''))
@@ -140,11 +140,11 @@ async function report() {
         Promise.all([
             jsr.countRedEpics(),
             jsr.countDeadIssues(),
-            jsr.countOpenIssuesByProject(config().project),
-            jsr.countIssuesDoneThisMonth(config().project),
-            jsr.getIssuesDoneThisMonth(config().project),
-            jsr.countIssuesChangedThisMonthByProjectAndStatus(config().project, 'Status'),
-            jsr.getIssuesChangedThisWeekByProjectAndStatus(config().project, 'Status')
+            jsr.countOpenIssuesByProject(config.get('project')),
+            jsr.countIssuesDoneThisMonth(config.get('project')),
+            jsr.getIssuesDoneThisMonth(config.get('project')),
+            jsr.countIssuesChangedThisMonthByProjectAndStatus(config.get('project'), 'Status'),
+            jsr.getIssuesChangedThisWeekByProjectAndStatus(config.get('project'), 'Status')
         ])
             .then((values) => {
                 const doneData = values[4].issues

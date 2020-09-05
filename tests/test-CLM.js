@@ -5,7 +5,7 @@ const fs = require('fs')
 
 const ChartLinkMaker = require('../ChartLinkMaker')
 
-const CONFIG_JS = '../config'
+const CONFIG_JS = 'config'
 
 const TEST_TITLE = 'test title'
 const TEST_DATA_OBJ = {
