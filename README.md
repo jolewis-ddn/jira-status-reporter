@@ -5,17 +5,17 @@ Collection of node scripts to query, store, and report on Jira issues.
 ## Folders
 
 * `./data/`: Where the database and all JSON files will be stored
+* `./.cache/`: Project data cache
 
 ## Contents
 
-* `config.js`: Defines how you connect to Jira
+* `JiraStatusServer.js`: Run a local server for handling queries
 * `JiraStatusReporter.js`: The main Javascript class
 * `*.sh`: Shell-wrappers for the Javascript files
   * `pullDataForYesterday.sh` queries and stores all Jira issues by Status for the prior calendar day. All data is stored in `./data/*.json` files with the Status and date in the filename.
 * `get*.js`: Query (and store) Jira issue details (counts or data)
   * `getIssueCounts*` only return a total number
   * `getIssues*` return the full Jira issue data
-* `simple-server.js`: Run a local server for handling queries
 * `jira-stats.sql`: Table definition for local jira stats
 
 ## Prerequisites
