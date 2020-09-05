@@ -12,7 +12,8 @@ data/*
 
 scratch.js
 
-./*/jiraConfig.json
+config/*
+
 auth*.js
 
 *.mmd
