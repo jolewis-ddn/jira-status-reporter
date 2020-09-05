@@ -66,6 +66,30 @@ Collection of node scripts to query, store, and report on Jira issues.
     >.quit
     ```
 
+## Endpoints
+* `/`: no-op
+### Configuration
+* `/config`: Current config
+* `/fields`: All Jira fields (standard and custom)
+### Issues
+* `/chart`: Visualize timeseries data using cache
+* `/dashboard`: Data visualization of current status (no cache)
+* `/epics`: Visualize Epic status (includes linked issues)
+* `/filter`: Visualize issue status using existing Jira filter
+* `/links`: Visualize issue links
+* `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
+### Cache
+* `/cache`: Current in-memory cache
+* `/datafiles`: List of data files in cache
+* `/dates`: All dates covered by cache
+* `/homedir`: The current root cache folder
+* `/rebuild-cache`: Delete and recreate the cache from source data
+* `/refresh-cache`: Update the cache with new source data files
+* `/reread-cache`: Re-read the cache from disk
+* `/reset`: Re-initialize the cache
+* `/series`: Issue counts by status
+* `/wipe-cache`: Delete the cache
+
 ## Optional Configuration: Multiple Jira Instances
 
 * If you would like to run multiple instances pointing to different Jira servers, follow these steps:
