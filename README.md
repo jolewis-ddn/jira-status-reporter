@@ -45,46 +45,32 @@ Collection of node scripts to query, store, and report on Jira issues.
   
   mkdir data
 	```
-* Copy (or rename) `config.js-template` to `config.js`
-* Update the values in `config.js` as appropriate
-  * The `server.port` setting is only required if you run the local server
+* Copy (or rename) `default-template.json` to `default.json`
+  * Note: Other formats may be used. See ![node-config Configuration Files wiki page](https://github.com/lorenwest/node-config/wiki/Configuration-Files) for full details. The fields in default-template.json` must exist in whatever config file/format you choose.
+* Update the values in `default.json` as appropriate
   * `fa` is optional and must include the full URL to your FontAwesome JavaScript kit - e.g. ,
     `"fa": "https://kit.fontawesome.com/0123456789.js"`
     * If you enable FontAwesome, you may wish to adjust the faIcons object to point to different icons.
-  * All others are required
+  * All others fields are required
 * Create the database
   * ```
     sqlite3 ./data/jira-stats.db
     >.read ./jira-stats.sql
     >.quit
     ```
-
-## Optional Configuration: Multiple Jira Instances
-
-* If you would like to run multiple instances pointing to different Jira servers, follow these steps:
-  * Copy `.JiraStatusServer-template.json` to `.JiraStatusServer.json`
-  * Update that file to set the "config" value to a valid file name in the current folder. That file must follow the same format as `jiraConfig.json`.
-  * Run `JiraStatusServer` as outlined below. When the app starts up, it will see the new config file name and read that new file name for the configuration parameters.
-    * If the new config file name in `.JiraStatusServer.json` does not exist, the app will fail to start.
-
-**Notes**:
-  * This is completely optional. If you only have a single Jira instance, you can simply use `jiraConfig.json` as-is.
-  * Make sure you don't use the same port number in multiple config files - otherwise app startup will fail.
-
+* You can specify alternate configurations by setting NODE_ENV.
+  * For example, if a config file named `Production.json` exists in the `config` directory, setting NODE_ENV to `Production` before running `JiraStatusServer.js` will pick up the values from `config/Production.json` (or `config/Production.yaml` or any other config file supported by `node-config` (see above).)
+  
 ## Usage example
 
 1. Collect status for a specific month: `./getIssueCountsByMonth.sh <month-number>` (e.g. `6` for June)
 1. Collect stats for a specific status and month: `node getIssueCountsByStatusAndMonth.js -s ICEBOX -m 6`
 1. Pull all Jira issue data for all statuses from yesterday and store as JSON files in `./data/`: `./pullDataForYesterday.sh`
     * ** Warning ** This can result in significant data storage, depending on your Jira project size
-1. Run the status server (_from source_): 
+1. Run the status server
   * Production: `npm run server`
-  * Debug (nodemon - _recommended_): `set DEBUG=*,-nodemon* && npm run server-debug`
-  * Debug: `set DEBUG=* && node JiraStatusServer.js`
-  1. Open http://localhost:9999/chart to see the default chart (use server.port as set in `jiraConfig.json`)
-1. Run the status server (_from binary_):
-  * Debug: `set DEBUG=*` before running the app binary.
-  * Run the binary for your platform (i.e. `JiraStatusServer-win.exe`, `JiraStatusServer-mac`, or `JiraStatusServer-linux`)
+  * Debug: `npm run server-debug`
+  1. Open http://localhost:9999/chart to see the default chart (use server.port as set in your config file)
 
 ## Getting help
 1. All node scripts have a help page: `node script.js --help`
