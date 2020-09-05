@@ -5,10 +5,12 @@
   "main": "JiraStatusServer.js",
   "dependencies": {
     "@nastyox/rando.js": "^2.0.2",
+    "config": "^3.3.1",
     "date-fns": "^2.15.0",
     "debug": "^4.1.1",
     "jira-client": "^6.18.0",
     "lodash": "^4.17.20",
+    "node-localstorage": "^2.1.6",
     "restify": "^8.5.1",
     "restify-cors-middleware": "^1.1.1",
     "sqlite3": "^4.2.0",
@@ -20,7 +22,7 @@
   },
   "scripts": {
     "test": "nyc --reporter=html --reporter=text ava",
-    "test-watch": "npm run test -- --watch",
+    "test-watch": "npx ava -- --watch",
     "server-debug": "set DEBUG=*,-nodemon* && nodemon JiraStatusServer.js",
     "server": "nodemon JiraStatusServer.js"
   },

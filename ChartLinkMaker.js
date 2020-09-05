@@ -1,7 +1,7 @@
 'use strict'
 
 const debug = require('debug')('chart-link-maker')
-const config = require('./config.js')
+const config = require('config')
 
 const randojs = require('@nastyox/rando.js'), rando = randojs.rando, randoSequence = randojs.randoSequence
 
@@ -9,11 +9,11 @@ const BAR_CHART_TYPE = 'bar'
 const LINE_CHART_TYPE = 'line'
 
 const BASE_URL =
-  config().graphicServer.protocol +
+  config.get('graphicServer.protocol') +
   '://' +
-  config().graphicServer.server +
+  config.get('graphicServer.server') +
   ':' +
-  config().graphicServer.port
+  config.get('graphicServer.port')
 
 const DEFAULT_CHART_TYPE = BAR_CHART_TYPE
 const DEFAULT_WIDTH = 500

@@ -4,7 +4,7 @@ const restify = require('restify')
 const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
 
-const config = require('./config')
+const config = require('config')
 
 const mermaidConfig = require('./config/mermaid-config')
 
@@ -19,9 +19,13 @@ let jsr = new JSR()
 const JiraDataReader = require('./JiraDataReader')
 let jdr = new JiraDataReader()
 
-const path = require('path')
-const { link } = require('fs')
-const { resolve } = require('path')
+const Dashboard = require('./Dashboard')
+const dashboard = new Dashboard()
+
+const LocalStorage = require('node-localstorage').LocalStorage
+let ls = new LocalStorage('./.cache')
+
+// const path = require('path')
 // const JiraDataCache = require('./JiraDataCache');
 
 const labels = ['Epic', 'Story', 'Task', 'Sub-task', 'Bug']
@@ -77,12 +81,13 @@ server.get('/homedir', (req, res, next) => {
 
 server.get('/config', async (req, res, next) => {
   const configDetails = await JiraStatus.getConfig()
+  debug(configDetails)
   if (req.query.format && req.query.format == 'html') {
     // TODO: Create automatic formatter
     res.writeHead(200, { 'Content-Type': 'text/html' })
     res.write(buildHtmlHeader('Config', false))
     res.write(buildPageHeader('Config'))
-    res.write(await JiraStatus.formatConfigHtml(configDetails))
+    res.write(JiraStatus.formatConfigHtml(configDetails))
     res.write(buildHtmlFooter())
   } else {
     res.send(configDetails)
@@ -315,180 +320,49 @@ function updateStats(stats, issueType, issueStatusName) {
  ************** ENDPOINTS **************
  */
 
-server.get('/dashboard', (req, res, next) => {
-  const results = Promise.all([
-    jsr.bareQueryCount(
-      `project = ${config().project} AND createdDate > -1d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND createdDate > -7d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND createdDate > -30d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND createdDate > -60d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND createdDate > -90d`,
-      1
-    ),
-
-    jsr.bareQueryCount(
-      `project = ${config().project} AND updatedDate > -1d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND updatedDate > -7d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND updatedDate > -30d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND updatedDate > -60d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND updatedDate > -90d`,
-      1
-    ),
-
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND createdDate > -1d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND createdDate > -7d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND createdDate > -30d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND createdDate > -60d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND createdDate > -90d`,
-      1
-    ),
-
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND updatedDate > -1d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND updatedDate > -7d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND updatedDate > -30d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND updatedDate > -60d`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${config().project} AND issuetype=bug AND updatedDate > -90d`,
-      1
-    ),
-
-    jsr.bareQueryCount(
-      `project = ${
-        config().project
-      } AND issuetype=bug AND status was in (DONE) DURING ("2020/08/27", "2020/08/28")`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${
-        config().project
-      } AND issuetype=bug AND status was in (DONE) DURING ("2020/08/20", "2020/08/21")`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${
-        config().project
-      } AND issuetype=bug AND status was in (DONE) DURING ("2020/07/27", "2020/07/28")`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${
-        config().project
-      } AND issuetype=bug AND status was in (DONE) DURING ("2020/06/27", "2020/06/28")`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${
-        config().project
-      } AND issuetype=bug AND status was in (DONE) DURING ("2020/05/27", "2020/05/28")`,
-      1
-    ),
-    jsr.bareQueryCount(
-      `project = ${
-        config().project
-      } AND issuetype=bug AND status was in (DONE) DURING ("2020/05/26", "2020/05/27")`,
-      1
-    )
-  ])
-    .then((results) => {
-      debug(`dashboard results: ${results}`)
-      res.send({
-        meta: {
-          Categories: [
-            'Yesterday',
-            'Last 7 days',
-            'Last 30 days',
-            'Last 60 days',
-            'Last 90 days'
-          ]
-        },
-        Total: {
-          Created: [results[0], results[1], results[2], results[3], results[4]],
-          Updated: [results[5], results[6], results[7], results[8], results[9]],
-          CreatedBugs: [
-            results[10],
-            results[11],
-            results[12],
-            results[13],
-            results[14]
-          ],
-          UpdatedBugs: [
-            results[15],
-            results[16],
-            results[17],
-            results[18],
-            results[19]
-          ],
-          ClosedBugs: [
-            results[20] - results[21],
-            results[21] - results[22],
-            results[22] - results[23],
-            results[23] - results[24],
-            results[24] - results[25]
-          ],
-          ClosedBugsRaw: [
-            results[20],
-            results[21],
-            results[22],
-            results[23],
-            results[24],
-            results[25]
-          ]
-        }
-      })
-    })
-    .finally(() => {
-      return next()
-    })
+server.get('/testStorage', async (req, res, next) => {
+  const data = { key: 'status', first: 'working', second: [ 'a','b','c'] }
+  // var store = require('store')
+  // store.set('test 1', data)
+  // const d2 = store.get('test 1')
+  // res.send(d2)
+  var ls = require('node-localstorage').LocalStorage
+  ls = new ls('./scratch')
+  // ls.setItem('test 2', JSON.stringify(data))
+  // debug(ls.getItem('test 2'))
+  res.send(JSON.parse(ls.getItem('test 2')))
+  return next()
 })
+
+server.get('/dashboard', async (req, res, next) => {
+  await dashboard.build()
+  if (req.query && req.query.format == 'html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' })
+    res.write(buildHtmlHeader('Dashboard', false))
+    res.write(buildPageHeader('Dashboard'))
+    res.write(dashboard.fetch("html"))
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send(dashboard.fetch())
+  }
+  return next()
+})
+
+// server.get('/projects', async (req, res, next) => {
+//   const projects = await jsr.getProjects()
+//   if (req.query && req.query.format == 'html') {
+//     res.writeHead(200, { 'Content-Type': 'text/html' })
+//     res.write(buildHtmlHeader('Projects', false))
+//     res.write(buildPageHeader('Projects'))
+//     res.write(JiraStatus.printList(projects, 'name', true))
+//     res.write(buildHtmlFooter())
+//     res.end()
+//   } else {
+//     res.send(projects)
+//   }
+//   return next()
+// })
 
 function buildLink(
   issueKey,
@@ -499,8 +373,8 @@ function buildLink(
   issueStatus
 ) {
   const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
-  return `<span class='issueComboLink lineicon'><a href='${config().jira.protocol}://${
-    config().jira.host
+  return `<span class='issueComboLink lineicon'><a href='${config.get('jira.protocol')}://${
+    config.get('jira.host')
   }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
     statusName
   )}' src='${issueTypeIconUrl}' title='${cleanText(
@@ -512,13 +386,43 @@ function startHtml(res) {
   res.writeHead(200, { 'Content-Type': 'text/html' })
 }
 
+server.get('/projects', async (req, res, next) => {
+  const fullView = req.query && req.query.full && req.query.full == 'true'
+  const projectData = await jsr.getProjects(fullView)
+
+  // Save project data locally
+  const nowMs = new Date().getTime()
+  ls.setItem(`projectData-${nowMs}`, JSON.stringify(projectData))
+
+  if (req.query && req.query.format == 'html') {
+    startHtml(res)
+    const title = `Project Data (${fullView ? 'Expanded' : 'Simple'})`
+    res.write(buildHtmlHeader(title, false))
+    res.write(buildPageHeader(title, config.get('jira.host')))
+    if (fullView) {
+      res.write(await JiraStatus.formatProjectDataHtml(projectData))
+    } else {
+      debug(projectData)
+      // TODO: Fix this URL
+      // res.write(JiraStatus.printList(projectData, 'key', true, "html", '/projects/'))
+      res.write(JiraStatus.printList(projectData, 'key', true))
+    }
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send(projectData)
+    res.end()
+  }
+  return next()
+})
+
 server.get('/fields', async (req, res, next) => {
   debug('/fields called...')
   const data = await JiraStatus.getFields()
   if (req.query && req.query.format == 'html') {
     startHtml(res)
     res.write(buildHtmlHeader('Field List', false))
-    res.write(buildPageHeader('Field List', config().jira.host))
+    res.write(buildPageHeader('Field List', config.get('jira.host')))
     res.write(await JiraStatus.formatFieldsHtml(data))
     res.write(buildHtmlFooter())
   } else {
@@ -758,7 +662,7 @@ server.get('/epics', (req, res, next) => {
           `<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`
         )
         details.push(
-          `<a href='${config().jira.protocol}://${config().jira.host}/browse/${
+          `<a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${
             epicData.key
           }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
             statusName
@@ -808,8 +712,8 @@ server.get('/epics', (req, res, next) => {
           switch (issue.fields.issuetype.name) {
             case 'Epic':
               resultCtr['Epics'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -825,8 +729,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Story':
               resultCtr['Stories'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -842,8 +746,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Task':
               resultCtr['Tasks'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -859,8 +763,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Sub-task':
               resultCtr['Sub-tasks'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -876,8 +780,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Bug':
               resultCtr['Bugs'].push(
-                `<a href='${config().jira.protocol}://${
-                  config().jira.host
+                `<a href='${config.get('jira.protocol')}://${
+                  config.get('jira.host')
                 }/browse/${
                   issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
@@ -1092,10 +996,10 @@ server.get('/datafiles', (req, res, next) => {
   return next()
 })
 
-server.listen(config().server.port, function () {
+server.listen(config.get('server.port'), function () {
   console.log(
     `${server.name} listening at ${server.url} [Jira Server: ${
-      config().jira.username
-    } @ ${config().jira.host}]`
+      config.get('jira.username')
+    } @ ${config.get('jira.host')}]`
   )
 })

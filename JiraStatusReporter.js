@@ -1,7 +1,7 @@
 'use strict'
 const debug = require('debug')('JSR')
 const JiraApi = require('jira-client')
-const config = require('./config.js')
+const config = require('config')
 const datefns = require('date-fns')
 
 const jsrFileMgr = require('./JiraStatusReporterFileManager')
@@ -10,14 +10,14 @@ const chartLinkMaker = require('./ChartLinkMaker')
 const ACTION_CONTENTS = 99
 const ACTION_COUNT = 1
 
-const PROJECT_NAME = config().project
+const PROJECT_NAME = config.has('project') ? config.get('project') : 'UNSET'
 
 const jira = new JiraApi({
-  protocol: config().jira.protocol,
-  host: config().jira.host,
-  username: config().jira.username,
-  password: config().jira.password,
-  apiVersion: config().jira.apiVersion,
+  protocol: config.get('jira.protocol'),
+  host: config.get('jira.host'),
+  username: config.get('jira.username'),
+  password: config.get('jira.password'),
+  apiVersion: config.get('jira.apiVersion'),
   strictSSL: true
 })
 
@@ -162,17 +162,34 @@ class JiraStatusReporter {
       action
     )
   }
-  countRedEpics() {
-    return this._redEpics(ACTION_COUNT)
-  }
-  getRedEpics() {
-    return this._redEpics(ACTION_CONTENTS)
+
+  countIssues(project, type) {
+    return this._genericJiraSearch(
+      this.jqlAppendProject(project, `type=${type}`),
+      ACTION_COUNT
+      )
   }
 
-  _redEpics(action) {
-    debug(`_redEpics(${action}) called`)
+  countEpics(project) {
+    return this._epics(project, ACTION_COUNT)
+  }
+
+  getEpics(project) {
+    return this._epics(project, ACTION_CONTENTS)
+  }
+
+  countRedEpics() {
+    return this.countEpics('RED', ACTION_COUNT)
+  }
+
+  getRedEpics() {
+    return this.getEpics('RED', ACTION_CONTENTS)
+  }
+
+  _epics(project, action) {
+    debug(`_epics(${project}, ${action}) called`)
     return this._genericJiraSearch(
-      this.jqlAppendProject(PROJECT_NAME, JQL_EPIC),
+      this.jqlAppendProject(project, JQL_EPIC),
       action
       )
   }
@@ -392,6 +409,49 @@ class JiraStatusReporter {
     this.startAt = null
   }
 
+  async getProjects(countIssues) {
+    if (countIssues) { // Get all the issue counts, too
+      let projectData = {}
+      let promises = []
+      let seq = []
+      let names = []
+      const projects = await jira.listProjects()
+      // debug(`got projects list: ${projects}`)
+      const types = ['epic', 'story', 'task', 'sub-task', 'bug']
+
+      for (let y = 0; y < projects.length; y++) {
+        let p = projects[y]
+        types.forEach((issuetype) => {
+          if (p.projectTypeKey == 'software') {
+            promises.push(this.countIssues(`'${p.key}'`, issuetype))
+            seq.push({ name: p.name, issuetype: issuetype })
+            if (!names.includes(p.name)) {
+              names.push(p.name)
+              // debug(`adding ${p.name} to the projectData obj`)
+              projectData[p.name] = { counts: [0,0,0,0,0] }
+            }
+          } else {
+            debug(`${p.name} isn't a Software projects, so skipping`)
+            projectData[p.name] = { counts: [0,0,0,0,0] }
+          }
+        })
+      }
+
+      const results = await Promise.all(promises)
+      for (let x = 0; x < results.length; x++) {
+        let result = results[x]
+        let ndx = x
+        // debug(`name: ${seq[ndx].name}; type: ${seq[ndx].issuetype}; index: ${types.indexOf(seq[ndx].issuetype)}; result: ${result}`)
+        // debug(projectData[seq[ndx].name])
+        projectData[seq[ndx].name].counts[types.indexOf(seq[ndx].issuetype)] = result
+      }
+      // debug(`finally returning `, projectData)
+      return (projectData)
+    } else { // Just the project names
+      return jira.listProjects()
+    }
+}
+      
   _genericJiraSearch(jql, action) {
     return new Promise((resolve, reject) => {
       debug(`_genericJiraSearch(${jql}) called...`)
@@ -405,7 +465,7 @@ class JiraStatusReporter {
           jira
             .searchJira(jql, queryConfig)
             .then((response) => {
-              debug(`response: ${response.total}`)
+              // debug(`response: ${response.total}`)
               resolve(response.total)
             })
             .catch((err) => {

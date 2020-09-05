@@ -10,7 +10,25 @@ const JiraStatus = require('../JiraStatus')
 test.todo('Verify simple report output')
 test.todo('Verify config output - JSON')
 test.todo('Verify config output - HTML')
-test.todo('getFields')
+
+test('getFields: Length', async t => {
+   const data = await JiraStatus.getFields()
+   t.assert(data.length > 0)
+})
+
+test('getFields: Array', async t => {
+   const data = await JiraStatus.getFields()
+   t.assert(typeof data == typeof [])
+})
+
+test('getFields: Required Fields', async t => {
+   const data = await JiraStatus.getFields()
+   const REQUIRED_FIELDS = ["resolution", "lastViewed", "labels", "issuelinks", "assignee", "components", "subtasks", "reporter", "progress", "worklog", "issuetype", "resolutiondate", "watches", "updated", "description", "summary", "environment", "duedate", "comment", "fixVersions", "priority", "versions", "status", "issuekey", "creator"]
+   REQUIRED_FIELDS.forEach((REQ) => {
+      t.assert(data.find(el => el.id == REQ))
+   })
+})
+
 test.todo('FontAwesome: Turned on')
 test.todo('FontAwesome: Turned off')
 test.todo('FontAwesome: Get icons')

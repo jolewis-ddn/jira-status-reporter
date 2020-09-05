@@ -7,13 +7,15 @@ coverage
 .cache/*
 
 data/*
+.cache/*
 .jiraCache.json
 *.json
 *.html
 
 scratch.js
 
-jiraConfig.json
+config/*
+
 auth*.js
 
 *.mmd

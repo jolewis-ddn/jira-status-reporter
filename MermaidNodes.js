@@ -255,8 +255,8 @@ class MermaidNodes {
                 htmlOutput.push(`click ${c} "${urlScript}${c}"\n`)
             } else {
                 htmlOutput.push(
-                    `click ${c} "${config().jira.protocol}://${
-                    config().jira.host
+                    `click ${c} "${config.get('jira.protocol')}://${
+                    config.get('jira.host')
                     }/browse/${c}" _blank\n`
                 )
             }
