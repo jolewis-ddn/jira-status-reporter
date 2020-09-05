@@ -4,6 +4,8 @@ node_modules
 .nyc_output
 coverage
 
+.cache/*
+
 data/*
 .jiraCache.json
 *.json

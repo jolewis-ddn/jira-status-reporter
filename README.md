@@ -37,6 +37,13 @@ Collection of node scripts to query, store, and report on Jira issues.
   * See https://quickchart.io/ for instructions
   * Configure the server and port in the config.js file
 
+## Features
+* Graphical display of issue links (using Mermaid)
+![Links with icon](./screenshots/Links-icons.png)
+![Links without icons](./screenshots/Links-noicons.png)
+* JSON/HTML list of projects (with or without issue type counts)
+* JSON/HTML list of fields (standard & custom)
+![Field list - sample](./screenshots/Field%20list%20example.png)
 
 ## Installation and Setup
 * ```sh
