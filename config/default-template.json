@@ -16,5 +16,6 @@
         "script": "QUICKCHART_SCRIPT_DEFAULT_chart"
     },
     "project": "DEFAULT_PROJECT_NAME",
+    "ignore": [ "PROJECT_KEY_OR_NAME_TO_IGNORE_OPTIONAL" ],
     "fa": "URL_TO_FONTAWESOME_WITH_KEY_OPTIONAL"
 }

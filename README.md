@@ -2,51 +2,17 @@
 
 Collection of node scripts to query, store, and report on Jira issues.
 
-## Folders
-
-* `./data/`: Where the database and all JSON files will be stored
-* `./.cache/`: Project data cache
-
-## Contents
-
-* `JiraStatusServer.js`: Run a local server for handling queries
-* `JiraStatusReporter.js`: The main Javascript class
-* `*.sh`: Shell-wrappers for the Javascript files
-  * `pullDataForYesterday.sh` queries and stores all Jira issues by Status for the prior calendar day. All data is stored in `./data/*.json` files with the Status and date in the filename.
-* `get*.js`: Query (and store) Jira issue details (counts or data)
-  * `getIssueCounts*` only return a total number
-  * `getIssues*` return the full Jira issue data
-* `jira-stats.sql`: Table definition for local jira stats
-
-## Prerequisites
-* sqlite3: for local stats storage
-* node
-
-## Dependencies
-* Node modules
-  * `jira-client`: Main Jira client tool
-  * `commander`: For parsing command line options
-  * `restify`: For `simple-server.js`
-  * `debug`: For logging
-  * `supports-color`: For `debug`
-  * `date-fns`: For date manipulation
-  * `ava`: For testing
-  * `istanbul`: For test coverage
-  * `rando.js`: For random chart IDs
-  * `node-config`: Manages configuration
-* Working QuickChart server
-  * See https://quickchart.io/ for instructions
-  * Configure the server and port in the config.js file
-
 ## Features
 * Graphical display of issue links (using Mermaid)
 ![Links with icon](./screenshots/Links-icons.png)
 ![Links without icons](./screenshots/Links-noicons.png)
 * JSON/HTML list of projects (with or without issue type counts)
+![Project list - sample](./screenshots/Project%20list%20example.png)
 * JSON/HTML list of fields (standard & custom)
 ![Field list - sample](./screenshots/Field%20list%20example.png)
 
 ## Installation and Setup
+### For live queries
 * ```sh
   git clone https://github.com/jolewis-ddn/jira-status-reporter
   npm install
@@ -60,6 +26,7 @@ Collection of node scripts to query, store, and report on Jira issues.
     `"fa": "https://kit.fontawesome.com/0123456789.js"`
     * If you enable FontAwesome, you may wish to adjust the faIcons object to point to different icons.
   * All others fields are required
+### For cached queries - _optional_
 * Create the database
   * ```
     sqlite3 ./data/jira-stats.db
@@ -115,6 +82,38 @@ To turn on debug output, set the `DEBUG` environment variable, like so:
 ```sh
 set DEBUG=*
 ```
+
+## Folders
+
+* `./data/`: Where the database and all JSON files will be stored
+* `./.cache/`: Project data cache
+
+## Main Files
+
+* `JiraStatusServer.js`: Run a local server for handling queries
+* `JiraStatusReporter.js`: The main Javascript class
+* `*.sh`: Shell-wrappers for the Javascript files
+  * `pullDataForYesterday.sh` queries and stores all Jira issues by Status for the prior calendar day. All data is stored in `./data/*.json` files with the Status and date in the filename.
+* `get*.js`: Query (and store) Jira issue details (counts or data)
+  * `getIssueCounts*` only return a total number
+  * `getIssues*` return the full Jira issue data
+* `jira-stats.sql`: Table definition for local jira stats
+
+## Dependencies
+* Node modules
+  * `jira-client`: Main Jira client tool
+  * `commander`: For parsing command line options
+  * `restify`: For `simple-server.js`
+  * `debug`: For logging
+  * `supports-color`: For `debug`
+  * `date-fns`: For date manipulation
+  * `ava`: For testing
+  * `istanbul`: For test coverage
+  * `rando.js`: For random chart IDs
+  * `node-config`: Manages configuration
+* Working QuickChart server
+  * See https://quickchart.io/ for instructions
+  * Configure the server and port in the config.js file
 
 ## License
 

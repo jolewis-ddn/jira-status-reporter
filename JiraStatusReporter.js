@@ -167,7 +167,7 @@ class JiraStatusReporter {
     return this._genericJiraSearch(
       this.jqlAppendProject(project, `type=${type}`),
       ACTION_COUNT
-      )
+    )
   }
 
   countEpics(project) {
@@ -421,20 +421,21 @@ class JiraStatusReporter {
 
       for (let y = 0; y < projects.length; y++) {
         let p = projects[y]
-        types.forEach((issuetype) => {
-          if (p.projectTypeKey == 'software') {
+        if (config.has('ignore') && (config.get('ignore').includes(p.key) || config.get('ignore').includes(p.name))) {
+          debug(`Skipping ${p.name} - set to 'ignore' in config`)
+          // projectData[p.name] = { counts: [0,0,0,0,0] }
+        } else {
+          debug(`Processing ${p.name}...`)
+          types.forEach((issuetype) => {
+            // promises.push(new Promise(resolve => setTimeout(resolve, 500)).then(() => this.countIssues(`'${p.key}'`, issuetype)))
             promises.push(this.countIssues(`'${p.key}'`, issuetype))
             seq.push({ name: p.name, issuetype: issuetype })
             if (!names.includes(p.name)) {
               names.push(p.name)
-              // debug(`adding ${p.name} to the projectData obj`)
               projectData[p.name] = { counts: [0,0,0,0,0] }
             }
-          } else {
-            debug(`${p.name} isn't a Software projects, so skipping`)
-            projectData[p.name] = { counts: [0,0,0,0,0] }
-          }
-        })
+          })
+        }
       }
 
       const results = await Promise.all(promises)
