@@ -64,13 +64,16 @@ server.get('/', (req, res, next) => {
 })
 
 server.get('/report', (req, res, next) => {
+  debug('/report called')
   JiraStatus.report()
   .then((response) => {
-
     debug(`report response = `, response)
     res.send(response)
     res.end()
     return next()
+  })
+  .catch((err) => {
+    throw err
   })
 })
 
@@ -81,7 +84,6 @@ server.get('/homedir', (req, res, next) => {
 
 server.get('/config', async (req, res, next) => {
   const configDetails = await JiraStatus.getConfig()
-  debug(configDetails)
   if (req.query.format && req.query.format == 'html') {
     // TODO: Create automatic formatter
     res.writeHead(200, { 'Content-Type': 'text/html' })
@@ -91,6 +93,7 @@ server.get('/config', async (req, res, next) => {
     res.write(buildHtmlFooter())
   } else {
     res.send(configDetails)
+    res.end()
   }
   return next()
 })
@@ -426,7 +429,9 @@ server.get('/fields', async (req, res, next) => {
     res.write(await JiraStatus.formatFieldsHtml(data))
     res.write(buildHtmlFooter())
   } else {
+    // debug(typeof data)
     res.send(data)
+    res.end()
   }
   return next()
 })
@@ -996,10 +1001,12 @@ server.get('/datafiles', (req, res, next) => {
   return next()
 })
 
-server.listen(config.get('server.port'), function () {
-  console.log(
-    `${server.name} listening at ${server.url} [Jira Server: ${
-      config.get('jira.username')
-    } @ ${config.get('jira.host')}]`
-  )
-})
+// server.listen(config.get('server.port'), function () {
+//   console.log(
+//     `${server.name} listening at ${server.url} [Jira Server: ${
+//       config.get('jira.username')
+//     } @ ${config.get('jira.host')}]`
+//   )
+// })
+
+module.exports = server

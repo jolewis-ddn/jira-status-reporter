@@ -2,6 +2,20 @@ const test = require('ava')
 const debug = require('debug')('ava-tests-JiraStatus')
 
 const JiraStatus = require('../JiraStatus')
+const server = require('../JiraStatusServer')
+
+const supertest = require('supertest')
+const request = supertest(server)
+
+/*-----------------------------------
+   JiraStatusServer
+/------------------------------------*/
+
+test('JiraStatusServer/config returns 200 or 300', async (t) => {
+   const res = await request.get('/config')
+   t.regex(res.header['content-type'], /json/)
+   t.assert(res.status < 400)
+})
 
 /*-----------------------------------
    JiraStatus

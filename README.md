@@ -16,9 +16,9 @@ Collection of node scripts to query, store, and report on Jira issues.
 * ```sh
   git clone https://github.com/jolewis-ddn/jira-status-reporter
   npm install
-  
   mkdir data
 	```
+### Configuration
 * Copy (or rename) `default-template.json` to `default.json`
   * Note: Other formats may be used. See ![node-config Configuration Files wiki page](https://github.com/lorenwest/node-config/wiki/Configuration-Files) for full details. The fields in default-template.json` must exist in whatever config file/format you choose.
 * Update the values in `default.json` as appropriate
@@ -33,6 +33,8 @@ Collection of node scripts to query, store, and report on Jira issues.
     >.read ./jira-stats.sql
     >.quit
     ```
+## Running
+`node app.js`
 
 ## Endpoints
 * `/`: no-op

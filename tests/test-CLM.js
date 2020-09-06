@@ -52,6 +52,20 @@ test('Set Fill', (t) => {
     t.assert(clm.setFill('#ff0000') == clm)
 })
 
+test('Set Size', (t) => {
+    const NEW_SIZE = 10
+    const clm = new ChartLinkMaker(TEST_DATA_ARR, TEST_CATEGORIES)
+    clm.setSize(NEW_SIZE)
+    t.assert(clm.h == NEW_SIZE)
+    t.assert(clm.w == NEW_SIZE)
+})
+
+test('Build datasets', (t) => {
+    const clm = new ChartLinkMaker(TEST_DATA_ARR, TEST_CATEGORIES)
+    const datasets = clm._buildDatasets()
+    t.assert(typeof datasets == typeof "")
+})
+
 test('Validate Categories: Fails (pre setCategories())', (t) => {
     const clm = new ChartLinkMaker(TEST_DATA_ARR, TEST_CATEGORIES)
     clm.dataCategories = false
@@ -94,8 +108,10 @@ test('Confirm bar chart content', async (t) => {
     const config = require(CONFIG_JS)
 
     const chart = await clm.buildChartImgTag(TEST_TITLE, TEST_DATA_OBJ)
-    debug(`chart: ${chart}`)
     t.true(typeof chart == 'string')
+    t.regex(chart, /bb.generate/)
+    t.regex(chart, /size/)
+    t.regex(chart, /title/)
+    t.regex(chart, /data/)
+    t.regex(chart, /type: "pie"/)
 })
-
-test.todo('Validate response string contents')

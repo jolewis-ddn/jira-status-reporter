@@ -18,12 +18,13 @@
   },
   "devDependencies": {
     "ava": "^3.12.1",
-    "nyc": "^15.1.0"
+    "nyc": "^15.1.0",
+    "supertest": "^4.0.2"
   },
   "scripts": {
     "test": "nyc --reporter=html --reporter=text ava",
     "test-watch": "npx ava -- --watch",
-    "server-debug": "set DEBUG=*,-nodemon* && nodemon JiraStatusServer.js",
+    "server-debug": "set DEBUG=*,-nodemon*,-supertest*,-superagent* && nodemon JiraStatusServer.js",
     "server": "nodemon JiraStatusServer.js"
   },
   "repository": {

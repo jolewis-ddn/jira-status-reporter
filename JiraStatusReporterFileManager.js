@@ -13,13 +13,6 @@ class JiraStatusReporterFileManager {
         debug(`getHomeDir() called... returning ${this.homeDir}`)
         return(this.homeDir) 
     }
-
-    buildChartUrl() {
-        return new Promise((resolve, reject) => {
-            resolve("ok")
-            // reject(err)
-        })
-    }
 }
 
 module.exports = JiraStatusReporterFileManager

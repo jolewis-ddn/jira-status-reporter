@@ -1,12 +1,12 @@
 const test = require('ava')
 const debug = require('debug')('ava-tests-Config')
 
-const CONFIG_JS = 'config'
-// const DEFAULT_CONFIG_FILE = '../config/default.json'
+const config = require('config')
+
+const supertest = require('supertest')
 
 // Configuration
 test('Verify config file format', (t) => {
-    const config = require(CONFIG_JS)
     t.true(config.has('jira'))
     t.true(config.has('jira.protocol'))
     t.true(config.has('jira.host'))
@@ -19,6 +19,13 @@ test('Verify config file format', (t) => {
     // Note: "fa" is optional
 })
 
+// Jira: Connection
+test('Simple Jira server call connects with 2** or 3** response', async (t) => {
+    const url = config.get('jira.protocol') + '://' + config.get('jira.host')
+    const res = await supertest(url).get('/')
+    t.assert(res.status < 400)
+})
+ 
 test('JSR: Custom field list', (t) => {
     const JSR = require('../JiraStatusReporter')
     const jsr = new JSR()
