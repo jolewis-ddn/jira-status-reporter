@@ -1,0 +1,62 @@
+swagger: "2.0"
+info:
+  description: "Jira Status Reporter"
+  version: "1.0.0"
+  title: "JSR-UI"
+  # termsOfService: "http://.../"
+  # contact:
+    # email: "contact@..."
+  license:
+    name: "MIT"
+    url: "https://mit-license.org/"
+host: "localhost:9292"
+basePath: "/"
+schemes:
+# - "https"
+- "http"
+paths:
+  /config:
+    get:
+      summary: "Display configuration"
+      description: "Shows the current configuration."
+      operationId: "config"
+      responses:
+        "200":
+          description: "successful operation"
+        "404":
+          description: "No configuration set"
+  /fields:
+    get:
+      summary: "Field list"
+      description: "List all fields (standard + custom)"
+      operationId: "fields"
+      responses:
+        "200":
+          description: "successful operation"
+        "404":
+          description: "No configuration set"
+  /report:
+    get:
+      summary: "Simple report"
+      description: "Simple report"
+      operationId: "report"
+      responses:
+        "200":
+          description: "successful operation"
+        "404":
+          description: "No configuration set"
+  /dashboard:
+    get:
+      summary: "Dashboard"
+      description: "Dashboard data"
+      operationId: "dashboard"
+      responses:
+        "200":
+          description: "successful operation"
+        "404":
+          description: "No configuration set"
+definitions:
+  Category:
+    type: "object"
+  Tag:
+    type: "object"
