@@ -7,20 +7,6 @@ const server = require('../JiraStatusServer')
 const supertest = require('supertest')
 const request = supertest(server)
 
-/*-----------------------------------
-   JiraStatusServer
-/------------------------------------*/
-
-test('JiraStatusServer/config returns 200 or 300', async (t) => {
-   const res = await request.get('/config')
-   t.regex(res.header['content-type'], /json/)
-   t.assert(res.status < 400)
-})
-
-/*-----------------------------------
-   JiraStatus
-/------------------------------------*/
-
 test.todo('Verify simple report output')
 test.todo('Verify config output - JSON')
 test.todo('Verify config output - HTML')
@@ -33,6 +19,7 @@ test('getFields: Length', async t => {
 test('getFields: Array', async t => {
    const data = await JiraStatus.getFields()
    t.assert(typeof data == typeof [])
+   t.assert(data.length > 0)
 })
 
 test('getFields: Required Fields', async t => {

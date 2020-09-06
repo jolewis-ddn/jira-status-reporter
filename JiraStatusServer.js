@@ -1001,12 +1001,4 @@ server.get('/datafiles', (req, res, next) => {
   return next()
 })
 
-// server.listen(config.get('server.port'), function () {
-//   console.log(
-//     `${server.name} listening at ${server.url} [Jira Server: ${
-//       config.get('jira.username')
-//     } @ ${config.get('jira.host')}]`
-//   )
-// })
-
 module.exports = server
