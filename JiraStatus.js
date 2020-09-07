@@ -113,7 +113,7 @@ function formatConfigHtml(configDetails) {
             Server: Port
             </dt>
             <dd class="col-sm-9">
-            ${config.get('server.port.port')}
+            ${config.get('server.port')}
             </dd>
             <dt class="col-sm-3">
             Graphic Server
@@ -171,7 +171,7 @@ async function report() {
                     })
                 })
 
-                response.push({
+                response = {
                     'Epic Count': values[0],
                     'Dead Issue Count': values[1],
                     'Open Issues (Count)': values[2],
@@ -181,7 +181,7 @@ async function report() {
                     'Issues Done this Month (Count)': values[3],
                     'Issues Done this Month (List)': doneKeys.join(',')
                     // 'Issues Done this Month (Data)': values[4],
-                })
+                }
                 resolve(response)
             })
             .catch((err) => {
