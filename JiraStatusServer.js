@@ -63,9 +63,9 @@ server.get('/', (req, res, next) => {
   return next()
 })
 
-server.get('/report', (req, res, next) => {
-  debug('/report called')
-  JiraStatus.report()
+server.get('/report/:project', (req, res, next) => {
+  debug(`/report/${req.params.project} called`)
+  JiraStatus.report(req.params.project)
   .then((response) => {
     debug(`report response = `, response)
     res.send(response)

@@ -133,9 +133,56 @@ function formatConfigHtml(configDetails) {
     return(response.join(''))
 }
 
-async function report() {
-    let response = []
+async function report(projectName = false) {
+    debug(`report(${projectName}) called...`)
+    let project = ''
+    if (projectName) {
+        project = `project='${projectName}' AND `
+    }
+    return new Promise((resolve, reject) => {
+        Promise.all([
+            jsr.bareQueryCount(`${project} created >= -1w`),
+            jsr.bareQueryCount(`${project} created >= -4w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and created >= -1w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and created >= -2w and created <= -1w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and created >= -3w and created <= -2w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and created >= -4w and created <= -3w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and created >= -4w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -1w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -2w and resolved <= -1w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -3w and resolved <= -2w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -4w and resolved <= -3w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -4w`),
+            jsr.bareQueryCount(`${project.substring(0,projectName.length-5)}`),
+            jsr.bareQueryCount(`${project} issuetype=bug`),
+            jsr.bareQueryCount(`${project} issuetype=story`),
+        ])
+        .then((values) => {
+            resolve({
+                allCreatedLastWeek: values[0],
+                allCreatedLastMonth: values[1],
+                bugsCreatedLastWeek: values[2],
+                bugsCreated2WeekAgo: values[3],
+                bugsCreated3WeekAgo: values[4],
+                bugsCreated4WeekAgo: values[5],
+                bugsCreatedLastMonth: values[6],
+                bugsResolvedLastWeek: values[7],
+                bugsResolved2WeekAgo: values[8],
+                bugsResolved3WeekAgo: values[9],
+                bugsResolved4WeekAgo: values[10],
+                bugsResolvedLastMonth: values[11],
+                all: values[12],
+                bugs: values[13],
+                stories: values[14]
+            })
+        })
+        .catch((err) => {
+            reject(err)
+        })
+    })
+}
 
+async function reportOld() {
     return new Promise((resolve, reject) => {
         Promise.all([
             jsr.countRedEpics(),

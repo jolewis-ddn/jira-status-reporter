@@ -24,3 +24,6 @@ vite-app/*
 static/*
 
 JiraStatusServer-*
+
+item-counts.js
+

@@ -553,6 +553,7 @@ class JiraStatusReporter {
   }
 
   async bareQueryCount(jql) {
+    debug(`bareQueryCount(${jql}) called...`)
     return await jira
       .searchJira(jql, { maxResults: 1, fields: ['key'] })
       .then((r) => {

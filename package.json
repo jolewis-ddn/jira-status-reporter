@@ -24,8 +24,8 @@
   "scripts": {
     "test": "nyc --reporter=html --reporter=text ava",
     "test-watch": "npx ava -- --watch",
-    "server-debug": "set DEBUG=*,-nodemon*,-supertest*,-superagent* && nodemon JiraStatusServer.js",
-    "server": "nodemon JiraStatusServer.js"
+    "server-debug": "set DEBUG=*,-nodemon*,-supertest*,-superagent* && nodemon app.js",
+    "server": "nodemon app.js"
   },
   "repository": {
     "type": "git",
