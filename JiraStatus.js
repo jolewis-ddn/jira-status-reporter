@@ -143,6 +143,8 @@ async function report(projectName = false) {
         Promise.all([
             jsr.bareQueryCount(`${project} created >= -1w`),
             jsr.bareQueryCount(`${project} created >= -4w`),
+            jsr.bareQueryCount(`${project} issuetype=bug and created >= -1d`),
+            jsr.bareQueryCount(`${project} issuetype=bug and created >= -2d and created <= -1d`),
             jsr.bareQueryCount(`${project} issuetype=bug and created >= -1w`),
             jsr.bareQueryCount(`${project} issuetype=bug and created >= -2w and created <= -1w`),
             jsr.bareQueryCount(`${project} issuetype=bug and created >= -3w and created <= -2w`),
@@ -161,19 +163,21 @@ async function report(projectName = false) {
             resolve({
                 allCreatedLastWeek: values[0],
                 allCreatedLastMonth: values[1],
-                bugsCreatedLastWeek: values[2],
-                bugsCreated2WeekAgo: values[3],
-                bugsCreated3WeekAgo: values[4],
-                bugsCreated4WeekAgo: values[5],
-                bugsCreatedLastMonth: values[6],
-                bugsResolvedLastWeek: values[7],
-                bugsResolved2WeekAgo: values[8],
-                bugsResolved3WeekAgo: values[9],
-                bugsResolved4WeekAgo: values[10],
-                bugsResolvedLastMonth: values[11],
-                all: values[12],
-                bugs: values[13],
-                stories: values[14]
+                bugsCreatedLastDay: values[2],
+                bugsCreated2DayAgo: values[3],
+                bugsCreatedLastWeek: values[4],
+                bugsCreated2WeekAgo: values[5],
+                bugsCreated3WeekAgo: values[6],
+                bugsCreated4WeekAgo: values[7],
+                bugsCreatedLastMonth: values[8],
+                bugsResolvedLastWeek: values[9],
+                bugsResolved2WeekAgo: values[10],
+                bugsResolved3WeekAgo: values[11],
+                bugsResolved4WeekAgo: values[12],
+                bugsResolvedLastMonth: values[13],
+                all: values[14],
+                bugs: values[15],
+                stories: values[16]
             })
         })
         .catch((err) => {
