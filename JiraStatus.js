@@ -139,46 +139,129 @@ async function report(projectName = false) {
     if (projectName) {
         project = `project='${projectName}' AND `
     }
+
+    const queries = [
+        {   name: 'All issues created in last week', 
+            shortname: 'allCreatedLasWeek',
+            query: `${project} created >= -1w` 
+        },
+        {   name: 'All issues created in last 4 weeks', 
+            shortname: 'allCreatedLastMonth',
+            query: `${project} created >= -4w`
+        },
+        {   name: 'All bugs created yesterday', 
+            shortname: 'bugsCreatedLastDay',
+            query: `${project} issuetype=bug and created >= -1d`
+        },
+        {   name: 'All bugs created day before yesterday', 
+            shortname: 'bugsCreated2DayAgo',
+            query: `${project} issuetype=bug and created >= -2d and created <= -1d`
+        },
+        {   name: 'All bugs created 3 day ago', 
+            shortname: 'bugsCreated3DayAgo',
+            query: `${project} issuetype=bug and created >= -3d and created <= -2d`
+        },
+        {   name: 'All bugs created 4 day ago', 
+            shortname: 'bugsCreated4DayAgo',
+            query: `${project} issuetype=bug and created >= -4d and created <= -3d`
+        },
+        {   name: 'All bugs created 5 day ago', 
+            shortname: 'bugsCreated5DayAgo',
+            query: `${project} issuetype=bug and created >= -5d and created <= -4d`
+        },
+        {   name: 'All bugs created last week', 
+            shortname: 'bugsCreatedLastWeek',
+            query: `${project} issuetype=bug and created >= -1w`
+        },
+        {   name: 'All bugs created 2 weeks ago', 
+            shortname: 'bugsCreated2WeekAgo',
+            query: `${project} issuetype=bug and created >= -2w and created <= -1w`
+        },
+        {   name: 'All bugs created 3 weeks ago', 
+            shortname: 'bugsCreated3WeekAgo',
+            query: `${project} issuetype=bug and created >= -3w and created <= -2w`
+        },
+        {   name: 'All bugs created 4 weeks ago', 
+            shortname: 'bugsCreated4WeekAgo',
+            query: `${project} issuetype=bug and created >= -4w and created <= -3w`
+        },
+        {   name: 'All bugs created in last 4 weeks', 
+            shortname: 'bugsCreatedLastMonth',
+            query: `${project} issuetype=bug and created >= -4w`
+        },
+        {   name: 'All bugs resolved yesterday', 
+            shortname: 'bugsResolvedLastDay',
+            query: `${project} issuetype=bug and resolved >= -1d`
+        },
+        {   name: 'All bugs resolved day before yesterday', 
+            shortname: 'bugsResolved2DayAgo',
+            query: `${project} issuetype=bug and resolved >= -2d and resolved <= -1d`
+        },
+        {   name: 'All bugs resolved 3 days ago', 
+            shortname: 'bugsResolved3DayAgo',
+            query: `${project} issuetype=bug and resolved >= -3d and resolved <= -2d`
+        },
+        {   name: 'All bugs resolved 4 days ago', 
+            shortname: 'bugsResolved4DayAgo',
+            query: `${project} issuetype=bug and resolved >= -4d and resolved <= -3d`
+        },
+        {   name: 'All bugs resolved 5 days ago', 
+            shortname: 'bugsResolved5DayAgo',
+            query: `${project} issuetype=bug and resolved >= -5d and resolved <= -4d`
+        },
+        {   name: 'All bugs resolved last week', 
+            shortname: 'bugsResolvedLastWeek',
+            query: `${project} issuetype=bug and resolved >= -1w`
+        },
+        {   name: 'All bugs resolved 2 weeks ago', 
+            shortname: 'bugsResolved2WeekAgo',
+            query: `${project} issuetype=bug and resolved >= -2w and resolved <= -1w`
+        },
+        {   name: 'All bugs resolved 3 weeks ago', 
+            shortname: 'bugsResolved3WeekAgo',
+            query: `${project} issuetype=bug and resolved >= -3w and resolved <= -2w`
+        },
+        {   name: 'All bugs resolved 4 weeks ago', 
+            shortname: 'bugsResolved4WeekAgo',
+            query: `${project} issuetype=bug and resolved >= -4w and resolved <= -3w`
+        },
+        {   name: 'All bugs resolved in last 4 weeks', 
+            shortname: 'bugsResolvedLastMonth',
+            query: `${project} issuetype=bug and resolved >= -4w`
+        },
+        {   name: 'All issues', 
+            shortname: 'all',
+            query: `project='${projectName}'`
+        },
+        {   name: 'All bugs', 
+            shortname: 'bugs',
+            query: `${project} issuetype=bug`
+        },
+        {   name: 'All stories', 
+            shortname: 'stories',
+            query: `${project} issuetype=story`
+        }
+    ]
+        
+    let promises = []
+    for (let qnum = 0; qnum < queries.length; qnum++) {
+        q = queries[qnum]
+        debug(`in queries.forEach with ${q}; pushing ${q.query}`)
+        promises.push(jsr.bareQueryCount(q.query)) 
+    }
+
     return new Promise((resolve, reject) => {
-        Promise.all([
-            jsr.bareQueryCount(`${project} created >= -1w`),
-            jsr.bareQueryCount(`${project} created >= -4w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and created >= -1d`),
-            jsr.bareQueryCount(`${project} issuetype=bug and created >= -2d and created <= -1d`),
-            jsr.bareQueryCount(`${project} issuetype=bug and created >= -1w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and created >= -2w and created <= -1w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and created >= -3w and created <= -2w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and created >= -4w and created <= -3w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and created >= -4w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -1w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -2w and resolved <= -1w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -3w and resolved <= -2w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -4w and resolved <= -3w`),
-            jsr.bareQueryCount(`${project} issuetype=bug and resolved >= -4w`),
-            jsr.bareQueryCount(`${project.substring(0,projectName.length-5)}`),
-            jsr.bareQueryCount(`${project} issuetype=bug`),
-            jsr.bareQueryCount(`${project} issuetype=story`),
-        ])
+        Promise.all(
+            promises
+        )
         .then((values) => {
-            resolve({
-                allCreatedLastWeek: values[0],
-                allCreatedLastMonth: values[1],
-                bugsCreatedLastDay: values[2],
-                bugsCreated2DayAgo: values[3],
-                bugsCreatedLastWeek: values[4],
-                bugsCreated2WeekAgo: values[5],
-                bugsCreated3WeekAgo: values[6],
-                bugsCreated4WeekAgo: values[7],
-                bugsCreatedLastMonth: values[8],
-                bugsResolvedLastWeek: values[9],
-                bugsResolved2WeekAgo: values[10],
-                bugsResolved3WeekAgo: values[11],
-                bugsResolved4WeekAgo: values[12],
-                bugsResolvedLastMonth: values[13],
-                all: values[14],
-                bugs: values[15],
-                stories: values[16]
-            })
+            let result = {}
+            for (let ndx = 0; ndx < queries.length; ndx++) {
+                q = queries[ndx]
+                result[q.shortname] = { name: q.name, query: q.query, result: values[ndx] }
+            }
+            let meta = { project: projectName, reportedOn: new Date() }
+            resolve({ meta: meta, errors: [], data: result })
         })
         .catch((err) => {
             reject(err)
