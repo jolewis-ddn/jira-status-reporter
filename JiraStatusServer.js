@@ -63,11 +63,18 @@ server.get('/', (req, res, next) => {
   return next()
 })
 
+server.get('/count/', async (req, res, next) => {
+  const count = await jsr.bareQueryCount(req.query.q)
+  res.send({ count: count })
+  res.end()
+  return next()
+})
+
 server.get('/report/:project', (req, res, next) => {
   debug(`/report/${req.params.project} called`)
   JiraStatus.report(req.params.project)
   .then((response) => {
-    debug(`report response = `, response)
+    // debug(`report response = `, response)
     res.send(response)
     res.end()
     return next()
