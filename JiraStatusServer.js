@@ -28,13 +28,14 @@ let ls = new LocalStorage('./.cache')
 // const path = require('path')
 // const JiraDataCache = require('./JiraDataCache');
 
-const labels = ['Epic', 'Story', 'Task', 'Sub-task', 'Bug']
-const states = ['Open', 'Active', 'Closed', 'Stopped']
+const labels = ['Epic', 'Story', 'Task', 'Sub-task', 'Bug', 'Requirement']
+const states = ['Open', 'Active', 'Closed', 'Stopped', 'New']
 const backgroundColors = [
   'SeaShell',
   'MediumSeaGreen',
   'CornflowerBlue',
-  'Pink'
+  'Pink',
+  'Purple'
 ]
 
 const backgroundColorStr = "backgroundColor:['"
@@ -210,6 +211,7 @@ function buildStylesheet() {
     .Dead { background-color: black; }
     .Emergency { background-color: pink; }
     .Blocked { background-color: pink; }
+    .New { background-color: purple; fill: purple; }
     .link { text-decoration: none; }
     .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
     .issueComboLink { display: grid; }

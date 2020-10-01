@@ -9,7 +9,8 @@ const faIcons = {
     Story: 'fa:fa-book-reader',
     Task: 'fa:fa-tasks',
     'Sub-task': 'fa:fa-subscript',
-    Bug: 'fa:fa-bug'
+    Bug: 'fa:fa-bug',
+    Requirement: 'fa:fa-clipboard-check'
 }
 
 const useFontawesome = config.has('fa')
@@ -46,7 +47,7 @@ async function formatFieldsHtml(fields) {
 }
 
 async function formatProjectDataHtml(projectData) {
-    const types = ['epic', 'story', 'task', 'sub-task', 'bug']
+    const types = ['epic', 'story', 'task', 'sub-task', 'bug', 'requirement']
     let response = []
     response.push(`<table style="width: auto;" class="table table-striped table-hover table-sm"><thead class="thead-dark"><tr><th scope="col">Project Name</th><th>${types.join('</th><th scope="col">')}</th></tr></thead><tbody>`)
     response.push(`<em>${Object.keys(projectData).length} projects as of ${new Date()}`)
