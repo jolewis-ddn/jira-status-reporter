@@ -357,7 +357,7 @@ server.get('/requirements', async (req, res, next) => {
     reqts.issues.forEach((reqt) => {
       teamCount = 0
       res.write(`<tr>`)
-      res.write(`<td style='width: 100px;'>${reqt.key}</td>`)
+      res.write(`<td style='width: 100px;'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${reqt.key}' target='_blank'>${reqt.key}</td>`)
       res.write(`<td style='width: 45%;'>${reqt.fields.summary}</td>`)
       // res.write(`<td>`)
       // if (reqt.fields.fixVersions) {
