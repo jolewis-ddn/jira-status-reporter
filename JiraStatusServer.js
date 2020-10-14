@@ -279,8 +279,10 @@ async function buildPieCharts(stats) {
   let promiseList = []
   // Charts...
   labels.forEach((i, ndx) => {
-    debug(`stats[${i}] = `, stats[i])
-    promiseList.push(jsrCLM.buildChartImgTag(i, stats[i]))
+    if (i !== 'Requirement') {
+      debug(`stats[${i}] = `, stats[i])
+      promiseList.push(jsrCLM.buildChartImgTag(i, stats[i]))
+    }
   })
 
   const charts = await Promise.all(promiseList)

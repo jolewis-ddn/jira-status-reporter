@@ -166,6 +166,7 @@ class ChartLinkMaker {
   async buildChartImgTag(title, data) {
     debug(`buildChartImgTag(${title}) called with data: `, data)
     return new Promise((resolve, reject) => {
+      if (data) {
         const id = rando(99999)
         let chartHtml = `<span id='chart-${id}' class='miniJSRChart'></span><script>
           var chart = bb.generate({
@@ -184,6 +185,10 @@ class ChartLinkMaker {
           });
         </script>`
         resolve(chartHtml)
+      } else {
+        debug(`ERR in buildChartImgTag: No data set for ${title}`)
+        reject('no data set')
+      }
     })
   }
 }
