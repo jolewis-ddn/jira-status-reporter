@@ -42,7 +42,9 @@ const DEFAULT_GET_FIELDS = [
   'updated',
   'project',
   'issuetype',
-  'fixVersions'
+  'fixVersions',
+  'customfield_10070',
+  'issuelinks'
 ]
 const DEFAULT_COUNT_FIELDS = ['key']
 
@@ -548,8 +550,8 @@ class JiraStatusReporter {
   }
 
   async bareQuery(jql) {
-    let result = await jira.searchJira(jql)
-    return await result
+    debug(`bareQuery(${jql}) called...`)
+    return await jira.searchJira(jql, { maxResults: 200, fields: [] })
   }
 
   async bareQueryCount(jql) {

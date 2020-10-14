@@ -206,12 +206,15 @@ function buildStylesheet() {
     .icon { padding: 4px; }
     .Icebox, .New, .Open { background-color: white; }
     .InProgress { background-color: green; }
-    .InReview { background-color: lightgreen; }
-    .Done, .CLOSED { background-color: blue; }
+    .InReview { background-color: lightgreen; color: black; }
+    .Done, .CLOSED { background-color: blue; color: white; }
     .Dead { background-color: black; }
-    .Emergency { background-color: pink; }
-    .Blocked { background-color: pink; }
-    .New { background-color: purple; fill: purple; }
+    .Emergency { background-color: pink; color: black; }
+    .Blocked { background-color: pink; color: black; }
+    .Rejected { background-color: darkred; fill: darkred; color: white; }
+    .New { background-color: #00bbbb; fill: #00bbbb; color: white; }
+    .Committed { background-color: navy; fill: navy; color: white; }
+    .Completed { background-color: darkgreen; fill: darkgreen; color: white; }
     .link { text-decoration: none; }
     .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
     .issueComboLink { display: grid; }
@@ -334,17 +337,99 @@ function updateStats(stats, issueType, issueStatusName) {
  ************** ENDPOINTS **************
  */
 
-server.get('/testStorage', async (req, res, next) => {
-  const data = { key: 'status', first: 'working', second: [ 'a','b','c'] }
-  // var store = require('store')
-  // store.set('test 1', data)
-  // const d2 = store.get('test 1')
-  // res.send(d2)
-  var ls = require('node-localstorage').LocalStorage
-  ls = new ls('./scratch')
-  // ls.setItem('test 2', JSON.stringify(data))
-  // debug(ls.getItem('test 2'))
-  res.send(JSON.parse(ls.getItem('test 2')))
+server.get('/requirements', async (req, res, next) => {
+  const pageTitle = 'Requirements Report'
+  res.write(buildHtmlHeader(pageTitle, false))
+  res.write(buildPageHeader(pageTitle))
+  try {
+    let inwardLinks = []
+    let teamCount = 0
+    let implementedByCounter = 0
+
+    const COLUMNS = ['name', 'summary', 'teams', 'status', 'links']
+
+    const reqts = await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99)
+    debug(`startAt: ${reqts.startAt}; maxResults: ${reqts.maxResults}; total: ${reqts.total}`)
+    res.write(`<em>${reqts.issues.length} requirements</em>`)
+
+    // Build the table
+    res.write(`<table class='table table-sm'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+    reqts.issues.forEach((reqt) => {
+      teamCount = 0
+      res.write(`<tr>`)
+      res.write(`<td style='width: 100px;'>${reqt.key}</td>`)
+      res.write(`<td style='width: 45%;'>${reqt.fields.summary}</td>`)
+      // res.write(`<td>`)
+      // if (reqt.fields.fixVersions) {
+      //   reqt.fields.fixVersions.length
+      //   ?
+      //   'none'
+      //   :
+      //   reqt.fields.fixVersions.map(x => x.name).join(',')
+      // }
+      // res.write(`</td>`)
+
+      // Teams
+      if (reqt.fields.customfield_10070) {
+        res.write(`<td>${reqt.fields.customfield_10070.map(x => x.value).join(',')}</td>`)
+        teamCount = reqt.fields.customfield_10070.length
+      } else {
+        res.write(`<td>None</td>`)
+        teamCount = 0
+      }
+
+      res.write(`<td class='${JiraStatus.formatCssClassName(reqt.fields.status.name)}'>${reqt.fields.status.name}</td>`)
+
+      res.write(`<td>`)
+      if (reqt.fields.issuelinks) {
+        implementedByCounter = 0
+        // Expect at least one "is implemented by" link for each team
+        reqt.fields.issuelinks.forEach((link) => {
+          if (link.inwardIssue) {
+            if (link.type.inward === 'is implemented by') {
+              implementedByCounter += 1
+            }
+            res.write(`${link.type.inward} <a href='${config.get('jira.protocol')}://${
+              config.get('jira.host')
+            }/browse/${link.inwardIssue.key}' target='_blank' title='${link.inwardIssue.fields.summary}'>${link.inwardIssue.key}</a><br>`)
+            inwardLinks[link.type.inward]
+              ?
+                inwardLinks[link.type.inward] += 1
+              :
+                inwardLinks[link.type.inward] = 1
+          } else { // outwardIssue
+            res.write(`${link.type.outward} <a href='${config.get('jira.protocol')}://${
+              config.get('jira.host')
+            }/browse/${link.outwardIssue.key}' target='_blank' title='${link.outwardIssue.fields.summary}'>${link.outwardIssue.key}</a><br>`)
+          }
+        })
+
+        // Not Rejected
+        if (reqt.fields.status.name === 'Rejected') {
+          res.write(`n/a`)
+        } else {
+          // Sufficient implemented by links?
+          if (teamCount > 0 && implementedByCounter >= teamCount) {
+            res.write(`<b style='color: green;'>Possibly sufficient</b>`)
+          } else {
+            res.write(`<b style='color: darkred;'>Insufficient</b>`)
+          }
+        }
+      } else {
+        res.write(`None`)
+      }
+      res.write(`</td>`)
+      // res.write(`<td>${reqt.fields.labels.join(',')}</td>`)
+      res.write(`</tr>`)
+    })
+    res.write(`</tbody></table>`)
+    debug(inwardLinks)
+  } catch (err) {
+    debug(err)
+    res.write(`<em>error</em><!-- ${err} -->`)
+  }
+  res.write(buildHtmlFooter())
+  res.end()
   return next()
 })
 
