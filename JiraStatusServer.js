@@ -215,8 +215,11 @@ function buildStylesheet() {
     .New { background-color: #00bbbb; fill: #00bbbb; color: white; }
     .Committed { background-color: navy; fill: navy; color: white; }
     .Completed { background-color: darkgreen; fill: darkgreen; color: white; }
-    .link { text-decoration: none; }
+
+    .labels { font-size: smaller; font-style: italic; color: darkgray; }
+
     .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
+    .link { text-decoration: none; }
     .issueComboLink { display: grid; }
     .issueName { display: inline; }
     .miniJSRChart { display: table-cell; }
@@ -358,7 +361,12 @@ server.get('/requirements', async (req, res, next) => {
       teamCount = 0
       res.write(`<tr>`)
       res.write(`<td style='width: 100px;'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${reqt.key}' target='_blank'>${reqt.key}</td>`)
-      res.write(`<td style='width: 45%;'>${reqt.fields.summary}</td>`)
+      res.write(`<td style='width: 45%;'>${reqt.fields.summary}`)
+      if (reqt.fields.labels.length) {
+        res.write(` <span class='labels'>[${reqt.fields.labels.join(', ')}]</span>`)
+        // debug(reqt.fields.labels)
+      }
+      res.write(`</td>`)
       res.write(`<td>${reqt.fields.fixVersions.map(x => x.name).join(', ')}</td>`)
 
       // Teams
