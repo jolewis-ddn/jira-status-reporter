@@ -41,6 +41,8 @@ Collection of node scripts to query, store, and report on Jira issues.
 ### Configuration
 * `/config`: Current config
 * `/fields`: All Jira fields (standard and custom)
+### Requirements
+* `/requirements`: Requirements report
 ### Issues
 * `/chart`: Visualize timeseries data using cache
 * `/dashboard`: Data visualization of current status (no cache)
