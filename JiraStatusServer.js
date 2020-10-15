@@ -346,7 +346,7 @@ server.get('/requirements', async (req, res, next) => {
     let teamCount = 0
     let implementedByCounter = 0
 
-    const COLUMNS = ['name', 'summary', 'teams', 'status', 'links']
+    const COLUMNS = ['name', 'summary', 'fixVersion', 'teams', 'status', 'links']
 
     const reqts = await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99)
     debug(`startAt: ${reqts.startAt}; maxResults: ${reqts.maxResults}; total: ${reqts.total}`)
@@ -359,19 +359,11 @@ server.get('/requirements', async (req, res, next) => {
       res.write(`<tr>`)
       res.write(`<td style='width: 100px;'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${reqt.key}' target='_blank'>${reqt.key}</td>`)
       res.write(`<td style='width: 45%;'>${reqt.fields.summary}</td>`)
-      // res.write(`<td>`)
-      // if (reqt.fields.fixVersions) {
-      //   reqt.fields.fixVersions.length
-      //   ?
-      //   'none'
-      //   :
-      //   reqt.fields.fixVersions.map(x => x.name).join(',')
-      // }
-      // res.write(`</td>`)
+      res.write(`<td>${reqt.fields.fixVersions.map(x => x.name).join(', ')}</td>`)
 
       // Teams
       if (reqt.fields.customfield_10070) {
-        res.write(`<td>${reqt.fields.customfield_10070.map(x => x.value).join(',')}</td>`)
+        res.write(`<td>${reqt.fields.customfield_10070.map(x => x.value).join(', ')}</td>`)
         teamCount = reqt.fields.customfield_10070.length
       } else {
         res.write(`<td>None</td>`)
@@ -409,10 +401,14 @@ server.get('/requirements', async (req, res, next) => {
           res.write(`n/a`)
         } else {
           // Sufficient implemented by links?
-          if (teamCount > 0 && implementedByCounter >= teamCount) {
-            res.write(`<b style='color: green;'>Possibly sufficient</b>`)
+          if (teamCount > 0) {
+            if (implementedByCounter >= teamCount) {
+              res.write(`<b style='color: green;'>Possibly sufficient</b>`)
+            } else {
+              res.write(`<b style='color: darkred;'>Insufficient</b>`)
+            }
           } else {
-            res.write(`<b style='color: darkred;'>Insufficient</b>`)
+            res.write(`<span style='color: red; font-style: italic;'>No Team Set</span>`)
           }
         }
       } else {
