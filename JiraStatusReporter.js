@@ -455,7 +455,7 @@ class JiraStatusReporter {
     }
 }
       
-  _genericJiraSearch(jql, action) {
+  _genericJiraSearch(jql, action, fields = []) {
     return new Promise((resolve, reject) => {
       debug(`_genericJiraSearch(${jql}) called...`)
       var queryConfig = {}
@@ -478,7 +478,10 @@ class JiraStatusReporter {
           // )
           break
         case ACTION_CONTENTS:
-          if (this.fields) {
+          if (fields) {
+            queryConfig.fields = fields
+            debug(`...using specified fields: ${fields}`)
+          } else if (this.fields) {
             queryConfig.fields = this.fields
           } else {
             queryConfig.fields = DEFAULT_GET_FIELDS

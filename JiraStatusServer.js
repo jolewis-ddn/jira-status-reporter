@@ -215,9 +215,9 @@ function buildStylesheet() {
     .New { background-color: #00bbbb; fill: #00bbbb; color: white; }
     .Committed { background-color: navy; fill: navy; color: white; }
     .Completed { background-color: darkgreen; fill: darkgreen; color: white; }
-
+    
     .labels { font-size: smaller; font-style: italic; color: darkgray; }
-
+    
     .legend { position: sticky; right: 0; bottom: 0; z-index: -1; }
     .link { text-decoration: none; }
     .issueComboLink { display: grid; }
@@ -229,6 +229,8 @@ function buildStylesheet() {
     .wraparound { display: contents; }
     .bundledicon { margin: -2px 4px -2px 4px; }
     .lineicon { margin: -2px 4px 0px 0px; }
+
+    .problem { background-color: pink; color: black; }
     </style>`
 }
 
@@ -339,6 +341,159 @@ function updateStats(stats, issueType, issueStatusName) {
 /*
  ************** ENDPOINTS **************
  */
+
+/*
+ * Function Template *
+server.get('/endpoint', async (req, res, next) => {
+  const pageTitle = 'Requirements Report'
+  res.write(buildHtmlHeader(pageTitle, false))
+  res.write(buildPageHeader(pageTitle))
+  try {
+  } catch (err) {
+    debug(err)
+    res.write(`<em>error</em><!-- ${err} -->`)
+  }
+  res.write(buildHtmlFooter())
+  res.end()
+  return next()
+})
+
+*/
+
+async function getEpicEstimates(epicKey) {
+  const fields = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking']
+  // Query for stories by parent epic
+  const result = await jsr._genericJiraSearch(`'Epic Link' in (${epicKey}) AND status not in (Done,Dead) and issuetype=story`, 99, fields)
+  const storyData = []
+  let progress = 0
+  let total = 0
+  result.issues.forEach((issue) => {
+    progress += issue.fields.aggregateprogress.progress
+    total += issue.fields.aggregateprogress.total
+    storyData.push({ 
+      key: `${issue.key} ${issue.fields.summary}`, 
+      assignee: issue.fields.assignee ? issue.fields.assignee.displayName : '', 
+      progress: issue.fields.aggregateprogress.progress, 
+      total: issue.fields.aggregateprogress.total
+    })
+  })
+  return({ progress: progress, total: total, details: storyData })
+}
+
+server.get('/estimates', async (req, res, next) => {
+  let format = 'html'
+  if (req.query.format) {
+    format = req.query.format
+  }
+
+  let sort = ''
+  if (req.query.sort) {
+    sort = `${req.query.sort}, `
+  }
+
+  const pageTitle = 'Estimates Report'
+  const COLUMNS = ['Epic', 'Story', 'Assignee', 'Spent', 'Total', '% Done']
+  const FIELDS = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking']
+
+  try {
+    // Get data
+    const epicList = await jsr._genericJiraSearch(`issuetype=epic and project=${config.project}`, 99, ['summary', 'assignee'])
+    const epics = {}
+    epicList.issues.forEach((epic) => {
+      epics[epic.key] = epic.fields.summary
+    })
+
+    const storyList = await jsr._genericJiraSearch(`issuetype=story and status not in (dead, done) and project=${config.project} and "Epic Link" is not empty order by ${sort}"EPIC LINK" ASC, key ASC`, 99, FIELDS)
+
+    if (format == 'csv') {
+      COLUMNS.pop()
+      let response = COLUMNS.join("\t") + "\n"
+      storyList.issues.forEach((story) => {
+        response += ([story.fields.customfield_10008 + ' ' + epics[story.fields.customfield_10008], 
+          story.key + ' ' + story.fields.summary, 
+          story.fields.assignee ? story.fields.assignee.displayName : 'none', 
+          story.fields.aggregateprogress.progress,
+          story.fields.aggregateprogress.total
+        ].join("\t"))
+        response += "\n"
+      })
+      res.header('Content-Type', 'text/csv')
+      res.header('Content-Disposition', 'attachment;filename=export.csv')
+      res.send(response)
+      return next()
+    } else {
+      // Assignee stats:
+      let assigneeStats = { 'none': { progress: 0, total: 0, count: 0, empty: 0 }}
+
+      res.write(buildHtmlHeader(pageTitle, false))
+      res.write(buildPageHeader(pageTitle))
+
+      res.write(`<div><a href='?format=csv'>Download as csv</a></div>`)
+      // Write table
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+      storyList.issues.forEach((story) => {
+        // debug(`story: `, story)
+        res.write(`<tr>
+                  <td style='font-size: smaller; color: gray;'>${story.fields.customfield_10008} ${epics[story.fields.customfield_10008]}</td>
+                  <td>${story.key} ${story.fields.summary}</td>`)
+        if (story.fields.assignee) {
+          const assignee = story.fields.assignee.displayName
+          res.write(`<td>${assignee}</td>`)
+          
+          // Update assigneeStats
+          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: 0, empty: 0 }}
+          assigneeStats[assignee].count += 1
+          assigneeStats[assignee].progress += story.fields.aggregateprogress.progress
+          assigneeStats[assignee].total += story.fields.aggregateprogress.total
+          if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty += 1 }
+        } else {
+          res.write(`<td class='problem'>none</td>`)
+          assigneeStats.none.count += 1
+          assigneeStats.none.progress += story.fields.aggregateprogress.progress
+          assigneeStats.none.total += story.fields.aggregateprogress.total
+          if (assigneeStats.none.total == 0) { assigneeStats.none.empty += 1 }
+        }
+        res.write(`<td>${cleanSeconds(story.fields.aggregateprogress.progress)} d</td>`)
+        if (story.fields.aggregateprogress.total > 0) {
+          res.write(`<td>${cleanSeconds(story.fields.aggregateprogress.total)} d</td>`)
+        } else {
+          res.write(`<td class='problem'>0d</td>`)
+        }
+        res.write(`<td>${story.fields.aggregateprogress.total > 0 ? (100*(story.fields.aggregateprogress.progress/story.fields.aggregateprogress.total).toFixed(2)) : '0'}%</td>
+                  </tr>`)
+      })
+      res.write(`</tbody></table>`)
+      res.write(`<hr>`)
+      res.write(`<h2>User Report</h2>`)
+      // Write table
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>Name</th><th>Spent</th><th>Progress</th><th>Total</th><th>Count</th><th>Empty</th><th>% Empty</th></tr></thead><tbody>`)
+      // debug(assigneeStats)
+      Object.keys(assigneeStats).forEach((a) => {
+        res.write(`<tr><td>${a}</td>
+          <td>${assigneeStats[a].progress > 0 ? cleanSeconds(assigneeStats[a].progress) : 0 } d</td>
+          <td>${assigneeStats[a].total > 0 ? cleanSeconds(assigneeStats[a].total) : 0 } d</td>
+          <td>${assigneeStats[a].total > 0 ? (assigneeStats[a].progress / assigneeStats[a].total).toFixed(2) : 0 }%</td>
+          <td>${assigneeStats[a].count}</td>
+          <td>${assigneeStats[a].empty}</td>
+          <td>${assigneeStats[a].empty > 0 ? (100*(assigneeStats[a].empty/assigneeStats[a].count).toFixed(2)) : 0 }% empty</td></tr>`)
+      })
+      res.write(buildHtmlFooter())
+    }
+    res.end()
+    return next()
+  } catch (err) {
+    debug(err)
+    res.write(`<em>error</em><!-- ${err} -->`)
+    res.end()
+    return next()
+  }
+})
+
+function cleanSeconds(sec) {
+  let result = (sec/28800).toFixed(2)
+  if (result == Math.round(result)) { result = Math.round(result) }
+  return(result)
+}
 
 server.get('/requirements', async (req, res, next) => {
   const pageTitle = 'Requirements Report'
