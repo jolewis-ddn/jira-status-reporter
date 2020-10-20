@@ -231,6 +231,8 @@ function buildStylesheet() {
     .lineicon { margin: -2px 4px 0px 0px; }
 
     .problem { background-color: pink; color: black; }
+
+    .tooltip-inner { max-width: 500px; text-align: left; }
     </style>`
 }
 
@@ -263,7 +265,12 @@ function buildHtmlFooter() {
 
   // Bootstrap 4.5
   return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>`
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+    <script>
+    $(function () {
+      $('[data-toggle="tooltip"]').tooltip()
+    })
+    </script>`
 }
 
 /**
@@ -423,7 +430,7 @@ server.get('/estimates', async (req, res, next) => {
       return next()
     } else {
       // Assignee stats:
-      let assigneeStats = { 'none': { progress: 0, total: 0, count: 0, empty: 0 }}
+      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [] }}
 
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
@@ -441,17 +448,17 @@ server.get('/estimates', async (req, res, next) => {
           res.write(`<td>${assignee}</td>`)
           
           // Update assigneeStats
-          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: 0, empty: 0 }}
-          assigneeStats[assignee].count += 1
+          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [] }}
+          assigneeStats[assignee].count.push(`${story.key} ${story.fields.summary} [${cleanSeconds(story.fields.aggregateprogress.progress)} of ${cleanSeconds(story.fields.aggregateprogress.total)}d]`)
           assigneeStats[assignee].progress += story.fields.aggregateprogress.progress
           assigneeStats[assignee].total += story.fields.aggregateprogress.total
-          if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty += 1 }
+          if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty.push(`${story.key} ${story.fields.summary}`) }
         } else {
           res.write(`<td class='problem'>none</td>`)
-          assigneeStats.none.count += 1
+          assigneeStats.none.count.push(`${story.key} ${story.fields.summary}`)
           assigneeStats.none.progress += story.fields.aggregateprogress.progress
           assigneeStats.none.total += story.fields.aggregateprogress.total
-          if (assigneeStats.none.total == 0) { assigneeStats.none.empty += 1 }
+          if (assigneeStats.none.total == 0) { assigneeStats.none.empty.push(`${story.key} ${story.fields.summary}`) }
         }
         res.write(`<td>${cleanSeconds(story.fields.aggregateprogress.progress)} d</td>`)
         if (story.fields.aggregateprogress.total > 0) {
@@ -466,16 +473,31 @@ server.get('/estimates', async (req, res, next) => {
       res.write(`<hr>`)
       res.write(`<h2>User Report</h2>`)
       // Write table
-      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>Name</th><th>Spent</th><th>Progress</th><th>Total</th><th>Count</th><th>Empty</th><th>% Empty</th></tr></thead><tbody>`)
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead>
+        <tr>
+          <th>Name</th>
+          <th>Spent</th>
+          <th>Total</th>
+          <th>Completed</th>
+          <th>Missing Est. (%)</th>
+        </tr></thead><tbody>`)
       // debug(assigneeStats)
       Object.keys(assigneeStats).forEach((a) => {
-        res.write(`<tr><td>${a}</td>
+        const titleContentCount = assigneeStats[a].count.length > 0 ? '<b>Total Story List</b><ol><li>' + assigneeStats[a].count.join('</li><li>') + '</ol>' : 'none'
+        const titleContentEmpty = assigneeStats[a].empty.length > 0 ? '<b>Unestimated Story list</b><ol><li>' + assigneeStats[a].empty.join('</li><li>') + '</ol>' : 'none'
+
+        res.write(`<tr>
+          <td>${a}</td>
           <td>${assigneeStats[a].progress > 0 ? cleanSeconds(assigneeStats[a].progress) : 0 } d</td>
-          <td>${assigneeStats[a].total > 0 ? cleanSeconds(assigneeStats[a].total) : 0 } d</td>
-          <td>${assigneeStats[a].total > 0 ? (assigneeStats[a].progress / assigneeStats[a].total).toFixed(2) : 0 }%</td>
-          <td>${assigneeStats[a].count}</td>
-          <td>${assigneeStats[a].empty}</td>
-          <td>${assigneeStats[a].empty > 0 ? (100*(assigneeStats[a].empty/assigneeStats[a].count).toFixed(2)) : 0 }% empty</td></tr>`)
+          <td`)
+        if (assigneeStats[a].total == 0) {
+          res.write(` class='problem'>0d</td>`)
+        } else {
+          res.write(` >${cleanSeconds(assigneeStats[a].total)} d</td>`)
+        }
+        res.write(`<td>${assigneeStats[a].total > 0 ? ((100*(assigneeStats[a].progress / assigneeStats[a].total).toFixed(2))) : 0 }%</td>
+          <td><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="${titleContentCount}">${assigneeStats[a].count.length}</span> 
+          (${assigneeStats[a].empty.length > 0 ? (100*(assigneeStats[a].empty.length/assigneeStats[a].count.length).toFixed(2)) : 0 }%)</td></tr>`)
       })
       res.write(buildHtmlFooter())
     }
