@@ -3,6 +3,10 @@
 Collection of node scripts to query, store, and report on Jira issues.
 
 ## Features
+* Estimate Report: See which Stories have/have not been estimated
+![User Report](./screenshots/estimates-report.png)
+* User Report: See progress on Stories, per Assignee
+![User Report](./screenshots/user-report.png)
 * Graphical display of issue links (using Mermaid)
 ![Links with icon](./screenshots/Links-icons.png)
 ![Links without icons](./screenshots/Links-noicons.png)
