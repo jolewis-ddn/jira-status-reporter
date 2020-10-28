@@ -167,12 +167,18 @@ function buildHtmlHeader(title = '', showButtons = true) {
   // Bootstrap 5 alpha
   // return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">${buildStylesheet()}</head>`)
 
-  let buttons = `<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>
-    <button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>
-    <button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`
+  let buttons = [`<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>`,`<button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>`,`<button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`]
 
-  if (!showButtons) {
-    buttons = ``
+  if (typeof showButtons === 'boolean') {
+    if (!showButtons) {
+      buttons = []
+      debug('emptying showButtons')
+    }
+  } else if (typeof showButtons === 'number') { // Single button to show
+    debug(`showButtons[${showButtons}] set`)
+    buttons = [buttons[showButtons]]
+  } else if (typeof showButtons === 'object') { // Array of buttons to show
+    console.error('typeof showButtons === object/array is not yet implemented')
   }
 
   // Bootstrap 4.5
@@ -192,7 +198,7 @@ function buildHtmlHeader(title = '', showButtons = true) {
         <body>
         <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
         <script>mermaid.initialize({startOnLoad:true});</script>
-        ${buttons}
+        ${buttons.join('')}
         `
 }
 
@@ -229,6 +235,13 @@ function buildStylesheet() {
     .wraparound { display: contents; }
     .bundledicon { margin: -2px 4px -2px 4px; }
     .lineicon { margin: -2px 4px 0px 0px; }
+
+    .summaryCol { width: 30%; }
+    .linksCol { width: 150px; }
+    .fixVersionCol { width: 150px; }
+    .nameCol { width: 100px; }
+    .statusCol { }
+    .childrenCol { width: 30%; }
 
     .problem { background-color: pink; color: black; }
 
@@ -484,7 +497,7 @@ server.get('/estimates', async (req, res, next) => {
       // debug(assigneeStats)
       Object.keys(assigneeStats).forEach((a) => {
         const titleContentCount = assigneeStats[a].count.length > 0 ? '<b>Total Story List</b><ol><li>' + assigneeStats[a].count.join('</li><li>') + '</ol>' : 'none'
-        const titleContentEmpty = assigneeStats[a].empty.length > 0 ? '<b>Unestimated Story list</b><ol><li>' + assigneeStats[a].empty.join('</li><li>') + '</ol>' : 'none'
+        const titleContentEmpty = assigneeStats[a].empty.length > 0 ? `<b>Unestimated Story list</b><ol><li>${assigneeStats[a].empty.join('</li><li>')}</ol>` : 'none'
 
         res.write(`<tr>
           <td>${a}</td>
@@ -517,54 +530,108 @@ function cleanSeconds(sec) {
   return(result)
 }
 
+async function getRequirements() {
+  return await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99)
+}
+
+async function getChildren(parentId) {
+  try {
+    return await jsr._genericJiraSearch(`parentEpic=${parentId} and key != ${parentId} ORDER BY key asc`, 99, ['summary', 'status', 'assignee', 'labels', 'fixVersions', 'issuetype', 'issuelinks'])
+  } catch (err) {
+    debug(`getChildren(${parentId}) error: `, err)
+    return(null)
+  }
+}
+
+server.get('/children/:id', async (req, res, next) => {
+  try {
+    debug(req.params.id, req.params.id.length)
+    if (req.params.id && req.params.id.length > 4) {
+      const kids = await getChildren(req.params.id)
+      res.send(kids)
+    } else {
+      debug('id.len not > 4')
+      res.send(`Error: Invalid Jira issue id`)
+    }
+  } catch (err) {
+    res.status(500).send(`Error: ${err.message}`)
+    debug(err)
+  } finally {
+    debug('finally')
+    return next()
+  }
+})
+
 server.get('/requirements', async (req, res, next) => {
   const pageTitle = 'Requirements Report'
-  res.write(buildHtmlHeader(pageTitle, false))
+  res.write(buildHtmlHeader(pageTitle, 1))
   res.write(buildPageHeader(pageTitle))
   try {
     let inwardLinks = []
     let teamCount = 0
     let implementedByCounter = 0
+    const childrenCache = []
 
-    const COLUMNS = ['name', 'summary', 'fixVersion', 'teams', 'status', 'links']
+    const COLUMNS = {
+      'Name': '',
+      'Summary': '',
+      'fixVersion': '',
+      'Teams': '',
+      'Status': '',
+      'Links': '',
+      'Children': ''
+    }
 
-    const reqts = await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99)
+    const reqts = await getRequirements()
     debug(`startAt: ${reqts.startAt}; maxResults: ${reqts.maxResults}; total: ${reqts.total}`)
     res.write(`<em>${reqts.issues.length} requirements</em>`)
 
     // Build the table
-    res.write(`<table class='table table-sm'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
-    reqts.issues.forEach((reqt) => {
+    res.write(`<table class='table table-sm'><thead><tr>`)
+    Object.keys(COLUMNS).forEach((col) => {
+      res.write(`<th ${COLUMNS[col]}>${col}`)
+    })
+    // res.write(`<th>${COLUMNS.join('</th><th>')}</th>`)
+    res.write(`</tr></thead><tbody>`)
+    // reqts.issues.forEach((reqt) => {
+    for (let r = 0; r < reqts.issues.length; r++) {
+      const reqt = reqts.issues[r]
       teamCount = 0
       res.write(`<tr>`)
-      res.write(`<td style='width: 100px;'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${reqt.key}' target='_blank'>${reqt.key}</td>`)
-      res.write(`<td style='width: 45%;'>${reqt.fields.summary}`)
+      res.write(`<td class='nameCol'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${reqt.key}' target='_blank'>${reqt.key}</td>`)
+      res.write(`<td class='summaryCol'>${reqt.fields.summary}`)
       if (reqt.fields.labels.length) {
-        res.write(` <span class='labels'>[${reqt.fields.labels.join(', ')}]</span>`)
+        res.write(` <span class='labelsCol'>[${reqt.fields.labels.join(', ')}]</span>`)
         // debug(reqt.fields.labels)
       }
       res.write(`</td>`)
-      res.write(`<td>${reqt.fields.fixVersions.map(x => x.name).join(', ')}</td>`)
+
+      res.write(`<td class='fixVersionsCol'>${reqt.fields.fixVersions.map(x => x.name).join(', ')}</td>`)
 
       // Teams
       if (reqt.fields.customfield_10070) {
-        res.write(`<td>${reqt.fields.customfield_10070.map(x => x.value).join(', ')}</td>`)
+        res.write(`<td class='teamsCol'>${reqt.fields.customfield_10070.map(x => x.value).join(', ')}</td>`)
         teamCount = reqt.fields.customfield_10070.length
       } else {
-        res.write(`<td>None</td>`)
+        res.write(`<td class='teamsCol'>None</td>`)
         teamCount = 0
       }
 
-      res.write(`<td class='${JiraStatus.formatCssClassName(reqt.fields.status.name)}'>${reqt.fields.status.name}</td>`)
+      res.write(`<td class='statusCol ${JiraStatus.formatCssClassName(reqt.fields.status.name)}'>${reqt.fields.status.name}</td>`)
 
-      res.write(`<td>`)
+      const implementedByKeys = []
+
+      res.write(`<td class='linksCol'>`)
       if (reqt.fields.issuelinks) {
         implementedByCounter = 0
         // Expect at least one "is implemented by" link for each team
-        reqt.fields.issuelinks.forEach((link) => {
+        // reqt.fields.issuelinks.forEach((link) => {
+        for (let i = 0; i < reqt.fields.issuelinks.length; i++) {
+          const link = reqt.fields.issuelinks[i]
           if (link.inwardIssue) {
             if (link.type.inward === 'is implemented by') {
               implementedByCounter += 1
+              implementedByKeys.push(link.inwardIssue.key)
             }
             res.write(`${link.type.inward} <a href='${config.get('jira.protocol')}://${
               config.get('jira.host')
@@ -579,7 +646,8 @@ server.get('/requirements', async (req, res, next) => {
               config.get('jira.host')
             }/browse/${link.outwardIssue.key}' target='_blank' title='${link.outwardIssue.fields.summary}'>${link.outwardIssue.key}</a><br>`)
           }
-        })
+        }
+        // })
 
         // Not Rejected
         if (reqt.fields.status.name === 'Rejected') {
@@ -601,10 +669,47 @@ server.get('/requirements', async (req, res, next) => {
       }
       res.write(`</td>`)
       // res.write(`<td>${reqt.fields.labels.join(',')}</td>`)
-      res.write(`</tr>`)
-    })
-    res.write(`</tbody></table>`)
-    debug(inwardLinks)
+      res.write('<td class="childrenCol">')
+      // implementedByKeys.forEach(async (key) => {
+      for (let i = 0; i < implementedByKeys.length; i++) {
+        const key = implementedByKeys[i];
+        res.write(`<p>${key}: `)
+        try {
+          const kids = key in Object.keys(childrenCache) ? childrenCache[key] : await getChildren(key)
+          if (kids.issues && kids.issues.length > 0) {
+            // debug(`kids/fields for ${key}: `, kids.issues[0].fields)
+            const issueList = []
+            kids.issues.forEach((issue) => {
+              const link = buildLink(
+                issue.key,
+                issue.fields.status.name,
+                issue.fields.issuetype.iconUrl,
+                issue.fields.summary,
+                issue.fields.assignee.displayName,
+                issue.fields.status.name,
+                false
+              )
+              issueList.push(link)
+            })
+            res.write(issueList.join(''))
+          } else {
+            res.write('none')
+          }
+          childrenCache[key] = kids
+        } catch (err) {
+          res.write(`<!-- ERROR: ${err.message} -->`)
+        }
+        res.write('</p>')
+      // })
+      }
+      res.write('</td>')
+
+      res.write('</tr>')
+    }
+    // })
+      res.write(`</tbody></table>`)
+    debug('done with table')
+    // debug(inwardLinks)
   } catch (err) {
     debug(err)
     res.write(`<em>error</em><!-- ${err} -->`)
@@ -650,16 +755,18 @@ function buildLink(
   issueTypeIconUrl,
   issueSummary,
   issueOwner,
-  issueStatus
+  issueStatus,
+  hideName = false
 ) {
   const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
-  return `<span class='issueComboLink lineicon'><a href='${config.get('jira.protocol')}://${
+  const displayTitle = hideName ? '' : title
+  return `<span class='${hideName ? '' : 'issueComboLink lineicon'}'><a href='${config.get('jira.protocol')}://${
     config.get('jira.host')
   }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
     statusName
   )}' src='${issueTypeIconUrl}' title='${cleanText(
     title
-  )}')/><span class='issueName'/>${title}</span></a></span>`
+  )}')/><span class='${hideName ? '' : 'issueName'}'/>${displayTitle}</span></a></span>`
 }
 
 function startHtml(res) {

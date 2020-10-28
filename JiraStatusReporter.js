@@ -508,7 +508,7 @@ class JiraStatusReporter {
               let jobList = []
               for (let ctr = 0; ctr < runCount; ctr++) {
                 queryConfig.startAt = ctr * queryConfig.maxResults
-                debug(`jobList.push(jira.searchJira(${jql}`, queryConfig, `)`)
+                // debug(`jobList.push(jira.searchJira(${jql}`, queryConfig, `)`)
                 jobList.push(jira.searchJira(jql, queryConfig))
               }
 
