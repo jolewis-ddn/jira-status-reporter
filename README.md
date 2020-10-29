@@ -19,6 +19,7 @@ Collection of node scripts to query, store, and report on Jira issues.
 ### For live queries
 * ```sh
   git clone https://github.com/jolewis-ddn/jira-status-reporter
+  cd jira-status-reporter
   npm install
   mkdir data
 	```
