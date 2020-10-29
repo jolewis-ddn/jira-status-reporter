@@ -2,8 +2,6 @@
 
 const debug = require('debug')('JSR-file-manager')
 
-const DATA_PATH = "data"
-
 class JiraStatusReporterFileManager {
     constructor(homeDir) {
         this.homeDir = homeDir

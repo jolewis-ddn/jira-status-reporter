@@ -1,19 +1,19 @@
 'use strict'
 
 const debug = require('debug')('chart-link-maker')
-const config = require('config')
+// const config = require('config')
 
-const randojs = require('@nastyox/rando.js'), rando = randojs.rando, randoSequence = randojs.randoSequence
+const randojs = require('@nastyox/rando.js'), rando = randojs.rando //, randoSequence = randojs.randoSequence
 
 const BAR_CHART_TYPE = 'bar'
 const LINE_CHART_TYPE = 'line'
 
-const BASE_URL =
-  config.get('graphicServer.protocol') +
-  '://' +
-  config.get('graphicServer.server') +
-  ':' +
-  config.get('graphicServer.port')
+// const BASE_URL =
+//   config.get('graphicServer.protocol') +
+//   '://' +
+//   config.get('graphicServer.server') +
+//   ':' +
+//   config.get('graphicServer.port')
 
 const DEFAULT_CHART_TYPE = BAR_CHART_TYPE
 const DEFAULT_WIDTH = 500
@@ -153,8 +153,8 @@ class ChartLinkMaker {
     this.dataSeries.forEach((cat, ndx) => {
       debug(`...in forEach(${JSON.stringify(cat)}, ${ndx})...`)
       datasets.push({
-        label: this.dataSeries[ndx]['label'],
-        data: this.dataSeries[ndx]['data'],
+        label: this.dataSeries[ndx].label,
+        data: this.dataSeries[ndx].data,
         fill: this.fill
       })
     })

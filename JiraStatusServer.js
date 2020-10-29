@@ -1,15 +1,17 @@
 'use strict'
 const debug = require('debug')('JiraStatusServer')
 const restify = require('restify')
-const restifyErrors = require('restify-errors')
+// const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
+
+const NodeCache = require('node-cache')
+const cache = new NodeCache( { stdTTL: 600, checkperiod: 120 } )
 
 const config = require('config')
 
-const mermaidConfig = require('./config/mermaid-config')
-
-const MermaidNodes = require('./MermaidNodes')
-const mermaid = new MermaidNodes()
+// const mermaidConfig = require('./config/mermaid-config')
+// const MermaidNodes = require('./MermaidNodes')
+// const mermaid = new MermaidNodes()
 
 const JiraStatus = require('./JiraStatus')
 
@@ -380,24 +382,48 @@ server.get('/endpoint', async (req, res, next) => {
 
 */
 
+server.get('/cache/stats', async (req, res, next) => {
+  try {
+    res.send({stats: cache.getStats(), keys: cache.keys() })
+  } catch (err) {
+    debug(err)
+    res.send( { error: err.message } )
+  }
+  return next()
+})
+
+server.get('/cache/flush', async (req, res, next) => {
+  try {
+    cache.flushAll()
+    res.send({result: 'flushed', stats: cache.getStats(), keys: cache.keys() })
+  } catch (err) {
+    debug(err)
+    res.send( { error: err.message } )
+  }
+  return next()
+})
+
 async function getEpicEstimates(epicKey) {
-  const fields = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking']
-  // Query for stories by parent epic
-  const result = await jsr._genericJiraSearch(`'Epic Link' in (${epicKey}) AND status not in (Done,Dead) and issuetype=story`, 99, fields)
-  const storyData = []
-  let progress = 0
-  let total = 0
-  result.issues.forEach((issue) => {
-    progress += issue.fields.aggregateprogress.progress
-    total += issue.fields.aggregateprogress.total
-    storyData.push({ 
-      key: `${issue.key} ${issue.fields.summary}`, 
-      assignee: issue.fields.assignee ? issue.fields.assignee.displayName : '', 
-      progress: issue.fields.aggregateprogress.progress, 
-      total: issue.fields.aggregateprogress.total
+  if (!cache.has(`epicEstimate-${epicKey}`)) {
+    const fields = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking']
+    // Query for stories by parent epic
+    const result = await jsr._genericJiraSearch(`'Epic Link' in (${epicKey}) AND status not in (Done,Dead) and issuetype=story`, 99, fields)
+    const storyData = []
+    let progress = 0
+    let total = 0
+    result.issues.forEach((issue) => {
+      progress += issue.fields.aggregateprogress.progress
+      total += issue.fields.aggregateprogress.total
+      storyData.push({
+        key: `${issue.key} ${issue.fields.summary}`,
+        assignee: issue.fields.assignee ? issue.fields.assignee.displayName : '',
+        progress: issue.fields.aggregateprogress.progress,
+        total: issue.fields.aggregateprogress.total
+      })
+      cache.set(`epicEstimate-${epicKey}`, { progress: progress, total: total, details: storyData })
     })
-  })
-  return({ progress: progress, total: total, details: storyData })
+  }
+  return (cache.get(`epicEstimate-${epicKey}`))
 }
 
 server.get('/estimates', async (req, res, next) => {
@@ -417,13 +443,24 @@ server.get('/estimates', async (req, res, next) => {
 
   try {
     // Get data
-    const epicList = await jsr._genericJiraSearch(`issuetype=epic and project=${config.project}`, 99, ['summary', 'assignee'])
     const epics = {}
-    epicList.issues.forEach((epic) => {
+    if (!cache.has('epicList')) {
+      debug('...epicList: loading from Jira')
+      cache.set('epicList', await jsr._genericJiraSearch(`issuetype=epic and project=${config.project}`, 99, ['summary', 'assignee']))
+    } else {
+      debug('...epicList: loading from cache')
+    }
+    cache.get('epicList').issues.forEach((epic) => {
       epics[epic.key] = epic.fields.summary
     })
 
-    const storyList = await jsr._genericJiraSearch(`issuetype=story and status not in (dead, done) and project=${config.project} and "Epic Link" is not empty order by ${sort}"EPIC LINK" ASC, key ASC`, 99, FIELDS)
+    if (!cache.has('storyList')) {
+      debug('...storyList: loading from Jira')
+      cache.set('storyList', await jsr._genericJiraSearch(`issuetype=story and status not in (dead, done) and project=${config.project} and "Epic Link" is not empty order by ${sort}"EPIC LINK" ASC, key ASC`, 99, FIELDS))
+    } else {
+      debug('...storyList: loading from cache')
+    }
+    const storyList = cache.get('storyList')
 
     if (format == 'csv') {
       COLUMNS.pop()
@@ -531,12 +568,26 @@ function cleanSeconds(sec) {
 }
 
 async function getRequirements() {
-  return await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99)
+  debug('getRequirements() called')
+  if (!cache.has('requirements')) {
+    debug('...fetching from Jira')
+    cache.set('requirements', await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99), 3600)
+  } else {
+    debug('...fetching from cache')
+  }
+  return cache.get('requirements')
 }
 
 async function getChildren(parentId) {
+  debug(`getChildren(${parentId}) called`)
   try {
-    return await jsr._genericJiraSearch(`parentEpic=${parentId} and key != ${parentId} ORDER BY key asc`, 99, ['summary', 'status', 'assignee', 'labels', 'fixVersions', 'issuetype', 'issuelinks'])
+    if (!cache.has(`children-${parentId}`)) {
+      debug('...fetching from Jira')
+      cache.set(`children-${parentId}`, await jsr._genericJiraSearch(`parentEpic=${parentId} and key != ${parentId} ORDER BY key asc`, 99, ['summary', 'status', 'assignee', 'labels', 'fixVersions', 'issuetype', 'issuelinks']))
+    } else {
+      debug('...fetching from cache')
+    }
+    return(cache.get(`children-${parentId}`))
   } catch (err) {
     debug(`getChildren(${parentId}) error: `, err)
     return(null)
@@ -553,11 +604,10 @@ server.get('/children/:id', async (req, res, next) => {
       debug('id.len not > 4')
       res.send(`Error: Invalid Jira issue id`)
     }
+    return next()
   } catch (err) {
     res.status(500).send(`Error: ${err.message}`)
     debug(err)
-  } finally {
-    debug('finally')
     return next()
   }
 })
@@ -1340,42 +1390,42 @@ server.get('/links', (req, res, next) => {
  ************** CACHE-RELATED ENDPOINTS **************
  */
 
-server.get('/cache', (req, res, next) => {
+server.get('/cacheJSR', (req, res, next) => {
   res.send(jdr.getCacheObject(false))
   return
 })
 
-server.get('/reread-cache', (req, res, next) => {
+server.get('/reread-cacheJSR', (req, res, next) => {
   res.send(`reread`)
   return next()
 })
 
-server.get('/refresh-cache', (req, res, next) => {
+server.get('/refresh-cacheJSR', (req, res, next) => {
   const updates = jdr.reloadCache(jdr.refresh())
   res.send(`refreshed ${updates}`)
   return next()
 })
 
-server.get('/rebuild-cache', (req, res, next) => {
+server.get('/rebuild-cacheJSR', (req, res, next) => {
   const updates = jdr.reloadCache(jdr.rebuild())
   res.send(`rebuilt ${updates}`)
   return next()
 })
 
-server.get('/reset', (req, res, next) => {
+server.get('/resetJSR', (req, res, next) => {
   jsr = new JSR()
   jdr = new JiraDataReader()
   res.redirect('/chart', next)
   return
 })
 
-server.get('/wipe-cache', (req, res, next) => {
+server.get('/wipe-cacheJSR', (req, res, next) => {
   jdr.getCacheObject().wipe(true)
   res.send(`wiped`)
   return next()
 })
 
-server.get('/datafiles', (req, res, next) => {
+server.get('/datafilesJSR', (req, res, next) => {
   try {
     let summary = jdr.getDataSummary()
     res.send(summary)

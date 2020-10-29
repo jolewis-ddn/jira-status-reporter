@@ -47,9 +47,9 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/config`: Current config
 * `/fields`: All Jira fields (standard and custom)
 ### Requirements
-* `/requirements`: Requirements report
+* `/requirements`: Requirements report (cached)
 ### Estimates
-* `/estimates`: List which Stories have been estimated
+* `/estimates`: List which Stories have been estimated (cached)
 ### Issues
 * `/chart`: Visualize timeseries data using cache
 * `/dashboard`: Data visualization of current status (no cache)
@@ -58,16 +58,21 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/links`: Visualize issue links
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
 ### Cache
-* `/cache`: Current in-memory cache
-* `/datafiles`: List of data files in cache
+#### General
+* `/cache/stats`: All dates covered by cache
+* `/cache/flush`: All dates covered by cache
+
+#### JSR Cache
 * `/dates`: All dates covered by cache
 * `/homedir`: The current root cache folder
-* `/rebuild-cache`: Delete and recreate the cache from source data
-* `/refresh-cache`: Update the cache with new source data files
-* `/reread-cache`: Re-read the cache from disk
-* `/reset`: Re-initialize the cache
 * `/series`: Issue counts by status
-* `/wipe-cache`: Delete the cache
+* `/cacheJSR`: Current in-memory cache
+* `/datafilesJSR`: List of data files in cache
+* `/rebuild-cacheJSR`: Delete and recreate the cache from source data
+* `/refresh-cacheJSR`: Update the cache with new source data files
+* `/reread-cacheJSR`: Re-read the cache from disk
+* `/resetJSR`: Re-initialize the cache
+* `/wipe-cacheJSR`: Delete the cache
 
 ## Usage example
 
@@ -97,7 +102,7 @@ set DEBUG=*
 ## Folders
 
 * `./data/`: Where the database and all JSON files will be stored
-* `./.cache/`: Project data cache
+* `./.cache/`: Project data (JSR) cache
 
 ## Main Files
 
@@ -122,6 +127,7 @@ set DEBUG=*
   * `istanbul`: For test coverage
   * `rando.js`: For random chart IDs
   * `node-config`: Manages configuration
+  * `node-cache`: Manages general cache
 * Working QuickChart server
   * See https://quickchart.io/ for instructions
   * Configure the server and port in the config.js file
