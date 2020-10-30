@@ -1,7 +1,7 @@
 'use strict'
 const debug = require('debug')('JiraStatusServer')
 const restify = require('restify')
-// const restifyErrors = require('restify-errors')
+const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
 
 const NodeCache = require('node-cache')
@@ -9,9 +9,9 @@ const cache = new NodeCache( { stdTTL: 600, checkperiod: 120 } )
 
 const config = require('config')
 
-// const mermaidConfig = require('./config/mermaid-config')
-// const MermaidNodes = require('./MermaidNodes')
-// const mermaid = new MermaidNodes()
+const mermaidConfig = require('./config/mermaid-config')
+const MermaidNodes = require('./MermaidNodes')
+const mermaid = new MermaidNodes()
 
 const JiraStatus = require('./JiraStatus')
 
@@ -241,7 +241,7 @@ function buildStylesheet() {
     .summaryCol { width: 30%; }
     .linksCol { width: 150px; }
     .fixVersionCol { width: 150px; }
-    .nameCol { width: 100px; }
+    .nameCol { width: 150px; }
     .statusCol { }
     .childrenCol { width: 30%; }
 
@@ -427,26 +427,30 @@ async function getEpicEstimates(epicKey) {
 }
 
 server.get('/estimates', async (req, res, next) => {
-  let format = 'html'
-  if (req.query.format) {
-    format = req.query.format
+  const today = new Date()
+
+  let relFilter = ''
+  if (req.query.release) { relFilter = ` and fixVersion = "${req.query.release}"` }
+
+  const releases = {}
+
+  if (req.query.flush && req.query.flush === 'yes') {
+    cache.flushAll()
   }
 
-  let sort = ''
-  if (req.query.sort) {
-    sort = `${req.query.sort}, `
-  }
+  let format = req.query.format ? req.query.format : 'html'
+  let sort = req.query.sort ? `${req.query.sort}, ` : ''
 
   const pageTitle = 'Estimates Report'
-  const COLUMNS = ['Epic', 'Story', 'Assignee', 'Spent', 'Total', '% Done']
-  const FIELDS = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking']
+  const COLUMNS = ['Epic', 'Story', 'Release', 'Assignee', 'Spent', 'Total', '% Done']
+  const FIELDS = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking', 'labels', 'fixVersions']
 
   try {
     // Get data
     const epics = {}
     if (!cache.has('epicList')) {
       debug('...epicList: loading from Jira')
-      cache.set('epicList', await jsr._genericJiraSearch(`issuetype=epic and project=${config.project}`, 99, ['summary', 'assignee']))
+      cache.set('epicList', await jsr._genericJiraSearch(`issuetype=epic and project=${config.project} ${relFilter}`, 99, ['summary', 'assignee']))
     } else {
       debug('...epicList: loading from cache')
     }
@@ -456,7 +460,7 @@ server.get('/estimates', async (req, res, next) => {
 
     if (!cache.has('storyList')) {
       debug('...storyList: loading from Jira')
-      cache.set('storyList', await jsr._genericJiraSearch(`issuetype=story and status not in (dead, done) and project=${config.project} and "Epic Link" is not empty order by ${sort}"EPIC LINK" ASC, key ASC`, 99, FIELDS))
+      cache.set('storyList', await jsr._genericJiraSearch(`issuetype=story and status not in (dead, done) and project=${config.project} and "Epic Link" is not empty ${relFilter} order by ${sort}"EPIC LINK" ASC, key ASC`, 99, FIELDS))
     } else {
       debug('...storyList: loading from cache')
     }
@@ -480,7 +484,7 @@ server.get('/estimates', async (req, res, next) => {
       return next()
     } else {
       // Assignee stats:
-      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [] }}
+      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [], rel: {} }}
 
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
@@ -489,65 +493,133 @@ server.get('/estimates', async (req, res, next) => {
       // Write table
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
       storyList.issues.forEach((story) => {
-        // debug(`story: `, story)
+        // debug(`story & labels & fixVersions: `, story.key, story.fields.labels.join(', '), story.fields.fixVersions)
         res.write(`<tr>
-                  <td style='font-size: smaller; color: gray;'>${story.fields.customfield_10008} ${epics[story.fields.customfield_10008]}</td>
+                  <td class='epicCol' style='font-size: smaller; color: gray;'>${story.fields.customfield_10008} ${epics[story.fields.customfield_10008]}</td>
                   <td>${story.key} ${story.fields.summary}</td>`)
+
+        // Release(s)
+        const fixVersions = story.fields.fixVersions.map((x) => { return(x.name) }).join(', ') || 'unset'
+        if (story.fields.fixVersions.length > 1) { debug(`Multiple fixVersions for ${story.key}: ${fixVersions}`) }
+        res.write(`<td class='fixVersionCol'>${fixVersions}</td>`)
+
+        // Store the release value in the releases list
+        if (!(Object.keys(releases).includes(fixVersions))) {
+          releases[fixVersions] = { total: story.fields.aggregateprogress.total, progress: story.fields.aggregateprogress.progress }
+        } else {
+          releases[fixVersions]['total'] = releases[fixVersions]['total'] + story.fields.aggregateprogress.total
+          releases[fixVersions]['progress'] = releases[fixVersions]['progress'] + story.fields.aggregateprogress.progress
+        }
+        
+        // There is an assignee
         if (story.fields.assignee) {
           const assignee = story.fields.assignee.displayName
-          res.write(`<td>${assignee}</td>`)
+          res.write(`<td class='storyCol'>${assignee}</td>`)
           
           // Update assigneeStats
-          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [] }}
+          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [], rel: {} }}
           assigneeStats[assignee].count.push(`${story.key} ${story.fields.summary} [${cleanSeconds(story.fields.aggregateprogress.progress)} of ${cleanSeconds(story.fields.aggregateprogress.total)}d]`)
+
           assigneeStats[assignee].progress += story.fields.aggregateprogress.progress
           assigneeStats[assignee].total += story.fields.aggregateprogress.total
+          
+          if (!Object.keys(assigneeStats[assignee]['rel']).includes(fixVersions)) { 
+            assigneeStats[assignee]['rel'][fixVersions] = { total: cleanSeconds(story.fields.aggregateprogress.total), progress: cleanSeconds(story.fields.aggregateprogress.progress) }
+          } else { // Key already exists, so increment it
+            assigneeStats[assignee]['rel'][fixVersions].total = assigneeStats[assignee]['rel'][fixVersions].total + cleanSeconds(story.fields.aggregateprogress.total)
+            assigneeStats[assignee]['rel'][fixVersions].progress = assigneeStats[assignee]['rel'][fixVersions].progress + cleanSeconds(story.fields.aggregateprogress.progress)
+          }
+          
           if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty.push(`${story.key} ${story.fields.summary}`) }
-        } else {
-          res.write(`<td class='problem'>none</td>`)
+        } else { // No assignee
+          res.write(`<td class='storyCol problem'>none</td>`)
           assigneeStats.none.count.push(`${story.key} ${story.fields.summary}`)
           assigneeStats.none.progress += story.fields.aggregateprogress.progress
           assigneeStats.none.total += story.fields.aggregateprogress.total
           if (assigneeStats.none.total == 0) { assigneeStats.none.empty.push(`${story.key} ${story.fields.summary}`) }
         }
-        res.write(`<td>${cleanSeconds(story.fields.aggregateprogress.progress)} d</td>`)
+
+        // Spent
+        res.write(`<td class='spentCol'>${cleanSeconds(story.fields.aggregateprogress.progress)} d</td>`)
+        // Total
         if (story.fields.aggregateprogress.total > 0) {
-          res.write(`<td>${cleanSeconds(story.fields.aggregateprogress.total)} d</td>`)
+          res.write(`<td class='totalCol'>${cleanSeconds(story.fields.aggregateprogress.total)} d</td>`)
         } else {
-          res.write(`<td class='problem'>0d</td>`)
+          res.write(`<td class='totalCol problem'>0d</td>`)
         }
-        res.write(`<td>${story.fields.aggregateprogress.total > 0 ? (100*(story.fields.aggregateprogress.progress/story.fields.aggregateprogress.total).toFixed(2)) : '0'}%</td>
+
+        // Percent Done
+        res.write(`<td class='percentDoneCol'>${story.fields.aggregateprogress.total > 0 ? (100*(story.fields.aggregateprogress.progress/story.fields.aggregateprogress.total).toFixed(2)) : '0'}%</td>
                   </tr>`)
       })
       res.write(`</tbody></table>`)
       res.write(`<hr>`)
+      // Write Releases table
+      res.write(`<h2>Releases</h2>`)
+      debug(releases)
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead>
+        <tr>
+          <th>Release</th>
+          <th>Spent (days)</th>
+          <th>Planned (days)</th>
+        </tr></thead><tbody>`)
+      Object.keys(releases).sort().forEach((rel) => {
+        res.write(`
+          <td>${rel}</td>
+          <td>${cleanSeconds(releases[rel].progress)}</td>
+          <td>${cleanSeconds(releases[rel].total)}</td>
+          </tr>`)
+      })
+      res.write('</tbody></table>')
+
+      res.write(`<hr>`)
+      // Write User Data table
       res.write(`<h2>User Report</h2>`)
-      // Write table
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead>
         <tr>
           <th>Name</th>
           <th>Spent</th>
           <th>Total</th>
           <th>Completed</th>
-          <th>Missing Est. (%)</th>
-        </tr></thead><tbody>`)
+          <th>Missing Est. (%)</th>`)
+      Object.keys(releases).sort().forEach((rel) => { res.write(`<th>${rel}</th>`)})
+      res.write(`</tr></thead><tbody>`)
       // debug(assigneeStats)
       Object.keys(assigneeStats).forEach((a) => {
         const titleContentCount = assigneeStats[a].count.length > 0 ? '<b>Total Story List</b><ol><li>' + assigneeStats[a].count.join('</li><li>') + '</ol>' : 'none'
         const titleContentEmpty = assigneeStats[a].empty.length > 0 ? `<b>Unestimated Story list</b><ol><li>${assigneeStats[a].empty.join('</li><li>')}</ol>` : 'none'
 
         res.write(`<tr>
-          <td>${a}</td>
-          <td>${assigneeStats[a].progress > 0 ? cleanSeconds(assigneeStats[a].progress) : 0 } d</td>
-          <td`)
+          <td class='nameCol'>${a}</td>
+          <td class='spentCol'>${assigneeStats[a].progress > 0 ? cleanSeconds(assigneeStats[a].progress) : 0 } d</td>
+          <td class='totalCol`)
         if (assigneeStats[a].total == 0) {
-          res.write(` class='problem'>0d</td>`)
+          res.write(` problem'>0d</td>`)
         } else {
-          res.write(` >${cleanSeconds(assigneeStats[a].total)} d</td>`)
+          const days = cleanSeconds(assigneeStats[a].total)
+          const endDate = calcFutureDate(cleanSeconds(assigneeStats[a].total - assigneeStats[a].progress))
+          res.write(`'><span title='${endDate}'>${days} d</td>`)
         }
-        res.write(`<td>${assigneeStats[a].total > 0 ? ((100*(assigneeStats[a].progress / assigneeStats[a].total).toFixed(2))) : 0 }%</td>
-          <td><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="${titleContentCount}">${assigneeStats[a].count.length}</span> 
-          (${assigneeStats[a].empty.length > 0 ? (100*(assigneeStats[a].empty.length/assigneeStats[a].count.length).toFixed(2)) : 0 }%)</td></tr>`)
+        // Completed
+        res.write(`<td class='completedCol'>${assigneeStats[a].total > 0 ? Math.round(100*(assigneeStats[a].progress / assigneeStats[a].total)) : 0 }%</td>`)
+        // Missing Estimate
+        res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="${titleContentCount}">${assigneeStats[a].count.length}</span> 
+          (${assigneeStats[a].empty.length > 0 ? (100*(assigneeStats[a].empty.length/assigneeStats[a].count.length)).toFixed(0) : 0 }%)</td>`)
+        
+        // Releases details
+        Object.keys(releases).sort().forEach((rel) => {
+          // debug(`processing release data for user = ${a} rel = ${rel}`)
+          // Print the user's numbers for this release
+          if (Object.keys(assigneeStats[a]['rel']).includes(rel)) {
+            // debug(`assigneeStats[a]['rel'][${rel}] = `, assigneeStats[a]['rel'][rel])
+            const userProgress = assigneeStats[a]['rel'][rel].progress
+            const userTotal = assigneeStats[a]['rel'][rel].total
+            res.write(`<!-- ${rel} --><td>${userProgress} of ${userTotal}</td>`)
+          } else {
+            res.write('<!-- no data --><td></td>')
+          }
+        })
+        res.write(`</tr>`)
       })
       res.write(buildHtmlFooter())
     }
@@ -561,10 +633,37 @@ server.get('/estimates', async (req, res, next) => {
   }
 })
 
+// Convert seconds into days
 function cleanSeconds(sec) {
   let result = (sec/28800).toFixed(2)
   if (result == Math.round(result)) { result = Math.round(result) }
   return(result)
+}
+
+// Ignore weekends
+function calcFutureDate(dplus) {
+  debug(`calcFutureDate(${dplus}) called...`)
+  // TODO: Fix calculation of working days in future
+  dplus = Math.round(dplus)
+  const d = new Date()
+  // Current weekday
+  const wd = d.getDay()
+  const toWeekend = 6-wd
+  // debug(`wd: ${wd}; toWeekend: ${toWeekend}`)
+  if (dplus > toWeekend) {
+    // debug(`dplus > (6-${wd})`)
+    const toMonday = toWeekend + 2
+    // debug(`toMonday: ${toMonday}`)
+    // dplus = dplus - toMonday
+    const weekCount = Math.round((dplus-1)/5)
+    // debug(`weekCount: ${weekCount}`)
+    d.setDate(d.getDate() + (toMonday + (7 * weekCount) + (dplus - (5 * weekCount))))
+  } else { // within this week
+    // debug(`dplus <= (6-${wd})`)
+    d.setDate(d.getDate() + dplus)
+  }
+  // debug(`... now equals ${d}`)
+  return(`roughly ${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`)
 }
 
 async function getRequirements() {
