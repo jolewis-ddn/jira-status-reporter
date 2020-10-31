@@ -1,11 +1,12 @@
 'use strict'
 const debug = require('debug')('JiraStatusServer')
+const d = require('./dateExtension')
 const restify = require('restify')
 const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
 
 const NodeCache = require('node-cache')
-const cache = new NodeCache( { stdTTL: 600, checkperiod: 120 } )
+const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 })
 
 const config = require('config')
 
@@ -76,15 +77,15 @@ server.get('/count/', async (req, res, next) => {
 server.get('/report/:project', (req, res, next) => {
   debug(`/report/${req.params.project} called`)
   JiraStatus.report(req.params.project)
-  .then((response) => {
-    // debug(`report response = `, response)
-    res.send(response)
-    res.end()
-    return next()
-  })
-  .catch((err) => {
-    throw err
-  })
+    .then((response) => {
+      // debug(`report response = `, response)
+      res.send(response)
+      res.end()
+      return next()
+    })
+    .catch((err) => {
+      throw err
+    })
 })
 
 server.get('/homedir', (req, res, next) => {
@@ -169,7 +170,7 @@ function buildHtmlHeader(title = '', showButtons = true) {
   // Bootstrap 5 alpha
   // return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">${buildStylesheet()}</head>`)
 
-  let buttons = [`<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>`,`<button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>`,`<button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`]
+  let buttons = [`<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>`, `<button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>`, `<button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`]
 
   if (typeof showButtons === 'boolean') {
     if (!showButtons) {
@@ -304,7 +305,7 @@ async function buildPieCharts(stats) {
   results.push("<span id='pieCharts' class='pieCharts miniJSRChartTable'>")
 
   let jsrCLM = jsr.getChartLinkMaker(config).reset()
-  jsrCLM.setCategories(['a','b']).reset().setSize(250)
+  jsrCLM.setCategories(['a', 'b']).reset().setSize(250)
 
   let promiseList = []
   // Charts...
@@ -316,10 +317,10 @@ async function buildPieCharts(stats) {
   })
 
   const charts = await Promise.all(promiseList)
-    results.push(charts)
-    results.push('</span>')
-    debug('returning from buildPieCharts(stats)...')
-    return results.join('')
+  results.push(charts)
+  results.push('</span>')
+  debug('returning from buildPieCharts(stats)...')
+  return results.join('')
 }
 
 // Clean out " from string - for use with Title attribute values
@@ -384,10 +385,10 @@ server.get('/endpoint', async (req, res, next) => {
 
 server.get('/cache/stats', async (req, res, next) => {
   try {
-    res.send({stats: cache.getStats(), keys: cache.keys() })
+    res.send({ stats: cache.getStats(), keys: cache.keys() })
   } catch (err) {
     debug(err)
-    res.send( { error: err.message } )
+    res.send({ error: err.message })
   }
   return next()
 })
@@ -395,10 +396,10 @@ server.get('/cache/stats', async (req, res, next) => {
 server.get('/cache/flush', async (req, res, next) => {
   try {
     cache.flushAll()
-    res.send({result: 'flushed', stats: cache.getStats(), keys: cache.keys() })
+    res.send({ result: 'flushed', stats: cache.getStats(), keys: cache.keys() })
   } catch (err) {
     debug(err)
-    res.send( { error: err.message } )
+    res.send({ error: err.message })
   }
   return next()
 })
@@ -470,11 +471,11 @@ server.get('/estimates', async (req, res, next) => {
       COLUMNS.pop()
       let response = COLUMNS.join("\t") + "\n"
       storyList.issues.forEach((story) => {
-        response += ([story.fields.customfield_10008 + ' ' + epics[story.fields.customfield_10008], 
-          story.key + ' ' + story.fields.summary, 
-          story.fields.assignee ? story.fields.assignee.displayName : 'none', 
-          story.fields.aggregateprogress.progress,
-          story.fields.aggregateprogress.total
+        response += ([story.fields.customfield_10008 + ' ' + epics[story.fields.customfield_10008],
+        story.key + ' ' + story.fields.summary,
+        story.fields.assignee ? story.fields.assignee.displayName : 'none',
+        story.fields.aggregateprogress.progress,
+        story.fields.aggregateprogress.total
         ].join("\t"))
         response += "\n"
       })
@@ -484,7 +485,7 @@ server.get('/estimates', async (req, res, next) => {
       return next()
     } else {
       // Assignee stats:
-      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [], rel: {} }}
+      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [], rel: {} } }
 
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
@@ -499,7 +500,7 @@ server.get('/estimates', async (req, res, next) => {
                   <td>${story.key} ${story.fields.summary}</td>`)
 
         // Release(s)
-        const fixVersions = story.fields.fixVersions.map((x) => { return(x.name) }).join(', ') || 'unset'
+        const fixVersions = story.fields.fixVersions.map((x) => { return (x.name) }).join(', ') || 'unset'
         if (story.fields.fixVersions.length > 1) { debug(`Multiple fixVersions for ${story.key}: ${fixVersions}`) }
         res.write(`<td class='fixVersionCol'>${fixVersions}</td>`)
 
@@ -510,26 +511,26 @@ server.get('/estimates', async (req, res, next) => {
           releases[fixVersions]['total'] = releases[fixVersions]['total'] + story.fields.aggregateprogress.total
           releases[fixVersions]['progress'] = releases[fixVersions]['progress'] + story.fields.aggregateprogress.progress
         }
-        
+
         // There is an assignee
         if (story.fields.assignee) {
           const assignee = story.fields.assignee.displayName
           res.write(`<td class='storyCol'>${assignee}</td>`)
-          
+
           // Update assigneeStats
-          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [], rel: {} }}
+          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [], rel: {} } }
           assigneeStats[assignee].count.push(`${story.key} ${story.fields.summary} [${cleanSeconds(story.fields.aggregateprogress.progress)} of ${cleanSeconds(story.fields.aggregateprogress.total)}d]`)
 
           assigneeStats[assignee].progress += story.fields.aggregateprogress.progress
           assigneeStats[assignee].total += story.fields.aggregateprogress.total
-          
-          if (!Object.keys(assigneeStats[assignee]['rel']).includes(fixVersions)) { 
+
+          if (!Object.keys(assigneeStats[assignee]['rel']).includes(fixVersions)) {
             assigneeStats[assignee]['rel'][fixVersions] = { total: cleanSeconds(story.fields.aggregateprogress.total), progress: cleanSeconds(story.fields.aggregateprogress.progress) }
           } else { // Key already exists, so increment it
             assigneeStats[assignee]['rel'][fixVersions].total = assigneeStats[assignee]['rel'][fixVersions].total + cleanSeconds(story.fields.aggregateprogress.total)
             assigneeStats[assignee]['rel'][fixVersions].progress = assigneeStats[assignee]['rel'][fixVersions].progress + cleanSeconds(story.fields.aggregateprogress.progress)
           }
-          
+
           if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty.push(`${story.key} ${story.fields.summary}`) }
         } else { // No assignee
           res.write(`<td class='storyCol problem'>none</td>`)
@@ -549,7 +550,7 @@ server.get('/estimates', async (req, res, next) => {
         }
 
         // Percent Done
-        res.write(`<td class='percentDoneCol'>${story.fields.aggregateprogress.total > 0 ? (100*(story.fields.aggregateprogress.progress/story.fields.aggregateprogress.total).toFixed(2)) : '0'}%</td>
+        res.write(`<td class='percentDoneCol'>${story.fields.aggregateprogress.total > 0 ? (100 * (story.fields.aggregateprogress.progress / story.fields.aggregateprogress.total).toFixed(2)) : '0'}%</td>
                   </tr>`)
       })
       res.write(`</tbody></table>`)
@@ -582,7 +583,7 @@ server.get('/estimates', async (req, res, next) => {
           <th>Total</th>
           <th>Completed</th>
           <th>Missing Est. (%)</th>`)
-      Object.keys(releases).sort().forEach((rel) => { res.write(`<th>${rel}</th>`)})
+      Object.keys(releases).sort().forEach((rel) => { res.write(`<th>${rel}</th>`) })
       res.write(`</tr></thead><tbody>`)
       // debug(assigneeStats)
       Object.keys(assigneeStats).forEach((a) => {
@@ -591,7 +592,7 @@ server.get('/estimates', async (req, res, next) => {
 
         res.write(`<tr>
           <td class='nameCol'>${a}</td>
-          <td class='spentCol'>${assigneeStats[a].progress > 0 ? cleanSeconds(assigneeStats[a].progress) : 0 } d</td>
+          <td class='spentCol'>${assigneeStats[a].progress > 0 ? cleanSeconds(assigneeStats[a].progress) : 0} d</td>
           <td class='totalCol`)
         if (assigneeStats[a].total == 0) {
           res.write(` problem'>0d</td>`)
@@ -601,11 +602,11 @@ server.get('/estimates', async (req, res, next) => {
           res.write(`'><span title='${endDate}'>${days} d</td>`)
         }
         // Completed
-        res.write(`<td class='completedCol'>${assigneeStats[a].total > 0 ? Math.round(100*(assigneeStats[a].progress / assigneeStats[a].total)) : 0 }%</td>`)
+        res.write(`<td class='completedCol'>${assigneeStats[a].total > 0 ? Math.round(100 * (assigneeStats[a].progress / assigneeStats[a].total)) : 0}%</td>`)
         // Missing Estimate
         res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="${titleContentCount}">${assigneeStats[a].count.length}</span> 
-          (${assigneeStats[a].empty.length > 0 ? (100*(assigneeStats[a].empty.length/assigneeStats[a].count.length)).toFixed(0) : 0 }%)</td>`)
-        
+          (${assigneeStats[a].empty.length > 0 ? (100 * (assigneeStats[a].empty.length / assigneeStats[a].count.length)).toFixed(0) : 0}%)</td>`)
+
         // Releases details
         Object.keys(releases).sort().forEach((rel) => {
           // debug(`processing release data for user = ${a} rel = ${rel}`)
@@ -635,35 +636,17 @@ server.get('/estimates', async (req, res, next) => {
 
 // Convert seconds into days
 function cleanSeconds(sec) {
-  let result = (sec/28800).toFixed(2)
+  let result = (sec / 28800).toFixed(2)
   if (result == Math.round(result)) { result = Math.round(result) }
-  return(result)
+  return (result)
 }
 
 // Ignore weekends
 function calcFutureDate(dplus) {
   debug(`calcFutureDate(${dplus}) called...`)
-  // TODO: Fix calculation of working days in future
-  dplus = Math.round(dplus)
   const d = new Date()
-  // Current weekday
-  const wd = d.getDay()
-  const toWeekend = 6-wd
-  // debug(`wd: ${wd}; toWeekend: ${toWeekend}`)
-  if (dplus > toWeekend) {
-    // debug(`dplus > (6-${wd})`)
-    const toMonday = toWeekend + 2
-    // debug(`toMonday: ${toMonday}`)
-    // dplus = dplus - toMonday
-    const weekCount = Math.round((dplus-1)/5)
-    // debug(`weekCount: ${weekCount}`)
-    d.setDate(d.getDate() + (toMonday + (7 * weekCount) + (dplus - (5 * weekCount))))
-  } else { // within this week
-    // debug(`dplus <= (6-${wd})`)
-    d.setDate(d.getDate() + dplus)
-  }
-  // debug(`... now equals ${d}`)
-  return(`roughly ${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`)
+  const dFuture = d.addBusinessDays(dplus, true)
+  return (`${dFuture.getMonth() + 1}/${dFuture.getDate()}/${dFuture.getFullYear()}`)
 }
 
 async function getRequirements() {
@@ -686,10 +669,10 @@ async function getChildren(parentId) {
     } else {
       debug('...fetching from cache')
     }
-    return(cache.get(`children-${parentId}`))
+    return (cache.get(`children-${parentId}`))
   } catch (err) {
     debug(`getChildren(${parentId}) error: `, err)
-    return(null)
+    return (null)
   }
 }
 
@@ -782,18 +765,16 @@ server.get('/requirements', async (req, res, next) => {
               implementedByCounter += 1
               implementedByKeys.push(link.inwardIssue.key)
             }
-            res.write(`${link.type.inward} <a href='${config.get('jira.protocol')}://${
-              config.get('jira.host')
-            }/browse/${link.inwardIssue.key}' target='_blank' title='${link.inwardIssue.fields.summary}'>${link.inwardIssue.key}</a><br>`)
+            res.write(`${link.type.inward} <a href='${config.get('jira.protocol')}://${config.get('jira.host')
+              }/browse/${link.inwardIssue.key}' target='_blank' title='${link.inwardIssue.fields.summary}'>${link.inwardIssue.key}</a><br>`)
             inwardLinks[link.type.inward]
               ?
-                inwardLinks[link.type.inward] += 1
+              inwardLinks[link.type.inward] += 1
               :
-                inwardLinks[link.type.inward] = 1
+              inwardLinks[link.type.inward] = 1
           } else { // outwardIssue
-            res.write(`${link.type.outward} <a href='${config.get('jira.protocol')}://${
-              config.get('jira.host')
-            }/browse/${link.outwardIssue.key}' target='_blank' title='${link.outwardIssue.fields.summary}'>${link.outwardIssue.key}</a><br>`)
+            res.write(`${link.type.outward} <a href='${config.get('jira.protocol')}://${config.get('jira.host')
+              }/browse/${link.outwardIssue.key}' target='_blank' title='${link.outwardIssue.fields.summary}'>${link.outwardIssue.key}</a><br>`)
           }
         }
         // })
@@ -849,14 +830,14 @@ server.get('/requirements', async (req, res, next) => {
           res.write(`<!-- ERROR: ${err.message} -->`)
         }
         res.write('</p>')
-      // })
+        // })
       }
       res.write('</td>')
 
       res.write('</tr>')
     }
     // })
-      res.write(`</tbody></table>`)
+    res.write(`</tbody></table>`)
     debug('done with table')
     // debug(inwardLinks)
   } catch (err) {
@@ -909,13 +890,12 @@ function buildLink(
 ) {
   const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
   const displayTitle = hideName ? '' : title
-  return `<span class='${hideName ? '' : 'issueComboLink lineicon'}'><a href='${config.get('jira.protocol')}://${
-    config.get('jira.host')
-  }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-    statusName
-  )}' src='${issueTypeIconUrl}' title='${cleanText(
-    title
-  )}')/><span class='${hideName ? '' : 'issueName'}'/>${displayTitle}</span></a></span>`
+  return `<span class='${hideName ? '' : 'issueComboLink lineicon'}'><a href='${config.get('jira.protocol')}://${config.get('jira.host')
+    }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+      statusName
+    )}' src='${issueTypeIconUrl}' title='${cleanText(
+      title
+    )}')/><span class='${hideName ? '' : 'issueName'}'/>${displayTitle}</span></a></span>`
 }
 
 function startHtml(res) {
@@ -972,168 +952,168 @@ server.get('/fields', async (req, res, next) => {
 server.get('/filter', async (req, res, next) => {
   debug('/filter called...')
   const data = await jsr.getFilter(req.query.id)
-    // .then((data) => {
-      debug(`getFilter returned...`)
+  // .then((data) => {
+  debug(`getFilter returned...`)
 
-      const newHeader = `${data.name}: Filter #${req.query.id}`
-      res.write(buildHtmlHeader(newHeader))
-      res.write(buildPageHeader(data.name, `Filter: ${req.query.id}`))
-      debug(`about to run genericJiraSearch(${data.jql}, 99)`)
-      jsr._genericJiraSearch(data.jql, 99)
-        .then((e) => {
-          let stats = {
-            Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-            Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 }
-          }
+  const newHeader = `${data.name}: Filter #${req.query.id}`
+  res.write(buildHtmlHeader(newHeader))
+  res.write(buildPageHeader(data.name, `Filter: ${req.query.id}`))
+  debug(`about to run genericJiraSearch(${data.jql}, 99)`)
+  jsr._genericJiraSearch(data.jql, 99)
+    .then((e) => {
+      let stats = {
+        Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+        Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+        Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+        'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+        Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 }
+      }
 
-          let results = {
-            Epics: [],
-            Stories: [],
-            Tasks: [],
-            Bugs: [],
-            'Sub-tasks': []
-          }
-          let contents = []
+      let results = {
+        Epics: [],
+        Stories: [],
+        Tasks: [],
+        Bugs: [],
+        'Sub-tasks': []
+      }
+      let contents = []
 
-          for (let x = 0; x < e.issues.length; x++) {
-            let issue = e.issues[x]
-            let ndx = x
+      for (let x = 0; x < e.issues.length; x++) {
+        let issue = e.issues[x]
+        let ndx = x
 
-            let owner = 'TBD'
-            try {
-              owner = issue.fields.assignee.displayName
-            } catch (err) {
-              owner = 'unassigned'
-            }
+        let owner = 'TBD'
+        try {
+          owner = issue.fields.assignee.displayName
+        } catch (err) {
+          owner = 'unassigned'
+        }
 
-            let statusName = 'unknown'
-            try {
-              statusName = issue.fields.status.name
-            } catch (err) {
-              statusName = 'unknown'
-            }
+        let statusName = 'unknown'
+        try {
+          statusName = issue.fields.status.name
+        } catch (err) {
+          statusName = 'unknown'
+        }
 
-            switch (issue.fields.issuetype.name) {
-              case 'Epic':
-                results.Epics.push(
-                  buildLink(
-                    issue.key,
-                    issue.fields.status.name,
-                    issue.fields.issuetype.iconUrl,
-                    issue.fields.summary,
-                    owner,
-                    statusName
-                  )
-                )
-                debug(`Sub-task ${issue.key}...`)
-                stats = updateStats(stats, 'Epic', statusName)
-                break
-              case 'Sub-task':
-                results['Sub-tasks'].push(
-                  buildLink(
-                    issue.key,
-                    issue.fields.status.name,
-                    issue.fields.issuetype.iconUrl,
-                    issue.fields.summary,
-                    owner,
-                    statusName
-                  )
-                )
-                debug(`Sub-task ${issue.key}...`)
-                stats = updateStats(stats, 'Sub-task', statusName)
-                break
-              case 'Task':
-                results.Tasks.push(
-                  buildLink(
-                    issue.key,
-                    issue.fields.status.name,
-                    issue.fields.issuetype.iconUrl,
-                    issue.fields.summary,
-                    owner,
-                    statusName
-                  )
-                )
-                debug(`Task ${issue.key}...`)
-                stats = updateStats(stats, 'Task', statusName)
-                break
-              case 'Story':
-                debug(
-                  `...adding Story ${issue.key} to results.Stories (increasing size (was ${results.Stories.length}) by 1)`
-                )
-                results.Stories.push(
-                  buildLink(
-                    issue.key,
-                    issue.fields.status.name,
-                    issue.fields.issuetype.iconUrl,
-                    issue.fields.summary,
-                    owner,
-                    statusName
-                  )
-                )
-                debug(`Story ${issue.key}...`)
-                stats = updateStats(stats, 'Story', statusName)
-                break
-              case 'Bug':
-                results.Bugs.push(
-                  buildLink(
-                    issue.key,
-                    issue.fields.status.name,
-                    issue.fields.issuetype.iconUrl,
-                    issue.fields.summary,
-                    owner,
-                    statusName
-                  )
-                )
-                debug(`Bug ${issue.key}...`)
-                stats = updateStats(stats, 'Bug', statusName)
-                break
-              default:
-                debug(
-                  `ERR ****** unrecognized issuetype: ${issue.fields.issuetype.name}`
-                )
-            }
-          }
-
-          debug(`stats: `, stats)
-
-          // charts
-          buildPieCharts(stats).then((charts) => {
-            res.write(charts)
-            // icons
-            res.write(
-              '<hr><div class="children">' +
-                results.Epics.join('') +
-                results.Stories.join('') +
-                results.Tasks.join('') +
-                results['Sub-tasks'].join('') +
-                results.Bugs.join('') +
-                '</div>'
+        switch (issue.fields.issuetype.name) {
+          case 'Epic':
+            results.Epics.push(
+              buildLink(
+                issue.key,
+                issue.fields.status.name,
+                issue.fields.issuetype.iconUrl,
+                issue.fields.summary,
+                owner,
+                statusName
+              )
             )
-            res.write('</div>')
-            res.write('<hr>')
-            res.write(buildLegend())
-            res.write(buildHtmlFooter())
-            res.end()
-            return next()
-          })
-        })
-        .catch((err) => {
-          debug(`error in generic search: ${err}`)
-          res.end()
-          return
-        })
-    // })
-    // .catch((err) => {
-    //   debug(`getFilter error...`)
-    //   debug(err)
-    //   res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
-    //   res.write(`<em>Error</em> ${err}`)
-    //   res.end()
-    //   return
-    // })
+            debug(`Sub-task ${issue.key}...`)
+            stats = updateStats(stats, 'Epic', statusName)
+            break
+          case 'Sub-task':
+            results['Sub-tasks'].push(
+              buildLink(
+                issue.key,
+                issue.fields.status.name,
+                issue.fields.issuetype.iconUrl,
+                issue.fields.summary,
+                owner,
+                statusName
+              )
+            )
+            debug(`Sub-task ${issue.key}...`)
+            stats = updateStats(stats, 'Sub-task', statusName)
+            break
+          case 'Task':
+            results.Tasks.push(
+              buildLink(
+                issue.key,
+                issue.fields.status.name,
+                issue.fields.issuetype.iconUrl,
+                issue.fields.summary,
+                owner,
+                statusName
+              )
+            )
+            debug(`Task ${issue.key}...`)
+            stats = updateStats(stats, 'Task', statusName)
+            break
+          case 'Story':
+            debug(
+              `...adding Story ${issue.key} to results.Stories (increasing size (was ${results.Stories.length}) by 1)`
+            )
+            results.Stories.push(
+              buildLink(
+                issue.key,
+                issue.fields.status.name,
+                issue.fields.issuetype.iconUrl,
+                issue.fields.summary,
+                owner,
+                statusName
+              )
+            )
+            debug(`Story ${issue.key}...`)
+            stats = updateStats(stats, 'Story', statusName)
+            break
+          case 'Bug':
+            results.Bugs.push(
+              buildLink(
+                issue.key,
+                issue.fields.status.name,
+                issue.fields.issuetype.iconUrl,
+                issue.fields.summary,
+                owner,
+                statusName
+              )
+            )
+            debug(`Bug ${issue.key}...`)
+            stats = updateStats(stats, 'Bug', statusName)
+            break
+          default:
+            debug(
+              `ERR ****** unrecognized issuetype: ${issue.fields.issuetype.name}`
+            )
+        }
+      }
+
+      debug(`stats: `, stats)
+
+      // charts
+      buildPieCharts(stats).then((charts) => {
+        res.write(charts)
+        // icons
+        res.write(
+          '<hr><div class="children">' +
+          results.Epics.join('') +
+          results.Stories.join('') +
+          results.Tasks.join('') +
+          results['Sub-tasks'].join('') +
+          results.Bugs.join('') +
+          '</div>'
+        )
+        res.write('</div>')
+        res.write('<hr>')
+        res.write(buildLegend())
+        res.write(buildHtmlFooter())
+        res.end()
+        return next()
+      })
+    })
+    .catch((err) => {
+      debug(`error in generic search: ${err}`)
+      res.end()
+      return
+    })
+  // })
+  // .catch((err) => {
+  //   debug(`getFilter error...`)
+  //   debug(err)
+  //   res.write(buildHtmlHeader(`Filter: ${req.query.id}`))
+  //   res.write(`<em>Error</em> ${err}`)
+  //   res.end()
+  //   return
+  // })
 })
 
 server.get('/epics', (req, res, next) => {
@@ -1200,8 +1180,7 @@ server.get('/epics', (req, res, next) => {
           `<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`
         )
         details.push(
-          `<a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${
-            epicData.key
+          `<a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${epicData.key
           }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
             statusName
           )}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanText(
@@ -1250,10 +1229,8 @@ server.get('/epics', (req, res, next) => {
           switch (issue.fields.issuetype.name) {
             case 'Epic':
               resultCtr['Epics'].push(
-                `<a href='${config.get('jira.protocol')}://${
-                  config.get('jira.host')
-                }/browse/${
-                  issue.key
+                `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
+                }/browse/${issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
@@ -1267,10 +1244,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Story':
               resultCtr['Stories'].push(
-                `<a href='${config.get('jira.protocol')}://${
-                  config.get('jira.host')
-                }/browse/${
-                  issue.key
+                `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
+                }/browse/${issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
@@ -1284,10 +1259,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Task':
               resultCtr['Tasks'].push(
-                `<a href='${config.get('jira.protocol')}://${
-                  config.get('jira.host')
-                }/browse/${
-                  issue.key
+                `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
+                }/browse/${issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
@@ -1301,10 +1274,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Sub-task':
               resultCtr['Sub-tasks'].push(
-                `<a href='${config.get('jira.protocol')}://${
-                  config.get('jira.host')
-                }/browse/${
-                  issue.key
+                `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
+                }/browse/${issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
@@ -1318,10 +1289,8 @@ server.get('/epics', (req, res, next) => {
               break
             case 'Bug':
               resultCtr['Bugs'].push(
-                `<a href='${config.get('jira.protocol')}://${
-                  config.get('jira.host')
-                }/browse/${
-                  issue.key
+                `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
+                }/browse/${issue.key
                 }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
                   issue.fields.status.name
                 )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
