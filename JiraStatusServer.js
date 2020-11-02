@@ -431,7 +431,10 @@ server.get('/estimates', async (req, res, next) => {
   const today = new Date()
 
   let relFilter = ''
-  if (req.query.release) { relFilter = ` and fixVersion = "${req.query.release}"` }
+  if (req.query.release) { 
+    relFilter = ` and fixVersion = "${req.query.release}"`
+    debug(`JQL: ${relFilter}`)
+ }
 
   const releases = {}
 
@@ -574,15 +577,12 @@ server.get('/estimates', async (req, res, next) => {
       res.write('</tbody></table>')
 
       res.write(`<hr>`)
+
+      let USER_COLUMNS = ['Name', 'Spent', 'Total', 'Completed', 'Missing Est. (%)']
       // Write User Data table
       res.write(`<h2>User Report</h2>`)
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead>
-        <tr>
-          <th>Name</th>
-          <th>Spent</th>
-          <th>Total</th>
-          <th>Completed</th>
-          <th>Missing Est. (%)</th>`)
+        <tr><th>${USER_COLUMNS.join('</th><th>')}</th>`)
       Object.keys(releases).sort().forEach((rel) => { res.write(`<th>${rel}</th>`) })
       res.write(`</tr></thead><tbody>`)
       // debug(assigneeStats)
@@ -609,7 +609,7 @@ server.get('/estimates', async (req, res, next) => {
 
         // Releases details
         Object.keys(releases).sort().forEach((rel) => {
-          // debug(`processing release data for user = ${a} rel = ${rel}`)
+          debug(`processing release data for user = ${a} rel = ${rel}`)
           // Print the user's numbers for this release
           if (Object.keys(assigneeStats[a]['rel']).includes(rel)) {
             // debug(`assigneeStats[a]['rel'][${rel}] = `, assigneeStats[a]['rel'][rel])
@@ -621,7 +621,14 @@ server.get('/estimates', async (req, res, next) => {
           }
         })
         res.write(`</tr>`)
+        // Sum of estimates by release
       })
+      res.write(`<tr><td><em>Release Totals</em></td><td colspan=${USER_COLUMNS.length-1}></td>`)        
+      Object.keys(releases).sort().forEach((rel) => {
+        res.write(`<td><b>${cleanSeconds(releases[rel].progress)} of ${cleanSeconds(releases[rel].total)}d</b></td>`)
+      })
+      res.write('</tr>')
+
       res.write(buildHtmlFooter())
     }
     res.end()
@@ -723,9 +730,8 @@ server.get('/requirements', async (req, res, next) => {
     Object.keys(COLUMNS).forEach((col) => {
       res.write(`<th ${COLUMNS[col]}>${col}`)
     })
-    // res.write(`<th>${COLUMNS.join('</th><th>')}</th>`)
     res.write(`</tr></thead><tbody>`)
-    // reqts.issues.forEach((reqt) => {
+    
     for (let r = 0; r < reqts.issues.length; r++) {
       const reqt = reqts.issues[r]
       teamCount = 0
@@ -800,7 +806,6 @@ server.get('/requirements', async (req, res, next) => {
       res.write(`</td>`)
       // res.write(`<td>${reqt.fields.labels.join(',')}</td>`)
       res.write('<td class="childrenCol">')
-      // implementedByKeys.forEach(async (key) => {
       for (let i = 0; i < implementedByKeys.length; i++) {
         const key = implementedByKeys[i];
         res.write(`<p>${key}: `)
@@ -830,13 +835,11 @@ server.get('/requirements', async (req, res, next) => {
           res.write(`<!-- ERROR: ${err.message} -->`)
         }
         res.write('</p>')
-        // })
       }
       res.write('</td>')
 
       res.write('</tr>')
     }
-    // })
     res.write(`</tbody></table>`)
     debug('done with table')
     // debug(inwardLinks)
