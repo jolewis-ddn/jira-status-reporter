@@ -431,10 +431,10 @@ server.get('/estimates', async (req, res, next) => {
   const today = new Date()
 
   let relFilter = ''
-  if (req.query.release) { 
+  if (req.query.release) {
     relFilter = ` and fixVersion = "${req.query.release}"`
     debug(`JQL: ${relFilter}`)
- }
+  }
 
   const releases = {}
 
@@ -623,7 +623,7 @@ server.get('/estimates', async (req, res, next) => {
         res.write(`</tr>`)
         // Sum of estimates by release
       })
-      res.write(`<tr><td><em>Release Totals</em></td><td colspan=${USER_COLUMNS.length-1}></td>`)        
+      res.write(`<tr><td><em>Release Totals</em></td><td colspan=${USER_COLUMNS.length - 1}></td>`)
       Object.keys(releases).sort().forEach((rel) => {
         res.write(`<td><b>${cleanSeconds(releases[rel].progress)} of ${cleanSeconds(releases[rel].total)}d</b></td>`)
       })
@@ -667,6 +667,43 @@ async function getRequirements() {
   return cache.get('requirements')
 }
 
+async function getGroups(flushCache) {
+  if (!cache.has('groups') || (flushCache && flushCache == 'yes')) {
+    cache.set('groups', await jsr.get('/groups/picker?maxResults=50'))
+  }
+  return(cache.get('groups'))
+}
+
+async function getSmallGroups(flushCache = false) {
+  if (!cache.has('smallGroups') || (flushCache && flushCache == 'yes')) {
+    const groups = await getGroups(false)
+    debug('getSmallGroups.length == ', groups.groups.length)
+    const smallGroups = groups.groups.filter(g => config.userGroups.includes(g.name))
+    for (let gi = 0; gi < smallGroups.length; gi++) {
+      const gname = smallGroups[gi].name
+      smallGroups[gi].members = await getGroupMembers(gname)
+    }
+    cache.set('smallGroups', smallGroups)
+  }
+  return cache.get('smallGroups')
+}
+
+async function getGroupMembers(groupName) {
+  debug(`getGroupMembers(${groupName}) called...`)
+  let groupMembers = []
+  if (!cache.has(`groupMembers-${groupName}`)) {
+    const mbrs = await jsr.get(`/group/member?groupname=${groupName}`)
+    if (config.has('userExclude')) {
+      // Exclude specific users
+      groupMembers = mbrs.values.map((v) => { return v.displayName }).filter(x => !config.userExclude.includes(x))
+    } else {
+      groupMembers = mbrs.values.map((v) => { return v.displayName })
+    }
+    cache.set(`groupMembers-${groupName}`, groupMembers)
+  }
+  return(cache.get(`groupMembers-${groupName}`))
+}
+
 async function getChildren(parentId) {
   debug(`getChildren(${parentId}) called`)
   try {
@@ -701,6 +738,52 @@ server.get('/children/:id', async (req, res, next) => {
   }
 })
 
+server.get('/groups', async (req, res, next) => {
+  try {
+    if (req.query.flush && req.query.flush == 'yes') {
+      cache.flushAll()
+    }
+
+    const groups = await getGroups()
+    if (req.query.format && req.query.format == 'html') {
+      const pageTitle = 'Groups'
+      res.write(buildHtmlHeader(pageTitle, false))
+      res.write(buildPageHeader(pageTitle))
+
+      // Build the table
+      if (req.query.filter && req.query.filter == 'yes') {
+        debug('returning filtered list')
+        const smallGroups = await getSmallGroups()
+        // debug(`smallGroups: `, smallGroups)
+        
+        res.write(`Showing ${smallGroups.length} groups`)
+        res.write('<ol>')
+
+        for (let gi = 0; gi < smallGroups.length; gi++) {
+          res.write(`<li><em>${smallGroups[gi].name}</em>: `)
+          // debug(`smallGroups[${gi}] `, smallGroups[gi])
+          res.write(smallGroups[gi].members.join(', '))
+        }
+
+        res.write('</li></ul>')
+      } else {
+        res.write(groups.header)
+        debug('returning un-filtered list')
+        res.write(['<ol><li>', groups.groups.map((g) => { return g.name }).join('</li><li>'), '</li></ul>'].join(''))
+      }
+      res.write(buildHtmlFooter())
+      res.end()
+      return next()
+    } else {
+      res.send(cache.get('groups'))
+    }
+    return next()
+  } catch (err) {
+    debug('unknown error #783: ', err)
+    return next(new restifyErrors.InternalServerError('unknown error #783'))
+  }
+})
+
 server.get('/requirements', async (req, res, next) => {
   const pageTitle = 'Requirements Report'
   res.write(buildHtmlHeader(pageTitle, 1))
@@ -731,7 +814,7 @@ server.get('/requirements', async (req, res, next) => {
       res.write(`<th ${COLUMNS[col]}>${col}`)
     })
     res.write(`</tr></thead><tbody>`)
-    
+
     for (let r = 0; r < reqts.issues.length; r++) {
       const reqt = reqts.issues[r]
       teamCount = 0

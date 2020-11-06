@@ -41,6 +41,9 @@ Collection of node scripts to query, store, and report on Jira issues.
 ## Running
 `node app.js`
 
+## Cache notes
+* `?flush=yes` is available for many endpoints to force a cache refresh. Note: this will wipe out the cache for all users
+
 ## Endpoints
 * `/`: no-op
 ### Configuration
@@ -57,6 +60,12 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/filter`: Visualize issue status using existing Jira filter
 * `/links`: Visualize issue links
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
+### Users and Groups
+* `/groups`: Shows a list of groups. 
+  * `?format=html` to see the list in HTML (unordered list)
+  * `?filter=yes` to see the subset (as specified by the userGroups config value)
+    * If userGroups array *is set* in the config, it will be excluded (and the members of the remaining groups will be fetched). 
+    * If userGroups *is not set*, the full list of groups (without members) will be fetched.
 ### Cache
 #### General
 * `/cache/stats`: All dates covered by cache
@@ -87,6 +96,22 @@ Collection of node scripts to query, store, and report on Jira issues.
 
 * You can specify alternate configurations by setting NODE_ENV.
   * For example, if a config file named `Production.json` exists in the `config` directory, setting NODE_ENV to `Production` before running `JiraStatusServer.js` will pick up the values from `config/Production.json` (or `config/Production.yaml` or any other config file supported by `node-config` (see above).)
+
+## Configuration File
+The following elements can be set in the config file:
+* jira:
+  * protocol: `http` or `https`
+  * host: Jira server hostname
+  * username: Full Jira username
+  * password: User password or token with sufficient rights to execute the queries
+  * apiVersion: Set to the integer or `latest`
+* server: Local server port
+* graphicServer
+* project: Jira project as the default
+* ignore
+* fa: Font Awesome link (full URL, including `.js`)
+* userGroups: Groups in Jira which are commonly used; membership is fetched only for groups in this list
+* userExclude: Individuals to not include in userGroup membership
 
 ## Getting help
 1. All node scripts have a help page: `node script.js --help`
