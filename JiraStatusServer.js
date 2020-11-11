@@ -246,6 +246,10 @@ function buildStylesheet() {
     .statusCol { }
     .childrenCol { width: 30%; }
 
+    .summCell { text-align: center; }
+    .smcenter { font-size: smaller; text-align: center; }
+    .smright { font-size: smaller; text-align: right; }
+
     .problem { background-color: pink; color: black; }
 
     .tooltip-inner { max-width: 500px; text-align: left; }
@@ -435,11 +439,11 @@ async function getVersions(flushCache) {
   return(cache.get('versions'))
 }
 
-function compileVersionDetails(issues, versionId) {
+function compileVersionDetails(issues, versionId, storyOnly = false) {
   const versionDetails = { components: [], issues: issues, componentEstimates: {} }
   const components = [['none']]
   let componentEstimates = { ['none']: { progress: 0, total: 0, percent: 0, timeoriginalestimate: 0 } }
-  debug(`issues: length = ${issues.length}; versionId = ${versionId}`)
+  // debug(`issues: length = ${issues.length}; versionId = ${versionId}`)
   // if (!cache.has(`versionDetails-${versionId}`)) {
     issues.forEach((issue) => {
       // Store components
@@ -450,34 +454,50 @@ function compileVersionDetails(issues, versionId) {
         issueComponents.forEach((c) => {
           if (!components.includes(c)) { 
             components.push(c)
-            componentEstimates[c] = { progress: 0, total: 0, percent: 0, timeoriginalestimate: 0 }
+            componentEstimates[c] = { count: { Epic: 0, Story: 0, 'Sub-task': 0, 'Bug': 0, 'Task': 0, 'Requirement': 0 }, progress: 0, total: 0, percent: 0, timeoriginalestimate: 0, assignees: {}, issues: [] }
           }
           // Update component estimates
           componentEstimates[c].progress += issue.fields.progress.progress
           componentEstimates[c].total += issue.fields.progress.total
           componentEstimates[c].timeoriginalestimate += issue.fields.timeoriginalestimate
-          // if (issue.key == 'RED-2308') {
-          if (c == 'CAT') {
-            debug(issue.key, issue.fields.progress, issue.fields.aggregateprogress, issue.fields.timeoriginalestimate, issue.fields)
+          componentEstimates[c].count[issue.fields.issuetype.name]++
+          let assignee = issue.fields.assignee ? issue.fields.assignee.displayName : 'none'
+          if (!Object.keys(componentEstimates[c].assignees).includes(assignee)) {
+            componentEstimates[c].assignees[assignee] = {
+              Epic: { progress: 0, total: 0 },
+              Story: { progress: 0, total: 0 },
+              'Sub-task': { progress: 0, total: 0 },
+              Bug: { progress: 0, total: 0 },
+              Task: { progress: 0, total: 0 },
+              Requirement: { progress: 0, total: 0 }
+            }
           }
+          
+          // debug(c, assignee, issue.fields.issuetype.name, issue.fields.progress.progress)
+
+          componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
+          componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
+
+          //   debug(issue.key, issue.fields.progress, issue.fields.aggregateprogress, issue.fields.timeoriginalestimate, issue.fields)
         })
-      } else {
-        // No component set, so record this to 'none'
+      } else {            // No component set, so record this to 'none'
         componentEstimates['none'].progress += issue.fields.progress.progress
         componentEstimates['none'].total += issue.fields.progress.total
         componentEstimates['none'].timeoriginalestimate += issue.fields.timeoriginalestimate
       }
     })
-    debug(`componentEstimates: `, componentEstimates)
+    // debug(`componentEstimates: `, componentEstimates)
   // }
-  // return(cache.get(`versionDetails-${versionId}`))
   versionDetails.componentEstimates = componentEstimates
   versionDetails.components = components
   return versionDetails
+  // return(cache.get(`versionDetails-${versionId}`))
 }
 
 server.get('/progress/:rel', async (req, res, next) => {
   const rel = req.params.rel || false
+  const storyOnly = req.params.storyOnly || false
+
   if (rel) {
     const pageTitle = 'Progress Report'
     res.write(buildHtmlHeader(pageTitle, false))
@@ -495,27 +515,53 @@ server.get('/progress/:rel', async (req, res, next) => {
       // if (!cache.has(`versionIssues-${rel}`)) {
         const jql = `project=${config.project} AND fixVersion=${rel}`
         debug(`jql: ${jql}`)
-        versionIssues = await jsr._genericJiraSearch(jql, 99, ['summary', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
+        versionIssues = await jsr._genericJiraSearch(jql, 99, ['summary', 'issuetype', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
         // cache.set(`versionIssues-${rel}`, versionIssues)
       // } else {
       //   versionIssues = cache.get(`versionIssues-${rel}`)
       // }
-      debug(`issues[0]: `, versionIssues.issues[0], versionIssues.issues[0].fields.components)
+      // debug(`issues[0]: `, versionIssues.issues[0], versionIssues.issues[0].fields.components)
       res.write(`<ul>
         <li>Fixed Issues: ${versionRelatedIssues.issuesFixedCount}</li>
         <li>Affected Issues: ${versionRelatedIssues.issuesAffectedCount}</li>
         <li>Unresolved Issues: ${versionUnresolvedIssues.issuesUnresolvedCount}</li>
         </ul>`)
-      let versionDetails = compileVersionDetails(versionIssues.issues, rel)
+      let versionDetails = compileVersionDetails(versionIssues.issues, rel, storyOnly)
       const COLUMNS = ['Component', 'Completed', 'Remaining', 'Percent', 'Original Est.']
-      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+      res.write(`<table style='width: auto !important;' class='table table-sm'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
       Object.keys(versionDetails.componentEstimates).sort().forEach((component) => {
-        res.write(`<tr><td>${component}</td>
-        <td>${cleanSeconds(versionDetails.componentEstimates[component].progress)}</td>
-        <td>${cleanSeconds(versionDetails.componentEstimates[component].total)}</td>
-        <td>${cleanSeconds(versionDetails.componentEstimates[component].percent)}</td>
-        <td>${cleanSeconds(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
+        res.write(`<tr class='table-active'><td>${component}</td>
+        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].progress)}</td>
+        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].total)}</td>
+        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].percent)}</td>
+        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
         </tr>`)
+        // Now print the assignee details/progress
+        if (versionDetails.componentEstimates[component].assignees) {
+          // debug(`assignees: `, versionDetails.componentEstimates[component].assignees)
+          Object.keys(versionDetails.componentEstimates[component].assignees).sort().forEach((assignee) => {
+            // Print total for this user
+            res.write(`<tr>
+              <td class='smright'><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee="${assignee}"%20AND%20component%20in%20(${component})%20AND%20fixversion=${rel}' target='_blank'>${assignee}</a></td>
+            `)
+            let resp = '' // HTML response for rest of user's data
+            let prog = 0  // Temp holder for progress
+            let tot = 0   // Temp holder for total
+
+            Object.keys(versionDetails.componentEstimates[component].assignees[assignee]).forEach((type) => {
+              // debug(`type: ${type}; Value: `, versionDetails.componentEstimates[component].assignees[assignee][type])
+              prog += versionDetails.componentEstimates[component].assignees[assignee][type].progress
+              tot += versionDetails.componentEstimates[component].assignees[assignee][type].total
+            })
+            // Print each issue type
+            res.write(`
+              <td class='smcenter'>${cleanSeconds(prog)}</td>
+              <td class='smcenter'>${cleanSeconds(tot)}</td>
+              <td></td>
+              <td></td>`)
+            res.write(`</tr>`)
+          })
+        }
       })
       res.write('</tbody></table>')
       
