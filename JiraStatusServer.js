@@ -427,6 +427,146 @@ async function getEpicEstimates(epicKey) {
   return (cache.get(`epicEstimate-${epicKey}`))
 }
 
+async function getVersions(flushCache) {
+  if (!cache.has('versions') || (flushCache && flushCache == 'yes')) {
+    debug(`getVersions(${flushCache})... updating cache...`)
+    cache.set('versions', await jsr.get(`/project/${config.project}/versions`))
+  }
+  return(cache.get('versions'))
+}
+
+function compileVersionDetails(issues, versionId) {
+  const versionDetails = { components: [], issues: issues, componentEstimates: {} }
+  const components = [['none']]
+  let componentEstimates = { ['none']: { progress: 0, total: 0, percent: 0, timeoriginalestimate: 0 } }
+  debug(`issues: length = ${issues.length}; versionId = ${versionId}`)
+  // if (!cache.has(`versionDetails-${versionId}`)) {
+    issues.forEach((issue) => {
+      // Store components
+      // debug(issue.fields.components)
+      if (issue.fields.components) {
+        let issueComponents = issue.fields.components.map(x => x.name)
+        // debug(issueComponents)
+        issueComponents.forEach((c) => {
+          if (!components.includes(c)) { 
+            components.push(c)
+            componentEstimates[c] = { progress: 0, total: 0, percent: 0, timeoriginalestimate: 0 }
+          }
+          // Update component estimates
+          componentEstimates[c].progress += issue.fields.progress.progress
+          componentEstimates[c].total += issue.fields.progress.total
+          componentEstimates[c].timeoriginalestimate += issue.fields.timeoriginalestimate
+          // if (issue.key == 'RED-2308') {
+          if (c == 'CAT') {
+            debug(issue.key, issue.fields.progress, issue.fields.aggregateprogress, issue.fields.timeoriginalestimate, issue.fields)
+          }
+        })
+      } else {
+        // No component set, so record this to 'none'
+        componentEstimates['none'].progress += issue.fields.progress.progress
+        componentEstimates['none'].total += issue.fields.progress.total
+        componentEstimates['none'].timeoriginalestimate += issue.fields.timeoriginalestimate
+      }
+    })
+    debug(`componentEstimates: `, componentEstimates)
+  // }
+  // return(cache.get(`versionDetails-${versionId}`))
+  versionDetails.componentEstimates = componentEstimates
+  versionDetails.components = components
+  return versionDetails
+}
+
+server.get('/progress/:rel', async (req, res, next) => {
+  const rel = req.params.rel || false
+  if (rel) {
+    const pageTitle = 'Progress Report'
+    res.write(buildHtmlHeader(pageTitle, false))
+    res.write(buildPageHeader(pageTitle))
+    try {
+      const versions = await getVersions(false)
+      const version = versions.filter((v) => v.id == rel)[0]
+      // debug(version)
+      res.write(`<h2>${version.name}</h2>`)
+      res.write(`<h3>Release Date: ${version.releaseDate}</h2>`)
+
+      const versionRelatedIssues = await jsr.get(`/version/${rel}/relatedIssueCounts`)
+      const versionUnresolvedIssues = await jsr.get(`/version/${rel}/unresolvedIssueCount`)
+      let versionIssues
+      // if (!cache.has(`versionIssues-${rel}`)) {
+        const jql = `project=${config.project} AND fixVersion=${rel}`
+        debug(`jql: ${jql}`)
+        versionIssues = await jsr._genericJiraSearch(jql, 99, ['summary', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
+        // cache.set(`versionIssues-${rel}`, versionIssues)
+      // } else {
+      //   versionIssues = cache.get(`versionIssues-${rel}`)
+      // }
+      debug(`issues[0]: `, versionIssues.issues[0], versionIssues.issues[0].fields.components)
+      res.write(`<ul>
+        <li>Fixed Issues: ${versionRelatedIssues.issuesFixedCount}</li>
+        <li>Affected Issues: ${versionRelatedIssues.issuesAffectedCount}</li>
+        <li>Unresolved Issues: ${versionUnresolvedIssues.issuesUnresolvedCount}</li>
+        </ul>`)
+      let versionDetails = compileVersionDetails(versionIssues.issues, rel)
+      const COLUMNS = ['Component', 'Completed', 'Remaining', 'Percent', 'Original Est.']
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+      Object.keys(versionDetails.componentEstimates).sort().forEach((component) => {
+        res.write(`<tr><td>${component}</td>
+        <td>${cleanSeconds(versionDetails.componentEstimates[component].progress)}</td>
+        <td>${cleanSeconds(versionDetails.componentEstimates[component].total)}</td>
+        <td>${cleanSeconds(versionDetails.componentEstimates[component].percent)}</td>
+        <td>${cleanSeconds(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
+        </tr>`)
+      })
+      res.write('</tbody></table>')
+      
+    } catch (err) {
+      debug(err)
+      res.write(`<em>error</em><!-- ${err} -->`)
+    }
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send({ err: 'invalid release' })
+  }
+  return next()
+})
+
+server.get('/releases', async (req, res, next) => {
+  try {
+    const releases = await getVersions(false)
+    if (req.query.format && req.query.format == 'html') {
+      const pageTitle = 'Releases Report'
+      res.write(buildHtmlHeader(pageTitle, false))
+      res.write(buildPageHeader(pageTitle))
+      const COLUMNS = ['Name', 'Description', 'Archived', 'Released', 'Release Date', 'User Release Date']
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+      releases.forEach((rel) => {
+        res.write(`<tr>
+          <td>${rel.name}</td>
+          <td>${rel.description || ''}</td>
+          <td>${rel.archived}</td>
+          <td>${rel.released}</td>
+          <td>${rel.releaseDate}</td>
+          <td>${rel.userReleaseDate}</td>
+          <td><a href='progress/${rel.id}' target='_blank'>Progress Report</a></td>
+          </tr>
+        `)
+
+      })
+      res.write(`</tbody></table>`)
+      res.write(buildHtmlFooter())
+      res.end()
+    } else {
+      res.send(releases)
+    }
+  } catch (err) {
+    debug(err)
+    res.write(`<em>error</em><!-- ${err} -->`)
+    res.end()
+  }
+  return next()
+})
+
 server.get('/estimates', async (req, res, next) => {
   const today = new Date()
 

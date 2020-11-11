@@ -60,6 +60,9 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/filter`: Visualize issue status using existing Jira filter
 * `/links`: Visualize issue links
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
+### Releases
+* `/releases`: List of versions (cached)
+* `/progress`: Release progress report (parameter: release ID)
 ### Users and Groups
 * `/groups`: Shows a list of groups. 
   * `?format=html` to see the list in HTML (unordered list)
