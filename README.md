@@ -114,7 +114,8 @@ The following elements can be set in the config file:
 * ignore
 * fa: Font Awesome link (full URL, including `.js`)
 * userGroups: Groups in Jira which are commonly used; membership is fetched only for groups in this list
-* userExclude: Individuals to not include in userGroup membership
+* userExclude: Individuals to not include in userGroup membership (type: array)
+* releaseExcludeTypes: Status(es) to exclude from the Progress Report (type: array) [Note: this has the same result as using the `exclude` query parameter, but cannot be overridden by the end user.]
 
 ## Getting help
 1. All node scripts have a help page: `node script.js --help`

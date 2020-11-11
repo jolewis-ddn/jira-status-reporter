@@ -480,18 +480,20 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
           }
           if (!Object.keys(componentEstimates[c].assignees).includes(assignee)) {
             componentEstimates[c].assignees[assignee] = {
-              Epic: { progress: 0, total: 0 },
-              Story: { progress: 0, total: 0 },
-              'Sub-task': { progress: 0, total: 0 },
-              Bug: { progress: 0, total: 0 },
-              Task: { progress: 0, total: 0 },
-              Requirement: { progress: 0, total: 0 }
+              Epic: { progress: 0, total: 0, count: 0 },
+              Story: { progress: 0, total: 0, count: 0 },
+              'Sub-task': { progress: 0, total: 0, count: 0 },
+              Bug: { progress: 0, total: 0, count: 0 },
+              Task: { progress: 0, total: 0, count: 0 },
+              Requirement: { progress: 0, total: 0, count: 0 }
             }
           }
           
           // debug(c, assignee, issue.fields.issuetype.name, issue.fields.progress.progress)
           componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
           componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
+          componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].count += 1
+          componentEstimates[c].count[issue.fields.issuetype.name] += 1
         })
       } else {            // No component set, so record this to 'none'
         // debug(`${issue.key} NONE: `, issue.fields.progress.progress, issue.fields.progress.total)
@@ -509,16 +511,18 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
         // debug(`componentEstimates[${NONE}]: `, componentEstimates.NONE)
         if (!Object.keys(componentEstimates[NONE].assignees).includes(assignee)) {
           componentEstimates[NONE].assignees[assignee] = {
-            Epic: { progress: 0, total: 0 },
-            Story: { progress: 0, total: 0 },
-            'Sub-task': { progress: 0, total: 0 },
-            Bug: { progress: 0, total: 0 },
-            Task: { progress: 0, total: 0 },
-            Requirement: { progress: 0, total: 0 }
+            Epic: { progress: 0, total: 0, count: 0 },
+            Story: { progress: 0, total: 0, count: 0 },
+            'Sub-task': { progress: 0, total: 0, count: 0 },
+            Bug: { progress: 0, total: 0, count: 0 },
+            Task: { progress: 0, total: 0, count: 0 },
+            Requirement: { progress: 0, total: 0, count: 0 }
           }
         }
         componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
         componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
+        componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].count += 1
+        componentEstimates[NONE].count[issue.fields.issuetype.name] += 1
       }
     })
     // debug(`componentEstimates: `, componentEstimates)
@@ -536,9 +540,11 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
 
 server.get('/progress/:rel', async (req, res, next) => {
   const rel = req.params.rel || false
-  const storyOnly = req.params.storyOnly || false
+
+  debug(`query: `, req.query.exclude)
 
   if (rel) {
+    let typesExcluded = []
     let jql_suffix = ''
     const pageTitle = 'Progress Report'
     res.write(buildHtmlHeader(pageTitle, false))
@@ -554,56 +560,108 @@ server.get('/progress/:rel', async (req, res, next) => {
       const versionUnresolvedIssues = await jsr.get(`/version/${rel}/unresolvedIssueCount`)
       let versionIssues
       if (!cache.has(`versionIssues-${rel}`)) {
+        // Base JQL
         const jql = `project=${config.project} AND fixVersion=${rel} `
-        if (config.releaseExcludeTypes) {
-          jql_suffix = ` and issuetype not in ("${config.releaseExcludeTypes}")`
+
+        // Exclude any types?
+        if (config.releaseExcludeTypes || req.query.exclude) {
+          debug(`req.query.exclude: ${req.query.exclude}`)
+          if (req.query.exclude) {
+            debug(`adding ${typeof req.query.exclude} ${req.query.exclude} to types[]`)
+            if (typeof req.query.exclude == 'string') {
+              typesExcluded.push(req.query.exclude) 
+            } else { // Assume array/object
+              typesExcluded = typesExcluded.concat(req.query.exclude) 
+            }
+            debug(`...typesExcluded: `, typesExcluded)
+          }
+
+          if (config.releaseExcludeTypes) {
+            debug(`adding ${config.releaseExcludeTypes.length} ${typeof config.releaseExcludeTypes} ${config.releaseExcludeTypes} to types[]`)
+            typesExcluded = typesExcluded.concat(config.releaseExcludeTypes)
+            // debug(`...typesExcluded: `, typesExcluded)
+          }
+          debug(`types: `, typesExcluded)
+          jql_suffix += ` and issuetype not in ("${typesExcluded.join('","')}")`
         }
-        debug(`jql: ${jql}`)
-        versionIssues = await jsr._genericJiraSearch(jql, 99, ['summary', 'issuetype', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
+        debug(`jql: ${jql}${jql_suffix}`)
+
+        versionIssues = await jsr._genericJiraSearch(jql + jql_suffix, 99, ['summary', 'issuetype', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
         cache.set(`versionIssues-${rel}`, versionIssues)
+
       } else {
         versionIssues = cache.get(`versionIssues-${rel}`)
       }
+
       // debug(`issues[0]: `, versionIssues.issues[0], versionIssues.issues[0].fields.components)
       res.write(`<ul>
         <li>Fixed Issues: ${versionRelatedIssues.issuesFixedCount}</li>
         <li>Affected Issues: ${versionRelatedIssues.issuesAffectedCount}</li>
         <li>Unresolved Issues: ${versionUnresolvedIssues.issuesUnresolvedCount}</li>
         </ul>`)
-      let versionDetails = compileVersionDetails(versionIssues.issues, rel, storyOnly)
-      const COLUMNS = ['Component', 'Completed', 'Remaining', 'Percent', 'Original Est.']
+      let versionDetails = compileVersionDetails(versionIssues.issues, rel)
+      const COLUMNS = ['Component', 'Count', 'Completed', 'Remaining', '%/Finish', 'Original Est.']
+
+      if (typesExcluded.length) {
+        res.write(`<em>Excluding: ${typesExcluded.join(', ')}</em>`)
+      } else {
+        res.write(`<em>Showing all issue types</em>`)
+      }
+
+      // Start main table
       res.write(`<table style='width: auto !important;' class='table table-sm'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+
       Object.keys(versionDetails.componentEstimates).sort().forEach((component) => {
-        res.write(`<tr class='table-active'><td>${component}</td>
-        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].progress)}</td>
-        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].total)}</td>
-        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].percent)}</td>
-        <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
-        </tr>`)
-        // Now print the assignee details/progress
+        // Component row
+        res.write(`<tr class='table-active'>
+          <td>${component}</td>
+          <td></td>
+          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].progress)}</td>
+          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].total)}</td>
+          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].percent)}</td>
+          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
+          </tr>`)
+        
+        // Assignee details/progress
         if (versionDetails.componentEstimates[component].assignees) {
           // debug(`assignees: `, versionDetails.componentEstimates[component].assignees)
           Object.keys(versionDetails.componentEstimates[component].assignees).sort().forEach((assignee) => {
-            // Print total for this user
-            res.write(`<tr>
-              <td class='smright'><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel}${jql_suffix}' target='_blank'>${assignee}</a></td>
-            `)
             let resp = '' // HTML response for rest of user's data
             let prog = 0  // Temp holder for progress
             let tot = 0   // Temp holder for total
 
+            let progTooltip = '<ul>'
+            let totalIssueCount = 0
             Object.keys(versionDetails.componentEstimates[component].assignees[assignee]).forEach((type) => {
               // debug(`type: ${type}; Value: `, versionDetails.componentEstimates[component].assignees[assignee][type])
               prog += versionDetails.componentEstimates[component].assignees[assignee][type].progress
               tot += versionDetails.componentEstimates[component].assignees[assignee][type].total
+
+              totalIssueCount += versionDetails.componentEstimates[component].assignees[assignee][type].count
+
+              if (versionDetails.componentEstimates[component].assignees[assignee][type].count) {
+                progTooltip += `<li><em>${type}</em>: 
+                  Count: ${versionDetails.componentEstimates[component].assignees[assignee][type].count}; 
+                  Completed: ${cleanSeconds(versionDetails.componentEstimates[component].assignees[assignee][type].progress)}d; 
+                  Total: ${cleanSeconds(versionDetails.componentEstimates[component].assignees[assignee][type].total)}d</li>`
+              }
             })
-            // Print each issue type
-            res.write(`
+            // debug(`totalIssueCount: ${totalIssueCount}`)
+            if (totalIssueCount > 0) {
+              progTooltip += '</ul>'
+            } else {
+              progTooltip = ''
+            }
+
+            // User row
+            res.write(`<tr>
+              <td class='smright' data-toggle="tooltip" data-html="true" title="${progTooltip}"><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
+              <td class='smcenter'>${totalIssueCount}</td>
               <td class='smcenter'>${cleanSeconds(prog)}</td>
               <td class='smcenter'>${cleanSeconds(tot)}</td>
-              <td></td>
-              <td></td>`)
-            res.write(`</tr>`)
+              <td class='smcenter'>${tot > 0 ? calcFutureDate(cleanSeconds(tot)) : ''}</td>
+              <td class='smcenter'></td>
+              </tr>`)
           })
         }
       })
@@ -880,9 +938,9 @@ function cleanSeconds(sec) {
 
 // Ignore weekends
 function calcFutureDate(dplus) {
-  debug(`calcFutureDate(${dplus}) called...`)
+  // debug(`calcFutureDate(${dplus}) called...`)
   const d = new Date()
-  const dFuture = d.addBusinessDays(dplus, true)
+  const dFuture = d.addBusinessDays(Math.round(dplus), true)
   return (`${dFuture.getMonth() + 1}/${dFuture.getDate()}/${dFuture.getFullYear()}`)
 }
 
