@@ -542,7 +542,7 @@ server.get('/progress/:rel', async (req, res, next) => {
           Object.keys(versionDetails.componentEstimates[component].assignees).sort().forEach((assignee) => {
             // Print total for this user
             res.write(`<tr>
-              <td class='smright'><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee="${assignee}"%20AND%20component%20in%20(${component})%20AND%20fixversion=${rel}' target='_blank'>${assignee}</a></td>
+              <td class='smright'><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee="${assignee}"%20AND%20component="${component}"%20AND%20fixversion=${rel}' target='_blank'>${assignee}</a></td>
             `)
             let resp = '' // HTML response for rest of user's data
             let prog = 0  // Temp holder for progress
