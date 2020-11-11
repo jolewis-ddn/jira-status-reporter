@@ -9,6 +9,7 @@ const NodeCache = require('node-cache')
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 })
 
 const config = require('config')
+const NONE = 'none'
 
 const mermaidConfig = require('./config/mermaid-config')
 const MermaidNodes = require('./MermaidNodes')
@@ -441,24 +442,42 @@ async function getVersions(flushCache) {
 
 function compileVersionDetails(issues, versionId, storyOnly = false) {
   const versionDetails = { components: [], issues: issues, componentEstimates: {} }
-  const components = [['none']]
-  let componentEstimates = { ['none']: { progress: 0, total: 0, percent: 0, timeoriginalestimate: 0 } }
+  const components = [NONE]
+  let componentEstimates = { 
+    'none': {
+      count: { Epic: 0, Story: 0, 'Sub-task': 0, Bug: 0, Task: 0, Requirement: 0 },
+      progress: 0,
+      total: 0,
+      percent: 0,
+      timeoriginalestimate: 0, 
+      assignees: {}, 
+      issues: [] 
+    }
+  }
+
   if (!cache.has(`versionDetails-${versionId}`)) {
     issues.forEach((issue) => {
       // Store components
-      if (issue.fields.components) {
+      if (issue.fields.components && issue.fields.components.length > 0) {
+        // debug(issue.fields.components.length)
         let issueComponents = issue.fields.components.map(x => x.name)
         issueComponents.forEach((c) => {
           if (!components.includes(c)) { 
             components.push(c)
-            componentEstimates[c] = { count: { Epic: 0, Story: 0, 'Sub-task': 0, 'Bug': 0, 'Task': 0, 'Requirement': 0 }, progress: 0, total: 0, percent: 0, timeoriginalestimate: 0, assignees: {}, issues: [] }
+            componentEstimates[c] = { count: { Epic: 0, Story: 0, 'Sub-task': 0, Bug: 0, Task: 0, Requirement: 0 }, progress: 0, total: 0, percent: 0, timeoriginalestimate: 0, assignees: {}, issues: [] }
           }
           // Update component estimates
           componentEstimates[c].progress += issue.fields.progress.progress
           componentEstimates[c].total += issue.fields.progress.total
           componentEstimates[c].timeoriginalestimate += issue.fields.timeoriginalestimate
           componentEstimates[c].count[issue.fields.issuetype.name]++
-          let assignee = issue.fields.assignee ? issue.fields.assignee.displayName : 'none'
+          let assignee
+          if (issue.fields.assignee) {
+            assignee = issue.fields.assignee.displayName
+          } else {
+            assignee = NONE
+            // debug(`assignee set to ${assignee}`)
+          }
           if (!Object.keys(componentEstimates[c].assignees).includes(assignee)) {
             componentEstimates[c].assignees[assignee] = {
               Epic: { progress: 0, total: 0 },
@@ -471,16 +490,35 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
           }
           
           // debug(c, assignee, issue.fields.issuetype.name, issue.fields.progress.progress)
-
           componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
           componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
-
-          //   debug(issue.key, issue.fields.progress, issue.fields.aggregateprogress, issue.fields.timeoriginalestimate, issue.fields)
         })
       } else {            // No component set, so record this to 'none'
-        componentEstimates['none'].progress += issue.fields.progress.progress
-        componentEstimates['none'].total += issue.fields.progress.total
-        componentEstimates['none'].timeoriginalestimate += issue.fields.timeoriginalestimate
+        // debug(`${issue.key} NONE: `, issue.fields.progress.progress, issue.fields.progress.total)
+        componentEstimates[NONE].progress += issue.fields.progress.progress
+        componentEstimates[NONE].total += issue.fields.progress.total
+        componentEstimates[NONE].timeoriginalestimate += issue.fields.timeoriginalestimate
+
+        let assignee
+        if (issue.fields.assignee) {
+          assignee = issue.fields.assignee.displayName
+        } else {
+          assignee = NONE
+          // debug(`assignee set to ${assignee}`)
+        }
+        // debug(`componentEstimates[${NONE}]: `, componentEstimates.NONE)
+        if (!Object.keys(componentEstimates[NONE].assignees).includes(assignee)) {
+          componentEstimates[NONE].assignees[assignee] = {
+            Epic: { progress: 0, total: 0 },
+            Story: { progress: 0, total: 0 },
+            'Sub-task': { progress: 0, total: 0 },
+            Bug: { progress: 0, total: 0 },
+            Task: { progress: 0, total: 0 },
+            Requirement: { progress: 0, total: 0 }
+          }
+        }
+        componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
+        componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
       }
     })
     // debug(`componentEstimates: `, componentEstimates)
@@ -501,6 +539,7 @@ server.get('/progress/:rel', async (req, res, next) => {
   const storyOnly = req.params.storyOnly || false
 
   if (rel) {
+    let jql_suffix = ''
     const pageTitle = 'Progress Report'
     res.write(buildHtmlHeader(pageTitle, false))
     res.write(buildPageHeader(pageTitle))
@@ -515,7 +554,10 @@ server.get('/progress/:rel', async (req, res, next) => {
       const versionUnresolvedIssues = await jsr.get(`/version/${rel}/unresolvedIssueCount`)
       let versionIssues
       if (!cache.has(`versionIssues-${rel}`)) {
-        const jql = `project=${config.project} AND fixVersion=${rel}`
+        const jql = `project=${config.project} AND fixVersion=${rel} `
+        if (config.releaseExcludeTypes) {
+          jql_suffix = ` and issuetype not in ("${config.releaseExcludeTypes}")`
+        }
         debug(`jql: ${jql}`)
         versionIssues = await jsr._genericJiraSearch(jql, 99, ['summary', 'issuetype', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
         cache.set(`versionIssues-${rel}`, versionIssues)
@@ -544,7 +586,7 @@ server.get('/progress/:rel', async (req, res, next) => {
           Object.keys(versionDetails.componentEstimates[component].assignees).sort().forEach((assignee) => {
             // Print total for this user
             res.write(`<tr>
-              <td class='smright'><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee="${assignee}"%20AND%20component="${component}"%20AND%20fixversion=${rel}' target='_blank'>${assignee}</a></td>
+              <td class='smright'><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel}${jql_suffix}' target='_blank'>${assignee}</a></td>
             `)
             let resp = '' // HTML response for rest of user's data
             let prog = 0  // Temp holder for progress
@@ -664,7 +706,7 @@ server.get('/estimates', async (req, res, next) => {
       storyList.issues.forEach((story) => {
         response += ([story.fields.customfield_10008 + ' ' + epics[story.fields.customfield_10008],
         story.key + ' ' + story.fields.summary,
-        story.fields.assignee ? story.fields.assignee.displayName : 'none',
+        story.fields.assignee ? story.fields.assignee.displayName : NONE,
         story.fields.aggregateprogress.progress,
         story.fields.aggregateprogress.total
         ].join("\t"))
@@ -676,7 +718,7 @@ server.get('/estimates', async (req, res, next) => {
       return next()
     } else {
       // Assignee stats:
-      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [], rel: {} } }
+      let assigneeStats = { NONE: { progress: 0, total: 0, count: [], empty: [], rel: {} } }
 
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
@@ -775,8 +817,8 @@ server.get('/estimates', async (req, res, next) => {
       res.write(`</tr></thead><tbody>`)
       // debug(assigneeStats)
       Object.keys(assigneeStats).forEach((a) => {
-        const titleContentCount = assigneeStats[a].count.length > 0 ? '<b>Total Story List</b><ol><li>' + assigneeStats[a].count.join('</li><li>') + '</ol>' : 'none'
-        const titleContentEmpty = assigneeStats[a].empty.length > 0 ? `<b>Unestimated Story list</b><ol><li>${assigneeStats[a].empty.join('</li><li>')}</ol>` : 'none'
+        const titleContentCount = assigneeStats[a].count.length > 0 ? '<b>Total Story List</b><ol><li>' + assigneeStats[a].count.join('</li><li>') + '</ol>' : NONE
+        const titleContentEmpty = assigneeStats[a].empty.length > 0 ? `<b>Unestimated Story list</b><ol><li>${assigneeStats[a].empty.join('</li><li>')}</ol>` : NONE
 
         res.write(`<tr>
           <td class='nameCol'>${a}</td>
@@ -1099,7 +1141,7 @@ server.get('/requirements', async (req, res, next) => {
             })
             res.write(issueList.join(''))
           } else {
-            res.write('none')
+            res.write(NONE)
           }
           childrenCache[key] = kids
         } catch (err) {
