@@ -443,14 +443,11 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
   const versionDetails = { components: [], issues: issues, componentEstimates: {} }
   const components = [['none']]
   let componentEstimates = { ['none']: { progress: 0, total: 0, percent: 0, timeoriginalestimate: 0 } }
-  // debug(`issues: length = ${issues.length}; versionId = ${versionId}`)
-  // if (!cache.has(`versionDetails-${versionId}`)) {
+  if (!cache.has(`versionDetails-${versionId}`)) {
     issues.forEach((issue) => {
       // Store components
-      // debug(issue.fields.components)
       if (issue.fields.components) {
         let issueComponents = issue.fields.components.map(x => x.name)
-        // debug(issueComponents)
         issueComponents.forEach((c) => {
           if (!components.includes(c)) { 
             components.push(c)
@@ -487,11 +484,16 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
       }
     })
     // debug(`componentEstimates: `, componentEstimates)
-  // }
-  versionDetails.componentEstimates = componentEstimates
-  versionDetails.components = components
-  return versionDetails
-  // return(cache.get(`versionDetails-${versionId}`))
+
+    versionDetails.componentEstimates = componentEstimates
+    versionDetails.components = components
+    debug(`...creating new cache value for versionDetails-${versionId}`)
+    cache.set(`versionDetails-${versionId}`, versionDetails)
+    return versionDetails
+  } else {
+    debug(`...returning versionDetails-${versionId} cached value`)
+    return(cache.get(`versionDetails-${versionId}`))
+  }
 }
 
 server.get('/progress/:rel', async (req, res, next) => {
@@ -512,14 +514,14 @@ server.get('/progress/:rel', async (req, res, next) => {
       const versionRelatedIssues = await jsr.get(`/version/${rel}/relatedIssueCounts`)
       const versionUnresolvedIssues = await jsr.get(`/version/${rel}/unresolvedIssueCount`)
       let versionIssues
-      // if (!cache.has(`versionIssues-${rel}`)) {
+      if (!cache.has(`versionIssues-${rel}`)) {
         const jql = `project=${config.project} AND fixVersion=${rel}`
         debug(`jql: ${jql}`)
         versionIssues = await jsr._genericJiraSearch(jql, 99, ['summary', 'issuetype', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
-        // cache.set(`versionIssues-${rel}`, versionIssues)
-      // } else {
-      //   versionIssues = cache.get(`versionIssues-${rel}`)
-      // }
+        cache.set(`versionIssues-${rel}`, versionIssues)
+      } else {
+        versionIssues = cache.get(`versionIssues-${rel}`)
+      }
       // debug(`issues[0]: `, versionIssues.issues[0], versionIssues.issues[0].fields.components)
       res.write(`<ul>
         <li>Fixed Issues: ${versionRelatedIssues.issuesFixedCount}</li>
