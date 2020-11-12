@@ -776,7 +776,7 @@ server.get('/estimates', async (req, res, next) => {
       return next()
     } else {
       // Assignee stats:
-      let assigneeStats = { NONE: { progress: 0, total: 0, count: [], empty: [], rel: {} } }
+      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [], rel: {} } }
 
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
@@ -809,7 +809,10 @@ server.get('/estimates', async (req, res, next) => {
           res.write(`<td class='storyCol'>${assignee}</td>`)
 
           // Update assigneeStats
-          if (!(assignee in assigneeStats)) { assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [], rel: {} } }
+          if (!(assignee in assigneeStats)) {
+            assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [], rel: {} } 
+          }
+
           assigneeStats[assignee].count.push(`${story.key} ${story.fields.summary} [${cleanSeconds(story.fields.aggregateprogress.progress)} of ${cleanSeconds(story.fields.aggregateprogress.total)}d]`)
 
           assigneeStats[assignee].progress += story.fields.aggregateprogress.progress
@@ -824,10 +827,11 @@ server.get('/estimates', async (req, res, next) => {
 
           if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty.push(`${story.key} ${story.fields.summary}`) }
         } else { // No assignee
+          // debug(`No assignee for ${story.key}`)
           res.write(`<td class='storyCol problem'>none</td>`)
-          assigneeStats.none.count.push(`${story.key} ${story.fields.summary}`)
-          assigneeStats.none.progress += story.fields.aggregateprogress.progress
-          assigneeStats.none.total += story.fields.aggregateprogress.total
+          assigneeStats[NONE].count.push(`${story.key} ${story.fields.summary}`)
+          assigneeStats[NONE].progress += story.fields.aggregateprogress.progress
+          assigneeStats[NONE].total += story.fields.aggregateprogress.total
           if (assigneeStats.none.total == 0) { assigneeStats.none.empty.push(`${story.key} ${story.fields.summary}`) }
         }
 
@@ -887,23 +891,23 @@ server.get('/estimates', async (req, res, next) => {
         } else {
           const days = cleanSeconds(assigneeStats[a].total)
           const endDate = calcFutureDate(cleanSeconds(assigneeStats[a].total - assigneeStats[a].progress))
-          res.write(`'><span title='${endDate}'>${days} d</td>`)
+          res.write(`'><span data-toggle="tooltip" data-html="true" title='${endDate}'>${days}d</span></td>`)
         }
         // Completed
         res.write(`<td class='completedCol'>${assigneeStats[a].total > 0 ? Math.round(100 * (assigneeStats[a].progress / assigneeStats[a].total)) : 0}%</td>`)
         // Missing Estimate
-        res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="${titleContentCount}">${assigneeStats[a].count.length}</span> 
+        res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="Finish by ${titleContentCount}">${assigneeStats[a].count.length}</span> 
           (${assigneeStats[a].empty.length > 0 ? (100 * (assigneeStats[a].empty.length / assigneeStats[a].count.length)).toFixed(0) : 0}%)</td>`)
 
         // Releases details
         Object.keys(releases).sort().forEach((rel) => {
-          debug(`processing release data for user = ${a} rel = ${rel}`)
+          // debug(`processing release data for user = ${a} rel = ${rel}`)
           // Print the user's numbers for this release
           if (Object.keys(assigneeStats[a]['rel']).includes(rel)) {
             // debug(`assigneeStats[a]['rel'][${rel}] = `, assigneeStats[a]['rel'][rel])
             const userProgress = assigneeStats[a]['rel'][rel].progress
             const userTotal = assigneeStats[a]['rel'][rel].total
-            res.write(`<!-- ${rel} --><td>${userProgress} of ${userTotal}</td>`)
+            res.write(`<!-- ${rel} --><td>${userProgress} of <span data-toggle="tooltip" data-html="true" title="${calcFutureDate(userTotal)}">${userTotal}d</span></td>`)
           } else {
             res.write('<!-- no data --><td></td>')
           }
