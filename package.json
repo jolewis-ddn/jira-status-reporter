@@ -5,6 +5,7 @@
   "main": "JiraStatusServer.js",
   "dependencies": {
     "@nastyox/rando.js": "^2.0.3",
+    "commander": "^6.2.0",
     "config": "^3.3.2",
     "date-fns": "^2.16.1",
     "debug": "^4.2.0",
@@ -15,7 +16,8 @@
     "restify": "^8.5.1",
     "restify-cors-middleware": "^1.1.1",
     "sqlite3": "^4.2.0",
-    "supports-color": "^7.2.0"
+    "supports-color": "^7.2.0",
+    "xxhashjs": "^0.2.2"
   },
   "devDependencies": {
     "ava": "^3.13.0",

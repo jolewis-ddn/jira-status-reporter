@@ -4,6 +4,7 @@ const d = require('./dateExtension')
 const restify = require('restify')
 const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
+const XXH = require('xxhashjs')
 
 const NodeCache = require('node-cache')
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 })
@@ -1733,7 +1734,10 @@ server.get('/epics', (req, res, next) => {
 
 server.get('/chart', (req, res, next) => {
   let jsrCLM = jsr.getChartLinkMaker(config).reset()
-  res.writeHead(200, { 'Content-Type': 'text/html' })
+  let chartTitle = req.params.title ? req.params.title : ''
+
+  debug(JSON.stringify(req.query))
+  res.write(buildHtmlHeader('Chart', false))
   const typeFilter = req.query.type || false
   if (typeFilter) {
     res.write(`<H1>${typeFilter}</H1>`)
@@ -1743,15 +1747,35 @@ server.get('/chart', (req, res, next) => {
 
   debug(`typeFilter: ${typeFilter}`)
 
-  let dates = jdr.getDates()
-  // Don't modify the original data
-  // let series = JSON.parse(JSON.stringify(jdr.getSeriesData()))
-  // n.b. es9 ... is much faster (10x) than JSON.parse/stringify
-  let series = { ...jdr.getSeriesData(typeFilter) }
-  let statuses = Object.keys(series)
+  // Calc cache key
+  const cacheKey = XXH.h32(JSON.stringify(req.query), 0xABCD ).toString()
+  debug(`cacheKey: `, cacheKey, ` from ${JSON.stringify(req.query)}`)
 
-  let reZero = false
-  let reZeroData = []
+  let dates, series, statuses, reZero, reZeroData
+  reZero = req.query.rezero ? req.query.rezero : false
+  reZeroData = []
+
+  if (!cache.has(cacheKey)) {
+    debug(`...chart: creating cache for ${cacheKey}`)
+    dates = jdr.getDates()
+    // Don't modify the original data
+    // let series = JSON.parse(JSON.stringify(jdr.getSeriesData()))
+    series = { ...jdr.getSeriesData(typeFilter) }
+    statuses = Object.keys(series)
+    
+    const cacheData = {
+      dates: dates,
+      series: series,
+      statuses: statuses
+    }
+    cache.set(cacheKey, cacheData)
+  } else {
+    debug(`...chart: fetching cache for ${cacheKey}`)
+    const cacheData = cache.get(cacheKey)
+    dates = cacheData.dates
+    series = cacheData.series
+    statuses = cacheData.statuses
+  }
 
   try {
     jsrCLM.setCategories(dates)
@@ -1759,7 +1783,6 @@ server.get('/chart', (req, res, next) => {
     debug('...in /temp about to go through all statuses')
     if (req.query.rezero) {
       debug(`reset = ${req.query.rezero}`)
-      reZero = req.query.rezero
       statuses.forEach((s, ndx) => {
         if (reZero.includes(s)) {
           debug(`reZeroing ${s}: First data point = ${series[s][0]}`)
@@ -1773,7 +1796,7 @@ server.get('/chart', (req, res, next) => {
       if (req.query.exclude) {
         if (!req.query.exclude.includes(s)) {
           debug(`......exclusion doesn't match -- adding series ${s}`)
-          jsrCLM.addSeries(s, series[s])
+          jsrCLM.addSeries(s, series[s], true)
         } else {
           debug(`......exclusion matches -- skipping series ${s}`)
         }
@@ -1788,9 +1811,9 @@ server.get('/chart', (req, res, next) => {
       // .setFill(true)
       .setFill(false)
 
-      .buildChartImgTag()
+      .buildChartImgTag(chartTitle, null, "line")
       .then((link) => {
-        debug(`buildChartImgTag returned ${link}`)
+        // debug(`buildChartImgTag returned ${link}`)
         res.write(link)
       })
       .catch((err) => {
@@ -1798,6 +1821,7 @@ server.get('/chart', (req, res, next) => {
         res.write(`<EM>Error</EM>: ${err}`)
       })
       .finally(() => {
+        res.write(buildHtmlFooter())
         res.end()
       })
   } catch (err) {

@@ -149,7 +149,9 @@ class JiraDataReader {
             'Task': { count: 0, issues: [] }, 
             'Sub-task': { count: 0, issues: [] }, 
             'Bug': { count: 0, issues: [] }, 
-            'Test': { count: 0, issues: [] } }
+            'Test': { count: 0, issues: [] },
+            'Requirement': { count: 0, issues: [] }
+        }
         this.lastData.issues.forEach((i) => {
             summary[i.fields.issuetype.name]['count'] += 1
             summary[i.fields.issuetype.name]['issues'].push(i.key)
