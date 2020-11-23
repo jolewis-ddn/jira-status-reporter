@@ -1732,6 +1732,38 @@ server.get('/epics', (req, res, next) => {
     })
 })
 
+server.get('/burndown', async (req, res, next) => {
+  let jsrCLM = await jsr.getChartLinkMaker(config).reset()
+  res.write(buildHtmlHeader('Burndown Chart', false))
+  res.write(buildPageHeader('Burndown Chart'))
+  jsrCLM.setCategories(['2020-11-01','2020-11-02','2020-11-03','2020-11-04'])
+  const data = {
+    // Spent: [10,20,30,40],
+    Remaining: [100, 50, 30, 20],
+    // Closed: [1,1,1,1],
+    // Stopped: [33,23,13,3]
+  }
+  const info = jdr._processFile('c:/users/jolewis/code/github/jira-status-reporter/data/ICEBOX-2020-11-22.json')
+  debug('info: ', info)
+  jsrCLM
+    .setLineChart()
+    .setSize({ h: 600, w: 800 })
+    .setFill(false)
+    .buildChartImgTag('Burndown', data, "bar")
+    .then((link) => {
+      res.write(link)
+    })
+    .catch((err) => {
+      debug(`Error caught in buildChartImgTag() = ${err}`)
+      res.write(`<EM>Error</EM>: ${err}`)
+    })
+    .finally(() => {
+      res.write(buildHtmlFooter())
+      res.end()
+    })
+  return next()
+})
+
 server.get('/chart', (req, res, next) => {
   let jsrCLM = jsr.getChartLinkMaker(config).reset()
   let chartTitle = req.params.title ? req.params.title : ''

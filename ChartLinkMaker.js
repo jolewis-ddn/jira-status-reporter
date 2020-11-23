@@ -33,12 +33,18 @@ const DEFAULT_FILL = false;
  * Size of labels must match # of data elements in data.data
  */
 
+/**
+ * Set any negative values to 0
+ *
+ * @param {array} arr
+ * @returns {array} Updated array
+ */
 function removeNegatives(arr) {
   return arr.map((x) => (x >= 0 ? x : 0));
 }
 
 /**
- * Make image tag
+ * Create an HTML string for a Billboard.js chart object
  *
  * @class ChartLinkMaker
  */
@@ -76,6 +82,12 @@ class ChartLinkMaker {
     return this;
   }
 
+  /**
+   * Zero out any existing settings and data: i.e. all data series (reset to empty array), all categories (reset to empty array), chart type (reset to DEFAULT_CHART_TYPE), width (reset to DEFAULT_WIDTH) and height (reset to DEFAULT_HEIGHT), and fill (reset to DEFAULT_FILL).
+   *
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   reset() {
     debug("reset() called");
     this.dataSeries = [];
@@ -87,42 +99,114 @@ class ChartLinkMaker {
     return this;
   }
 
+  /**
+   * Set the chart type to bar chart
+   *
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   setBarChart() {
     debug("setBarChart() called");
     this.chartType = BAR_CHART_TYPE;
     return this;
   }
 
+  /**
+   * Set the chart type to line chart
+   *
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   setLineChart() {
     debug("setLineChart() called");
     this.chartType = LINE_CHART_TYPE;
     return this;
   }
 
+  /**
+   * Set the chart type to specified type.
+   * Must be a chart type supported by Billboard.js
+   *
+   * @param {string} newType
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   setChartType(newType) {
     debug(`setChartType(${newType}) called`);
     this.chartType = newType;
     return this;
   }
 
+  /**
+   * Set the chart height and width.
+   *
+   * @param {object} hw { h: 400, w: 600 }
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   setSize(hw) {
-    this.h = hw;
-    this.w = hw;
+    this.h = hw.h;
+    this.w = hw.w;
     return this;
   }
 
+  /**
+   * Sset the chart height (pixels)
+   *
+   * @param {integer} h
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
+  setHeight(h) {
+    this.h = h;
+    return this;
+  }
+
+  /**
+   * Set the chart width (pixels)
+   *
+   * @param {integer} w
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
+  setWidth(w) {
+    this.w = w;
+    return this;
+  }
+
+  /**
+   * Set chart fill (for area charts)
+   *
+   * @param {*} newFill
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   setFill(newFill) {
     debug(`setFill(${newFill}) called...`);
     this.fill = newFill;
     return this;
   }
 
+  /**
+   * Specify the data categories, replacing all existing categories.
+   *
+   * @param {array} cats
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   setCategories(cats) {
     debug(`setCategories(${cats}) called...`);
     this.dataCategories = cats;
     return this;
   }
 
+  /**
+   * Make sure the categories are valid and their sizes match the series length/size.
+   *
+   * @param {integer} [seriesSize=-1]
+   * @returns {boolean}
+   * @memberof ChartLinkMaker
+   */
   _validateCategories(seriesSize = -1) {
     if (this.dataCategories) {
       if (this.dataCategories.length == seriesSize) {
@@ -141,6 +225,15 @@ class ChartLinkMaker {
     }
   }
 
+  /**
+   * Update the cache with a new data series
+   *
+   * @param {string} newLabel
+   * @param {object} newData
+   * @param {boolean} [ignoreValidation=false]
+   * @returns ChartLinkMaker
+   * @memberof ChartLinkMaker
+   */
   addSeries(newLabel, newData, ignoreValidation = false) {
     debug(`addSeries(${newLabel}, ${newData}) called...`);
     try {
@@ -154,6 +247,12 @@ class ChartLinkMaker {
     return this;
   }
 
+  /**
+   * Create the datasets object using the existing dataSeries data
+   *
+   * @returns {string} datasets
+   * @memberof ChartLinkMaker
+   */
   _buildDatasets() {
     debug(`_buildDatasets() called...`);
     let datasets = [];
@@ -170,6 +269,29 @@ class ChartLinkMaker {
       .replace(/"/g, "'");
   }
 
+  getJson(data) {
+    if (data) {
+      debug(data);
+      const response = {};
+      debug(Object.keys(data).join(","));
+      Object.keys(data).forEach(key => {
+        response[key] = data[key]
+      })
+      response['x'] = `[${'^' + this.dataCategories.join('^,^') + '^'}]`
+      return(JSON.stringify(response).replace(/"/g, '').replace(/\^/g, '"'))
+    } else {
+      throw new Error("getJson called without data");
+    }
+  }
+  /**
+   * Create the HTML tag for a single chart
+   *
+   * @param {string} title
+   * @param {object} data
+   * @param {string} [chartType="area"]
+   * @returns
+   * @memberof ChartLinkMaker
+   */
   async buildChartImgTag(title, data, chartType = "area") {
     debug(
       `buildChartImgTag(${title}, data, ${chartType}) called with data: `,
@@ -215,11 +337,15 @@ class ChartLinkMaker {
     }
     return new Promise((resolve, reject) => {
       if (data) {
+        const subchartContent = chartType === "area" || chartType === "line" ? 'subchart: { show: true, }' : ''
+
         const id = rando(99999);
         let chartHtml = `<span id='chart-${id}' class='miniJSRChart'></span><script>
           var chart = bb.generate({
             bindto: "#chart-${id}",
-            size: { height: ${this.h}, width: ${this.w} },
+            size: { height: ${this.h ? this.h : DEFAULT_HEIGHT}, width: ${
+          this.w ? this.w : DEFAULT_WIDTH
+        } },
             title: { text: '${title}' },
             axis: {
               x: {
@@ -235,17 +361,11 @@ class ChartLinkMaker {
             data: {
               x: "x",
               type: "${chartType}",
-              json: {
-                Open: [${removeNegatives(data.Open)}],
-                Active: [${removeNegatives(data.Active)}],
-                Closed: [${removeNegatives(data.Closed)}],
-                Stopped: [${removeNegatives(data.Stopped)}],
-                x: [${'"' + this.dataCategories.join('","') + '"'}]
-              }
+              json: ${this.getJson(data)},
             },
-            color: { pattern: [ 'SeaShell', 'MediumSeaGreen', 'CornflowerBlue', 'Pink' ] },
+            color: { pattern: [ 'lightblue', 'MediumSeaGreen', 'CornflowerBlue', 'Pink' ] },
             xFormat: "%Y-%m-%d",
-            subchart: { show: true, },
+            ${subchartContent}
           });
         </script>`;
         resolve(chartHtml);
