@@ -15,6 +15,8 @@ class JiraDataCache {
         this.readCache(false, true)
     }
 
+    getCacheFilename() { return(this.filename) }
+    
     containsFile(filename) {
         debug(`containsFile(${filename}) called...`)
         if (this.cache) {

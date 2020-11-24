@@ -6,10 +6,14 @@ const fs = require("fs");
 const glob = require("glob");
 const path = require("path");
 
+const { convertSecondsToDays } = require("./jiraUtils");
+
 const NodeCache = require("node-cache");
-const cache = new NodeCache({ stdTTL: 60 * 24, checkperiod: 1200 });
 
 const JiraDataCache = require("./JiraDataCache");
+
+const ALL_RELEASES = "ALL_RELEASES";
+const NO_RELEASE = "NONE";
 
 /**
  * Save cached data
@@ -19,6 +23,7 @@ const JiraDataCache = require("./JiraDataCache");
 class JiraDataReader {
   constructor() {
     this.cache = new JiraDataCache();
+    this.nodeCache = new NodeCache({ stdTTL: 60 * 24, checkperiod: 1200 });
     this.loaded = this.cache.isActive();
     this.REBUILD = 999;
     this.REFRESH = 10;
@@ -39,11 +44,11 @@ class JiraDataReader {
   /**
    * Re-read the existing cache. The cache is not re-loaded or wiped.
    *
-   * @param {*} [reloadType=this.REFRESH]
-   * @returns
+   * @param {number} [reloadType=this.REFRESH]
+   * @returns Number of items processed
    * @memberof JiraDataReader
    */
-  reloadCache(reloadType = this.REFRESH) {
+  reloadCache(reloadType = this.REFRESH, releaseName = false) {
     debug(`reloadCache(${reloadType}) called...`);
     let d = this.cache.getCache(true);
     let flist = glob.sync("./data/*.json");
@@ -52,10 +57,11 @@ class JiraDataReader {
       this.clearCache();
     }
     flist.forEach((fname) => {
+      debug(`processing ${fname}...`);
       if (reloadType == this.REBUILD || !this.cache.containsFile(fname)) {
         try {
           updates += 1;
-          let raw = this._processFile(fname);
+          let raw = this._processFile(fname, releaseName);
           d.push({
             fullname: fname,
             base: path.basename(fname, ".json"),
@@ -190,6 +196,111 @@ class JiraDataReader {
     return fname.substring(fname.length - 15, fname.length - 5);
   }
 
+  getBurndownStats(releaseName = false) {
+    debug("getBurndownStats() called...");
+    if (!releaseName) {
+      releaseName = ALL_RELEASES;
+    }
+
+    if (
+      !this.nodeCache.has(`burndownStatDetails-${releaseName}`) ||
+      !this.nodeCache.has(`burndownStatDaily-${releaseName}`) ||
+      !this.nodeCache.has(`burndownStatDates-${releaseName}`)
+    ) {
+      /* Structures:
+       burndownStatDetails:
+       {
+       <date> = the date in string format
+        - <release>
+          - <status> = Jira Status name
+              - progress: <summary.Story.aggregateprogress.progress> = Spent
+              - total:    <summary.Story.aggregateprogress.total>    = Total
+       }
+       dates == [<list of all dates processed>]
+       burndownStatDaily:
+       {
+        <status>: [<remaining-estimate in date order>]
+       }
+      */
+      let burndownStatDetails = {};
+      let burndownStatDaily = {};
+      let burndownStatDates = [];
+
+      // Read in the local cache file
+      let data = JSON.parse(fs.readFileSync(this.cache.getCacheFilename()));
+      // Loop through the stories, accumulating estimates
+      data.forEach((entry) => {
+        debug(`entry: `, entry, entry.summary.Story.aggregateprogress);
+        if (
+          releaseName === ALL_RELEASES ||
+          (entry.fields.fixVersions &&
+            entry.fields.fixVersions.name === releaseName)
+        ) {
+          debug(`...continuing in forEach(entry)...`);
+          // if (entry.date === "2020-11-20") {
+          // debug(
+          //   "entry elements",
+          //   entry.status,
+          //   entry.date,
+          //   entry.summary.Story.aggregateprogress.progress,
+          //   entry.summary.Story.aggregateprogress.total,
+          //   burndownStatDaily
+          // );
+          // }
+          // If the stats structure doesn't have the date, add it
+          if (!burndownStatDates.includes(entry.date)) {
+            burndownStatDetails[entry.date] = {};
+            burndownStatDates.push(entry.date);
+          }
+          if (!Object.keys(burndownStatDaily).includes(entry.status)) {
+            burndownStatDaily[entry.status] = [];
+          }
+
+          // If the stats structure doesn't have the status, add it
+          if (
+            !Object.keys(burndownStatDetails[entry.date]).includes(entry.status)
+          ) {
+            burndownStatDetails[entry.date][entry.status] = {
+              progress: 0,
+              total: 0,
+            };
+          }
+          // Store the individual elements in ...Details
+          // TODO: Implement per-release data
+          burndownStatDetails[entry.date][entry.status].progress +=
+            1 * entry.summary.Story.aggregateprogress.progress;
+          burndownStatDetails[entry.date][entry.status].total +=
+            1 * entry.summary.Story.aggregateprogress.total;
+
+          // Store the remaining time only in ...Daily
+          let delta = 0;
+          delta =
+            entry.summary.Story.aggregateprogress.total -
+            entry.summary.Story.aggregateprogress.progress;
+          debug(
+            `delta: ${entry.summary.Story.aggregateprogress.total} ${
+              entry.summary.Story.aggregateprogress.progress
+            } ${delta} ${typeof delta} `,
+            entry.summary.Story
+          );
+          burndownStatDaily[entry.status].push(convertSecondsToDays(delta));
+        } else {
+          debug(`...skipping in forEach(entry)...`);
+        }
+      });
+      this.nodeCache.set(
+        `burndownStatDetails-${releaseName}`,
+        burndownStatDetails
+      );
+      this.nodeCache.set(`burndownStatDaily-${releaseName}`, burndownStatDaily);
+      this.nodeCache.set(`burndownStatDates-${releaseName}`, burndownStatDates);
+    }
+    return {
+      stats: this.nodeCache.get(`burndownStatDetails-${releaseName}`),
+      daily: this.nodeCache.get(`burndownStatDaily-${releaseName}`),
+      dates: this.nodeCache.get(`burndownStatDates-${releaseName}`),
+    };
+  }
   /**
    * Read in the data file from local disk and store it in the cache.
    *
@@ -197,8 +308,10 @@ class JiraDataReader {
    * @returns {object} Summary data object
    * @memberof JiraDataReader
    */
-  _processFile(fname) {
-    // debug(`_processFile(${fname}) called`);
+  _processFile(fname, filterForRelease = false) {
+    debug(`_processFile(${fname}, ${filterForRelease}) called`);
+    // TODO: Handle filterForRelease
+
     // The filename must be more than 16 characters long
     // Date + extension (.json) == 16 characters
     if (fname.length > 16) {
@@ -208,7 +321,7 @@ class JiraDataReader {
 
       let response = {};
 
-      if (!cache.has(fname)) {
+      if (!this.nodeCache.has(fname)) {
         let data = fs.readFileSync(fname);
         this.lastData = JSON.parse(data);
         // debug(`this.lastData.total = ${this.lastData.total}`);
@@ -229,24 +342,28 @@ class JiraDataReader {
 
         // Increment the counter and store the issue key
         this.lastData.issues.forEach((i) => {
-          summary[i.fields.issuetype.name]["count"] += 1;
-          summary[i.fields.issuetype.name]["issues"].push(i.key);
+          let release = i.fields.fixVersion ? i.fields.fixVersion.Name : "NONE";
+          // let process = filterForRelease ? release === filterForRelease : true;
+          let process = true // TODO: Handle per-release stats
+          if (process) {
+            summary[i.fields.issuetype.name]["count"] += 1;
+            summary[i.fields.issuetype.name]["issues"].push(i.key);
 
-          // Update the running total of progress (spent) and total work estimates
-          // No aggregateprogress field indicates no estimated/spent time
-          // Only store for Stories, not Epics or Sub-Tasks - to avoid double-counting
-          if (
-            i.fields.issuetype.name === "Story" &&
-            i.fields.aggregateprogress
-          ) {
-            summary[i.fields.issuetype.name].aggregateprogress.progress +=
-              i.fields.aggregateprogress.progress;
-            summary[i.fields.issuetype.name].aggregateprogress.total +=
-              i.fields.aggregateprogress.total;
+            // Update the running total of progress (spent) and total work estimates
+            // No aggregateprogress field indicates no estimated/spent time
+            // Only store for Stories, not Epics or Sub-Tasks - to avoid double-counting
+            if (
+              i.fields.issuetype.name === "Story" &&
+              i.fields.aggregateprogress
+            ) {
+              summary[i.fields.issuetype.name].aggregateprogress.progress +=
+                i.fields.aggregateprogress.progress;
+              summary[i.fields.issuetype.name].aggregateprogress.total +=
+                i.fields.aggregateprogress.total;
+            }
           }
         });
 
-        // debug(summary["Story"].aggregateprogress);
         response = {
           total: this.lastData.total,
           raw: this.lastData,
@@ -254,11 +371,11 @@ class JiraDataReader {
         };
 
         // debug(`Saving ${fname} data to cache`);
-        cache.set(fname, response);
+        this.nodeCache.set(fname, response);
       } else {
         // Get cache instead
         // debug(`Returning ${fname} data from cache`);
-        response = cache.get(fname);
+        response = this.nodeCache.get(fname);
       }
       return response;
     } else {

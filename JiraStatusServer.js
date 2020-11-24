@@ -25,6 +25,7 @@ const JiraDataReader = require('./JiraDataReader')
 let jdr = new JiraDataReader()
 
 const Dashboard = require('./Dashboard')
+const { convertSecondsToDays } = require("./jiraUtils")
 const dashboard = new Dashboard()
 
 const LocalStorage = require('node-localstorage').LocalStorage
@@ -617,10 +618,10 @@ server.get('/progress/:rel', async (req, res, next) => {
         res.write(`<tr class='table-active'>
           <td>${component}</td>
           <td></td>
-          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].progress)}</td>
-          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].total)}</td>
-          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].percent)}</td>
-          <td class='summCell'>${cleanSeconds(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
+          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].progress)}</td>
+          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].total)}</td>
+          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].percent)}</td>
+          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
           </tr>`)
         
         // Assignee details/progress
@@ -643,8 +644,8 @@ server.get('/progress/:rel', async (req, res, next) => {
               if (versionDetails.componentEstimates[component].assignees[assignee][type].count) {
                 progTooltip += `<li><em>${type}</em>: 
                   Count: ${versionDetails.componentEstimates[component].assignees[assignee][type].count}; 
-                  Completed: ${cleanSeconds(versionDetails.componentEstimates[component].assignees[assignee][type].progress)}d; 
-                  Total: ${cleanSeconds(versionDetails.componentEstimates[component].assignees[assignee][type].total)}d</li>`
+                  Completed: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].progress)}d; 
+                  Total: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].total)}d</li>`
               }
             })
             // debug(`totalIssueCount: ${totalIssueCount}`)
@@ -658,9 +659,9 @@ server.get('/progress/:rel', async (req, res, next) => {
             res.write(`<tr>
               <td class='smright' data-toggle="tooltip" data-html="true" title="${progTooltip}"><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
               <td class='smcenter'>${totalIssueCount}</td>
-              <td class='smcenter'>${cleanSeconds(prog)}</td>
-              <td class='smcenter'>${cleanSeconds(tot)}</td>
-              <td class='smcenter'>${tot > 0 ? calcFutureDate(cleanSeconds(tot)) : ''}</td>
+              <td class='smcenter'>${convertSecondsToDays(prog)}</td>
+              <td class='smcenter'>${convertSecondsToDays(tot)}</td>
+              <td class='smcenter'>${tot > 0 ? calcFutureDate(convertSecondsToDays(tot)) : ''}</td>
               <td class='smcenter'></td>
               </tr>`)
           })
@@ -814,16 +815,16 @@ server.get('/estimates', async (req, res, next) => {
             assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [], rel: {} } 
           }
 
-          assigneeStats[assignee].count.push(`${story.key} ${story.fields.summary} [${cleanSeconds(story.fields.aggregateprogress.progress)} of ${cleanSeconds(story.fields.aggregateprogress.total)}d]`)
+          assigneeStats[assignee].count.push(`${story.key} ${story.fields.summary} [${convertSecondsToDays(story.fields.aggregateprogress.progress)} of ${convertSecondsToDays(story.fields.aggregateprogress.total)}d]`)
 
           assigneeStats[assignee].progress += story.fields.aggregateprogress.progress
           assigneeStats[assignee].total += story.fields.aggregateprogress.total
 
           if (!Object.keys(assigneeStats[assignee]['rel']).includes(fixVersions)) {
-            assigneeStats[assignee]['rel'][fixVersions] = { total: cleanSeconds(story.fields.aggregateprogress.total), progress: cleanSeconds(story.fields.aggregateprogress.progress) }
+            assigneeStats[assignee]['rel'][fixVersions] = { total: convertSecondsToDays(story.fields.aggregateprogress.total), progress: convertSecondsToDays(story.fields.aggregateprogress.progress) }
           } else { // Key already exists, so increment it
-            assigneeStats[assignee]['rel'][fixVersions].total = assigneeStats[assignee]['rel'][fixVersions].total + cleanSeconds(story.fields.aggregateprogress.total)
-            assigneeStats[assignee]['rel'][fixVersions].progress = assigneeStats[assignee]['rel'][fixVersions].progress + cleanSeconds(story.fields.aggregateprogress.progress)
+            assigneeStats[assignee]['rel'][fixVersions].total = assigneeStats[assignee]['rel'][fixVersions].total + convertSecondsToDays(story.fields.aggregateprogress.total)
+            assigneeStats[assignee]['rel'][fixVersions].progress = assigneeStats[assignee]['rel'][fixVersions].progress + convertSecondsToDays(story.fields.aggregateprogress.progress)
           }
 
           if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty.push(`${story.key} ${story.fields.summary}`) }
@@ -837,10 +838,10 @@ server.get('/estimates', async (req, res, next) => {
         }
 
         // Spent
-        res.write(`<td class='spentCol'>${cleanSeconds(story.fields.aggregateprogress.progress)} d</td>`)
+        res.write(`<td class='spentCol'>${convertSecondsToDays(story.fields.aggregateprogress.progress)} d</td>`)
         // Total
         if (story.fields.aggregateprogress.total > 0) {
-          res.write(`<td class='totalCol'>${cleanSeconds(story.fields.aggregateprogress.total)} d</td>`)
+          res.write(`<td class='totalCol'>${convertSecondsToDays(story.fields.aggregateprogress.total)} d</td>`)
         } else {
           res.write(`<td class='totalCol problem'>0d</td>`)
         }
@@ -863,8 +864,8 @@ server.get('/estimates', async (req, res, next) => {
       Object.keys(releases).sort().forEach((rel) => {
         res.write(`
           <td>${rel}</td>
-          <td>${cleanSeconds(releases[rel].progress)}</td>
-          <td>${cleanSeconds(releases[rel].total)}</td>
+          <td>${convertSecondsToDays(releases[rel].progress)}</td>
+          <td>${convertSecondsToDays(releases[rel].total)}</td>
           </tr>`)
       })
       res.write('</tbody></table>')
@@ -885,13 +886,13 @@ server.get('/estimates', async (req, res, next) => {
 
         res.write(`<tr>
           <td class='nameCol'>${a}</td>
-          <td class='spentCol'>${assigneeStats[a].progress > 0 ? cleanSeconds(assigneeStats[a].progress) : 0} d</td>
+          <td class='spentCol'>${assigneeStats[a].progress > 0 ? convertSecondsToDays(assigneeStats[a].progress) : 0} d</td>
           <td class='totalCol`)
         if (assigneeStats[a].total == 0) {
           res.write(` problem'>0d</td>`)
         } else {
-          const days = cleanSeconds(assigneeStats[a].total)
-          const endDate = calcFutureDate(cleanSeconds(assigneeStats[a].total - assigneeStats[a].progress))
+          const days = convertSecondsToDays(assigneeStats[a].total)
+          const endDate = calcFutureDate(convertSecondsToDays(assigneeStats[a].total - assigneeStats[a].progress))
           res.write(`'><span data-toggle="tooltip" data-html="true" title='${endDate}'>${days}d</span></td>`)
         }
         // Completed
@@ -918,7 +919,7 @@ server.get('/estimates', async (req, res, next) => {
       })
       res.write(`<tr><td><em>Release Totals</em></td><td colspan=${USER_COLUMNS.length - 1}></td>`)
       Object.keys(releases).sort().forEach((rel) => {
-        res.write(`<td><b>${cleanSeconds(releases[rel].progress)} of ${cleanSeconds(releases[rel].total)}d</b></td>`)
+        res.write(`<td><b>${convertSecondsToDays(releases[rel].progress)} of ${convertSecondsToDays(releases[rel].total)}d</b></td>`)
       })
       res.write('</tr>')
 
@@ -933,13 +934,6 @@ server.get('/estimates', async (req, res, next) => {
     return next()
   }
 })
-
-// Convert seconds into days
-function cleanSeconds(sec) {
-  let result = (sec / 28800).toFixed(2)
-  if (result == Math.round(result)) { result = Math.round(result) }
-  return (result)
-}
 
 // Ignore weekends
 function calcFutureDate(dplus) {
@@ -1732,24 +1726,38 @@ server.get('/epics', (req, res, next) => {
     })
 })
 
+server.get('/burndownStats', async (req, res, next) => {
+  res.write(buildHtmlHeader('Burndown Stats', false))
+  res.write(buildPageHeader('Burndown Stats'))
+  debug(jdr.getBurndownStats())
+  res.write('ok')
+  res.write(buildHtmlFooter())
+  res.end()
+  return next()  
+})
+
 server.get('/burndown', async (req, res, next) => {
   let jsrCLM = await jsr.getChartLinkMaker(config).reset()
   res.write(buildHtmlHeader('Burndown Chart', false))
   res.write(buildPageHeader('Burndown Chart'))
-  jsrCLM.setCategories(['2020-11-01','2020-11-02','2020-11-03','2020-11-04'])
+  const burndown = jdr.getBurndownStats()
+  debug(`burndown: `, burndown)
+  jsrCLM.setCategories(burndown.dates)
   const data = {
-    // Spent: [10,20,30,40],
-    Remaining: [100, 50, 30, 20],
-    // Closed: [1,1,1,1],
-    // Stopped: [33,23,13,3]
+    Blocked: burndown.daily["BLOCKED"],
+    Dead: burndown.daily["DEAD"],
+    Defined: burndown.daily["DEFINED"],
+    Done: burndown.daily["DONE"],
+    Emergency: burndown.daily["EMERGENCY"],
+    Icebox: burndown.daily["ICEBOX"],
+    InProgress: burndown.daily["IN PROGRESS"],
+    InReview: burndown.daily["IN REVIEW"],
   }
-  const info = jdr._processFile('c:/users/jolewis/code/github/jira-status-reporter/data/ICEBOX-2020-11-22.json')
-  debug('info: ', info)
   jsrCLM
     .setLineChart()
     .setSize({ h: 600, w: 800 })
     .setFill(false)
-    .buildChartImgTag('Burndown', data, "bar")
+    .buildChartImgTag('Burndown', data, "stacked-bar")
     .then((link) => {
       res.write(link)
     })
@@ -1908,8 +1916,8 @@ server.get('/refresh-cacheJSR', (req, res, next) => {
   return next()
 })
 
-server.get('/rebuild-cacheJSR', (req, res, next) => {
-  const updates = jdr.reloadCache(jdr.rebuild())
+server.get('/rebuild-cacheJSR/:rel', (req, res, next) => {
+  const updates = jdr.reloadCache(jdr.rebuild(), req.params.rel)
   res.send(`rebuilt ${updates}`)
   return next()
 })

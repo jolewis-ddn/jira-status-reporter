@@ -283,6 +283,11 @@ class ChartLinkMaker {
       throw new Error("getJson called without data");
     }
   }
+
+  getGroups(data) {
+    return(JSON.stringify(`[${'^' + Object.keys(data).join('^,^') + '^'}]`).replace(/"/g, '').replace(/\^/g, '"'))
+  }
+
   /**
    * Create the HTML tag for a single chart
    *
@@ -337,6 +342,13 @@ class ChartLinkMaker {
     }
     return new Promise((resolve, reject) => {
       if (data) {
+        let dataGroups = ""
+        // Workaround for specifying stacked bar chart
+        if (chartType === "stacked-bar") {
+          dataGroups = `groups: [ ${this.getGroups(data)} ],`
+          chartType = "bar"
+        }
+
         const subchartContent = chartType === "area" || chartType === "line" ? 'subchart: { show: true, }' : ''
 
         const id = rando(99999);
@@ -362,6 +374,7 @@ class ChartLinkMaker {
               x: "x",
               type: "${chartType}",
               json: ${this.getJson(data)},
+              ${dataGroups}
             },
             color: { pattern: [ 'lightblue', 'MediumSeaGreen', 'CornflowerBlue', 'Pink' ] },
             xFormat: "%Y-%m-%d",
