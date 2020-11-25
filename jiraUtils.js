@@ -4,4 +4,10 @@ function convertSecondsToDays(sec) {
   if (result == Math.round(result)) { result = Math.round(result); }
   return (result);
 }
+
+function removeSpaces(x) {
+  return(x.replace(/\s/g, '_'))
+}
+
 exports.convertSecondsToDays = convertSecondsToDays;
+exports.removeSpaces = removeSpaces;

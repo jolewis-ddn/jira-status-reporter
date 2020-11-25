@@ -30,8 +30,8 @@
   "scripts": {
     "test": "nyc --reporter=html --reporter=text ava",
     "test-watch": "npx ava -- --watch",
-    "server-debug": "set DEBUG=*,-nodemon*,-supertest*,-superagent* && nodemon app.js",
-    "server": "nodemon app.js"
+    "server-debug": "set DEBUG=*,-nodemon*,-supertest*,-superagent* && nodemon -i data app.js",
+    "server": "nodemon -i data app.js"
   },
   "repository": {
     "type": "git",

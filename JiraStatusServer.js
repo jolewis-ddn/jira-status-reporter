@@ -1726,38 +1726,79 @@ server.get('/epics', (req, res, next) => {
     })
 })
 
-server.get('/burndownStats', async (req, res, next) => {
-  res.write(buildHtmlHeader('Burndown Stats', false))
-  res.write(buildPageHeader('Burndown Stats'))
-  debug(jdr.getBurndownStats())
-  res.write('ok')
-  res.write(buildHtmlFooter())
+server.get('/burndownStats/:rel', async (req, res, next) => {
+  let release = req.params.rel ? req.params.rel : ""
+  debug(`/burndownStats/${release} called...`)
+  res.send(await jdr.getBurndownStats(release))
   res.end()
   return next()  
 })
 
 server.get('/burndown', async (req, res, next) => {
+  // In case someone tries to hit the bare burndown url...
+  res.redirect('/burndown/', next)
+})
+
+/**
+ * Create simple Bootstrap button for consistency
+ *
+ * @param {string} label Button text
+ * @param {string} [target=false] HREF (if false, not linked)
+ * @param {boolean} [active=true] Active button?
+ * @returns HTML string - either <a> or <button> depending on the target value
+ */
+function simpleButton(label, target = false, active = true) {
+  if (target) {
+    return(`<a href='${target}' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</a>`)
+  } else {
+    return(`<button type='button' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</button>`)
+  }
+}
+
+server.get('/burndown/:rel', async (req, res, next) => {
+  let release = req.params.rel ? req.params.rel : false
   let jsrCLM = await jsr.getChartLinkMaker(config).reset()
+
   res.write(buildHtmlHeader('Burndown Chart', false))
   res.write(buildPageHeader('Burndown Chart'))
-  const burndown = jdr.getBurndownStats()
-  debug(`burndown: `, burndown)
-  jsrCLM.setCategories(burndown.dates)
-  const data = {
-    Blocked: burndown.daily["BLOCKED"],
-    Dead: burndown.daily["DEAD"],
-    Defined: burndown.daily["DEFINED"],
-    Done: burndown.daily["DONE"],
-    Emergency: burndown.daily["EMERGENCY"],
-    Icebox: burndown.daily["ICEBOX"],
-    InProgress: burndown.daily["IN PROGRESS"],
-    InReview: burndown.daily["IN REVIEW"],
+  
+  let releaseList = await jdr.getReleaseList()
+
+  // Buttons to burndown chart for each release, including combined
+  res.write(`<div style='display: flex; float: none;'>`)
+  // Make sure the current page button isn't linked/active
+  if (release) {
+    res.write(simpleButton('All/Combined', '/burndown/'))
+  } else {
+    res.write(simpleButton('All/Combined', false, false))
   }
+  releaseList.forEach((rel) => {
+    let relName = rel === 'NONE' ? 'No release set' : rel
+    // Make sure the current page button isn't linked/active
+    if (release === rel) {
+      res.write(simpleButton(relName, false, false))
+    } else {
+      res.write(simpleButton(relName, `/burndown/${rel}`, false))
+    }
+  })
+  res.write(`</div>`)
+
+
+  const burndown = await jdr.getBurndownStats(release)
+  jsrCLM.setCategories(burndown.dates)
+  debug(`burndown statuses: `, Object.keys(burndown.stats).join(','))
+  // Build the data object based on the burndown data
+  const data = {}
+  Object.keys(burndown.stats).forEach((status) => {
+    status.replace(/\s/g, '')
+    data[status] = burndown.stats[status]
+  })
+  
   jsrCLM
     .setLineChart()
     .setSize({ h: 600, w: 800 })
     .setFill(false)
-    .buildChartImgTag('Burndown', data, "stacked-bar")
+    .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' }`, data, "stacked-bar")
     .then((link) => {
       res.write(link)
     })
@@ -1765,7 +1806,7 @@ server.get('/burndown', async (req, res, next) => {
       debug(`Error caught in buildChartImgTag() = ${err}`)
       res.write(`<EM>Error</EM>: ${err}`)
     })
-    .finally(() => {
+    .finally(async () => {
       res.write(buildHtmlFooter())
       res.end()
     })
@@ -1916,8 +1957,8 @@ server.get('/refresh-cacheJSR', (req, res, next) => {
   return next()
 })
 
-server.get('/rebuild-cacheJSR/:rel', (req, res, next) => {
-  const updates = jdr.reloadCache(jdr.rebuild(), req.params.rel)
+server.get('/rebuild-cacheJSR', (req, res, next) => {
+  const updates = jdr.reloadCache(jdr.rebuild())
   res.send(`rebuilt ${updates}`)
   return next()
 })

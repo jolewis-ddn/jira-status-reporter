@@ -6,15 +6,10 @@ const debug = require("debug")("chart-link-maker");
 const randojs = require("@nastyox/rando.js"),
   rando = randojs.rando; //, randoSequence = randojs.randoSequence
 
+const { convertSecondsToDays, removeSpaces } = require("./jiraUtils")
+
 const BAR_CHART_TYPE = "bar";
 const LINE_CHART_TYPE = "line";
-
-// const BASE_URL =
-//   config.get('graphicServer.protocol') +
-//   '://' +
-//   config.get('graphicServer.server') +
-//   ':' +
-//   config.get('graphicServer.port')
 
 const DEFAULT_CHART_TITLE = "";
 const DEFAULT_CHART_TYPE = BAR_CHART_TYPE;
@@ -271,11 +266,11 @@ class ChartLinkMaker {
 
   getJson(data) {
     if (data) {
-      debug(data);
+      // debug(data);
       const response = {};
-      debug(Object.keys(data).join(","));
+      // debug(Object.keys(data).join(","));
       Object.keys(data).forEach(key => {
-        response[key] = data[key]
+        response[removeSpaces(key)] = data[key]
       })
       response['x'] = `[${'^' + this.dataCategories.join('^,^') + '^'}]`
       return(JSON.stringify(response).replace(/"/g, '').replace(/\^/g, '"'))
@@ -285,7 +280,8 @@ class ChartLinkMaker {
   }
 
   getGroups(data) {
-    return(JSON.stringify(`[${'^' + Object.keys(data).join('^,^') + '^'}]`).replace(/"/g, '').replace(/\^/g, '"'))
+    // debug(`getGroups called: `, data)
+    return(JSON.stringify(`[${'^' + Object.keys(data).map((x) => removeSpaces(x)).join('^,^') + '^'}]`).replace(/"/g, '').replace(/\^/g, '"'))
   }
 
   /**
@@ -298,10 +294,10 @@ class ChartLinkMaker {
    * @memberof ChartLinkMaker
    */
   async buildChartImgTag(title, data, chartType = "area") {
-    debug(
-      `buildChartImgTag(${title}, data, ${chartType}) called with data: `,
-      data
-    );
+    // debug(
+    //   `buildChartImgTag(${title}, data, ${chartType}) called with data: `,
+    //   data
+    // );
     if (!data) {
       // No data, so build from local data
       this.h = DEFAULT_HEIGHT;
@@ -352,7 +348,7 @@ class ChartLinkMaker {
         const subchartContent = chartType === "area" || chartType === "line" ? 'subchart: { show: true, }' : ''
 
         const id = rando(99999);
-        let chartHtml = `<span id='chart-${id}' class='miniJSRChart'></span><script>
+        let chartHtml = `<div id='chart-${id}' class='miniJSRChart'></div><script>
           var chart = bb.generate({
             bindto: "#chart-${id}",
             size: { height: ${this.h ? this.h : DEFAULT_HEIGHT}, width: ${
@@ -376,7 +372,7 @@ class ChartLinkMaker {
               json: ${this.getJson(data)},
               ${dataGroups}
             },
-            color: { pattern: [ 'lightblue', 'MediumSeaGreen', 'CornflowerBlue', 'Pink' ] },
+            color: { pattern: [ 'lightblue', 'MediumSeaGreen', 'CornflowerBlue', 'Pink', 'Orange' ] },
             xFormat: "%Y-%m-%d",
             ${subchartContent}
           });
