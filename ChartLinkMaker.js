@@ -293,7 +293,7 @@ class ChartLinkMaker {
    * @returns
    * @memberof ChartLinkMaker
    */
-  async buildChartImgTag(title, data, chartType = "area") {
+  async buildChartImgTag(title, data, chartType = "area", xLabel = "") {
     // debug(
     //   `buildChartImgTag(${title}, data, ${chartType}) called with data: `,
     //   data
@@ -356,8 +356,9 @@ class ChartLinkMaker {
         } },
             title: { text: '${title}' },
             axis: {
+              ${xLabel ? 'y: { label: "' + xLabel + '" },' : '' }
               x: {
-                type: "timeseries"
+                type: "timeseries",
               }
             },
             bar: {

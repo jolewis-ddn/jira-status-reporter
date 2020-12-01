@@ -47,6 +47,7 @@ Collection of node scripts to query, store, and report on Jira issues.
 ## Endpoints
 * `/`: no-op
 ### Configuration
+* `/components`: Unique and sorted list of all the Components
 * `/config`: Current config
 * `/fields`: All Jira fields (standard and custom)
 ### Requirements

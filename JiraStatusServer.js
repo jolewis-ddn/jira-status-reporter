@@ -1734,6 +1734,11 @@ server.get('/burndownStats/:rel', async (req, res, next) => {
   return next()  
 })
 
+server.get('/components', async (req, res, next) => {
+  res.send(await jdr.getComponentList())
+  return next()
+})
+
 server.get('/burndown', async (req, res, next) => {
   // In case someone tries to hit the bare burndown url...
   res.redirect('/burndown/', next)
@@ -1757,6 +1762,8 @@ function simpleButton(label, target = false, active = true) {
 
 server.get('/burndown/:rel', async (req, res, next) => {
   let release = req.params.rel ? req.params.rel : false
+  let component = req.query.component ? req.query.component : false
+
   let jsrCLM = await jsr.getChartLinkMaker(config).reset()
 
   res.write(buildHtmlHeader('Burndown Chart', false))
@@ -1784,7 +1791,8 @@ server.get('/burndown/:rel', async (req, res, next) => {
   res.write(`</div>`)
 
 
-  const burndown = await jdr.getBurndownStats(release)
+  const burndown = await jdr.getBurndownStats(release, component)
+
   jsrCLM.setCategories(burndown.dates)
   debug(`burndown statuses: `, Object.keys(burndown.stats).join(','))
   // Build the data object based on the burndown data
@@ -1798,7 +1806,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     .setLineChart()
     .setSize({ h: 600, w: 800 })
     .setFill(false)
-    .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' }`, data, "stacked-bar")
+    .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' } ${component ? ' (Component: ' + component + ')' : '' }`, data, "line", 'days')
     .then((link) => {
       res.write(link)
     })
@@ -1807,6 +1815,14 @@ server.get('/burndown/:rel', async (req, res, next) => {
       res.write(`<EM>Error</EM>: ${err}`)
     })
     .finally(async () => {
+      const componentList = await jdr.getComponentList()
+      res.write('<ul>')
+      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname; return false;"><em>No component filter</em></a></li>`)
+      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE'; return false;"><em>No component set</em></a></li>`)
+      componentList.forEach((c) => {
+        res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}'; return false;">${c}</a></li>`)
+      })
+      res.write(`</ul>`)
       res.write(buildHtmlFooter())
       res.end()
     })
@@ -1957,8 +1973,8 @@ server.get('/refresh-cacheJSR', (req, res, next) => {
   return next()
 })
 
-server.get('/rebuild-cacheJSR', (req, res, next) => {
-  const updates = jdr.reloadCache(jdr.rebuild())
+server.get('/rebuild-cacheJSR', async (req, res, next) => {
+  const updates = await jdr.reloadCache(jdr.rebuild())
   res.send(`rebuilt ${updates}`)
   return next()
 })

@@ -31,10 +31,7 @@ class JiraDataReader {
     this.loaded = this.cache.isActive();
     this.REBUILD = 999;
     this.REFRESH = 10;
-    this.db = new sqlite3.Database(
-      "./data/jira-stats.db",
-      sqlite3.OPEN_READONLY
-    );
+    this.db = new sqlite3.Database("./data/jira-stats.db");
     return this;
   }
 
@@ -57,13 +54,13 @@ class JiraDataReader {
    * @returns Number of items processed
    * @memberof JiraDataReader
    */
-  reloadCache(reloadType = this.REFRESH, releaseName = false) {
+  async reloadCache(reloadType = this.REFRESH, releaseName = false) {
     debug(`reloadCache(${reloadType}) called...`);
     let d = this.cache.getCache(true);
     let flist = glob.sync("./data/*.json");
     let updates = 0;
     if (reloadType == this.REBUILD) {
-      this.clearCache();
+      await this.clearCache();
     }
     debug(`Beginning db transaction...`);
 
@@ -200,8 +197,8 @@ class JiraDataReader {
    * @returns JiraDataReader
    * @memberof JiraDataReader
    */
-  clearCache() {
-    this.db.run("DELETE FROM 'story-stats';");
+  async clearCache() {
+    await this.db.run("DELETE FROM 'story-stats';");
 
     this.cache.makeCache();
     this.loaded = this.cache.isActive();
@@ -216,6 +213,7 @@ class JiraDataReader {
   _parseFileDate(fname) {
     return fname.substring(fname.length - 15, fname.length - 5);
   }
+
   /**
    * Return a list of all the releases in the cache
    *
@@ -230,8 +228,52 @@ class JiraDataReader {
         if (err) {
           reject(err);
         } else {
-          debug(rows);
+          // debug(rows);
           resolve(rows.map((x) => x.fixVersion));
+        }
+      });
+    });
+  }
+
+  /**
+   * Return a list of all the releases in the cache
+   *
+   * @returns {array} Release Names
+   * @memberof JiraDataReader
+   */
+  async getComponentList() {
+    debug(`getComponentList() called...`);
+    return new Promise((resolve, reject) => {
+      let sql = `SELECT distinct(component) FROM 'story-stats' where component is not null ORDER BY component`;
+      this.db.all(sql, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          let cleanList = []
+          const uglyList = rows.map((x) => x.component)
+          uglyList.forEach((entry) => {
+            // debug(`entry: `, entry)
+            cleanList = cleanList.concat(entry.split(','))
+          })
+          resolve([...new Set(cleanList)].sort())
+        }
+      });
+    });
+  }
+
+  /**
+   * Return a list of all the dates in the cache db, in date order
+   *
+   * @memberof JiraDataReader
+   */
+  async getDateList(whereFilter = "") {
+    return new Promise((resolve, reject) => {
+      let sql = `select date from 'story-stats' ${whereFilter} group by date order by date`;
+      this.db.all(sql, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows.map((x) => x.date));
         }
       });
     });
@@ -250,7 +292,7 @@ class JiraDataReader {
       }
    * @memberof JiraDataReader
    */
-  async getBurndownStats(releaseName = false) {
+  async getBurndownStats(releaseName = false, componentName = false) {
     debug(`getBurndownStats(${releaseName}) called...`);
     return new Promise((resolve, reject) => {
       let releaseNameFilter = "";
@@ -258,10 +300,18 @@ class JiraDataReader {
         releaseNameFilter = `WHERE fixVersion='${releaseName}'`;
       }
 
-      let sql = `SELECT status, date, sum(total)-sum(progress) as remaining FROM 'story-stats' ${releaseNameFilter} GROUP BY date, status ORDER BY status, date`;
+      let componentNameFilter = ''
+      if (componentName) {
+        if (releaseName) {
+          componentNameFilter = ` AND `
+        }
+        componentNameFilter += ` component ${componentName === "NONE" ? "is null" : "like '%" + componentName + "%'"}`
+      }
+
+      let sql = `SELECT status, date, sum(total)-sum(progress) as remaining FROM 'story-stats' ${releaseNameFilter} ${componentNameFilter} GROUP BY date, status ORDER BY status, date`;
       debug(sql);
 
-      this.db.all(sql, (err, rows) => {
+      this.db.all(sql, async (err, rows) => {
         if (err != null) {
           reject(err);
         } else {
@@ -270,7 +320,7 @@ class JiraDataReader {
           // TODO: Fix implicit assumption that the first status has an entry for every day
 
           let burndownStatDaily = {};
-          let burndownStatDates = [];
+          let burndownStatDates = await this.getDateList();
 
           /* Example results...
             { status: 'In Progress', date: '2020-11-01', remaining: 3513600 },
@@ -280,15 +330,18 @@ class JiraDataReader {
             ...
             */
           rows.forEach((row) => {
-            if (!burndownStatDates.includes(row.date)) {
-              burndownStatDates.push(row.date);
-            }
+            // debug(`in rows.forEach(`, row, `)`);
+            // if (!burndownStatDates.includes(row.date)) {
+            //   burndownStatDates.push(row.date);
+            // }
             if (!Object.keys(burndownStatDaily).includes(row.status)) {
-              burndownStatDaily[row.status] = [];
+              // Build an array the same length as the dates array, filled with 0s
+              burndownStatDaily[row.status] = Array(burndownStatDates.length).fill(0);
             }
-            burndownStatDaily[row.status].push(
-              convertSecondsToDays(row.remaining)
-            );
+            // burndownStatDaily[row.status].push(
+            //   convertSecondsToDays(row.remaining)
+            // );
+            burndownStatDaily[row.status][burndownStatDates.indexOf(row.date)] = convertSecondsToDays(row.remaining)
           });
           resolve({ stats: burndownStatDaily, dates: burndownStatDates });
         }
@@ -306,8 +359,6 @@ class JiraDataReader {
   _processFile(fname) {
     debug(`_processFile(${fname}) called`);
     // TODO: Handle filterForRelease
-
-    // this.db.run(`delete from 'jira-stats' WHERE status='${status}' AND year=${y} AND month=${m}`)
 
     // The filename must be more than 16 characters long
     // Date + extension (.json) == 16 characters
@@ -354,6 +405,12 @@ class JiraDataReader {
             );
           }
 
+          // Save the component value
+          // TODO: Handle multiple components
+          let component = i.fields.components.length
+            ? i.fields.components.map((c) => c.name).join(",")
+            : null;
+
           summary[i.fields.issuetype.name]["count"] += 1;
           summary[i.fields.issuetype.name]["issues"].push(i.key);
 
@@ -369,22 +426,24 @@ class JiraDataReader {
             summary[i.fields.issuetype.name].aggregateprogress.total +=
               i.fields.aggregateprogress.total;
 
-            if (
-              i.fields.aggregateprogress.progress +
-                i.fields.aggregateprogress.total >
-              0
-            ) {
-              // debug(`INSERT INTO 'story-stats' (key, date, status, fixVersion, progress, total) VALUES (${i.key}, ${this.lastFiledate}, ${i.fields.status.name}, ${release}, ${i.fields.aggregateprogress.progress}, ${i.fields.aggregateprogress.total})`)
-              this.db.run(
-                "INSERT INTO `story-stats` (key, date, status, fixVersion, progress, total) VALUES (?, ?, ?, ?, ?, ?)",
-                i.key,
-                this.lastFiledate,
-                i.fields.status.name,
-                release,
-                i.fields.aggregateprogress.progress,
-                i.fields.aggregateprogress.total
-              );
-            }
+            // To only cache items with an estimate, uncomment this if... statement
+            // if (
+            //   i.fields.aggregateprogress.progress +
+            //     i.fields.aggregateprogress.total >
+            //   0
+            // ) {
+            // debug(`INSERT INTO 'story-stats' (key, date, status, fixVersion, progress, total) VALUES (${i.key}, ${this.lastFiledate}, ${i.fields.status.name}, ${release}, ${i.fields.aggregateprogress.progress}, ${i.fields.aggregateprogress.total})`)
+            this.db.run(
+              "INSERT INTO `story-stats` (key, date, status, fixVersion, component, progress, total) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              i.key,
+              this.lastFiledate,
+              i.fields.status.name,
+              release,
+              component,
+              i.fields.aggregateprogress.progress,
+              i.fields.aggregateprogress.total
+            );
+            // }
           }
         });
 
