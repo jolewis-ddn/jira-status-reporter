@@ -169,6 +169,10 @@ function buildLegend() {
   return legendStr
 }
 
+function startHtml(res) {
+  res.writeHead(200, { 'Content-Type': 'text/html' })
+}
+
 function buildHtmlHeader(title = '', showButtons = true) {
   // Bootstrap 5 alpha
   // return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">${buildStylesheet()}</head>`)
@@ -330,7 +334,13 @@ async function buildPieCharts(stats) {
   return results.join('')
 }
 
-// Clean out " from string - for use with Title attribute values
+/**
+ * Replace troublesome characters (', ", >, <) with HTML equivalents
+ * For use with Title attribute values
+ *
+ * @param {string} t Original string
+ * @returns {string} newText Cleaned text string
+ */
 function cleanText(t) {
   let newText = t
   newText = newText.replace(/'/g, '&apos;')
@@ -368,49 +378,28 @@ function updateStats(stats, issueType, issueStatusName) {
   return newStats
 }
 
-/*
- ************** ENDPOINTS **************
+/**
+ * Create simple Bootstrap button for consistency
+ *
+ * @param {string} label Button text
+ * @param {string} [target=false] HREF (if false, not linked)
+ * @param {boolean} [active=true] Active button?
+ * @returns HTML string - either <a> or <button> depending on the target value
  */
-
-/*
- * Function Template *
-server.get('/endpoint', async (req, res, next) => {
-  const pageTitle = 'Requirements Report'
-  res.write(buildHtmlHeader(pageTitle, false))
-  res.write(buildPageHeader(pageTitle))
-  try {
-  } catch (err) {
-    debug(err)
-    res.write(`<em>error</em><!-- ${err} -->`)
+function simpleButton(label, target = false, active = true) {
+  if (target) {
+    return(`<a href='${target}' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</a>`)
+  } else {
+    return(`<button type='button' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</button>`)
   }
-  res.write(buildHtmlFooter())
-  res.end()
-  return next()
-})
+}
 
-*/
-
-server.get('/cache/stats', async (req, res, next) => {
-  try {
-    res.send({ stats: cache.getStats(), keys: cache.keys() })
-  } catch (err) {
-    debug(err)
-    res.send({ error: err.message })
-  }
-  return next()
-})
-
-server.get('/cache/flush', async (req, res, next) => {
-  try {
-    cache.flushAll()
-    res.send({ result: 'flushed', stats: cache.getStats(), keys: cache.keys() })
-  } catch (err) {
-    debug(err)
-    res.send({ error: err.message })
-  }
-  return next()
-})
-
+/**
+ * Get total estimates for all stories in a single Epic
+ *
+ * @param {string} epicKey Jira key
+ * @returns Object containing all Story estimate totals in that Epic
+ */
 async function getEpicEstimates(epicKey) {
   if (!cache.has(`epicEstimate-${epicKey}`)) {
     const fields = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking']
@@ -434,11 +423,19 @@ async function getEpicEstimates(epicKey) {
   return (cache.get(`epicEstimate-${epicKey}`))
 }
 
-async function getVersions(flushCache) {
+/**
+ * Get details on all the versions defined in the Jira project
+ *
+ * @param {string} [flushCache=false] Force flush rebuild
+ * @returns string JSON array of versions from Jira /project/:id/versions
+ */
+async function getVersions(flushCache = false) {
+  debug(`getVersions(${flushCache})...`)
   if (!cache.has('versions') || (flushCache && flushCache == 'yes')) {
-    debug(`getVersions(${flushCache})... updating cache...`)
+    debug(`... +++ updating cache...`)
     cache.set('versions', await jsr.get(`/project/${config.project}/versions`))
   }
+  debug(`... returning from cache...`)
   return(cache.get('versions'))
 }
 
@@ -539,6 +536,186 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
     return(cache.get(`versionDetails-${versionId}`))
   }
 }
+
+/**
+ * Calculate the date X days from now
+ *
+ * @param {integer} dplus Number of days to add
+ * @returns string (format: MM/DD/YYYY)
+ */
+function calcFutureDate(dplus) {
+  const d = new Date()
+  const dFuture = d.addBusinessDays(Math.round(dplus), true)
+  return (`${dFuture.getMonth() + 1}/${dFuture.getDate()}/${dFuture.getFullYear()}`)
+}
+
+/**
+ * Create an HTML HREF based on the provided parameters
+ *
+ * @param {*} issueKey Jira issue key
+ * @param {*} statusName Jira Status value
+ * @param {*} issueTypeIconUrl Link for type icon
+ * @param {*} issueSummary Jira Summary
+ * @param {*} issueOwner Jira Assignee
+ * @param {*} issueStatus Jira Status
+ * @param {boolean} [hideName=false] Display the Jira issue name or not
+ * @returns HTML snippet with the full HREF
+ */
+function buildLink(
+  issueKey,
+  statusName,
+  issueTypeIconUrl,
+  issueSummary,
+  issueOwner,
+  issueStatus,
+  hideName = false
+) {
+  const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
+  const displayTitle = hideName ? '' : title
+  return `<span class='${hideName ? '' : 'issueComboLink lineicon'}'><a href='${config.get('jira.protocol')}://${config.get('jira.host')
+    }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+      statusName
+    )}' src='${issueTypeIconUrl}' title='${cleanText(
+      title
+    )}')/><span class='${hideName ? '' : 'issueName'}'/>${displayTitle}</span></a></span>`
+}
+
+/**
+ * Get a list of all the Requirements in the active project.
+ * Requirement == the Jira issue type name
+ *
+ * @returns Array of Jira objects
+ */
+async function getRequirements() {
+  debug('getRequirements() called')
+  if (!cache.has('requirements')) {
+    debug('...fetching from Jira')
+    cache.set('requirements', await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99), 3600)
+  } else {
+    debug('...fetching from cache')
+  }
+  return cache.get('requirements')
+}
+
+/**
+ * Get a list of all the Groups in the active Jira project
+ *
+ * @param {string} flushCache Wipe/refresh cache?
+ * @returns Object from Jira /groups/picker
+ */
+async function getGroups(flushCache) {
+  if (!cache.has('groups') || (flushCache && flushCache == 'yes')) {
+    cache.set('groups', await jsr.get('/groups/picker?maxResults=50'))
+  }
+  return(cache.get('groups'))
+}
+
+/**
+ * Get the names of all the Groups in the active Jira project with members
+ *
+ * @param {boolean} [flushCache=false] Wipe/refresh cache?
+ * @returns Array of objects [ { name: <group_name>, members: [ <member_data> ] }]
+ */
+async function getSmallGroups(flushCache = false) {
+  if (!cache.has('smallGroups') || (flushCache && flushCache == 'yes')) {
+    const groups = await getGroups(false)
+    debug('getSmallGroups.length == ', groups.groups.length)
+    const smallGroups = groups.groups.filter(g => config.userGroups.includes(g.name))
+    for (let gi = 0; gi < smallGroups.length; gi++) {
+      const gname = smallGroups[gi].name
+      smallGroups[gi].members = await getGroupMembers(gname)
+    }
+    cache.set('smallGroups', smallGroups)
+  }
+  return cache.get('smallGroups')
+}
+
+/**
+ * Get the members of a specific group
+ *
+ * @param {string} groupName Name of the group (Required)
+ * @returns Array of names
+ */
+async function getGroupMembers(groupName) {
+  debug(`getGroupMembers(${groupName}) called...`)
+  let groupMembers = []
+  if (!cache.has(`groupMembers-${groupName}`)) {
+    const mbrs = await jsr.get(`/group/member?groupname=${groupName}`)
+    if (config.has('userExclude')) {
+      // Exclude specific users
+      groupMembers = mbrs.values.map((v) => { return v.displayName }).filter(x => !config.userExclude.includes(x))
+    } else {
+      groupMembers = mbrs.values.map((v) => { return v.displayName })
+    }
+    cache.set(`groupMembers-${groupName}`, groupMembers)
+  }
+  return(cache.get(`groupMembers-${groupName}`))
+}
+
+/**
+ * Get all the children for a supplied Epic
+ *
+ * @param {string} parentId Epic key
+ * @returns Object
+ */
+async function getChildren(parentId) {
+  debug(`getChildren(${parentId}) called`)
+  try {
+    if (!cache.has(`children-${parentId}`)) {
+      debug('...fetching from Jira')
+      cache.set(`children-${parentId}`, await jsr._genericJiraSearch(`parentEpic=${parentId} and key != ${parentId} ORDER BY key asc`, 99, ['summary', 'status', 'assignee', 'labels', 'fixVersions', 'issuetype', 'issuelinks']))
+    } else {
+      debug('...fetching from cache')
+    }
+    return (cache.get(`children-${parentId}`))
+  } catch (err) {
+    debug(`getChildren(${parentId}) error: `, err)
+    return (null)
+  }
+}
+
+/*
+ ************** ENDPOINTS **************
+ */
+
+/*
+ * Function Template *
+server.get('/endpoint', async (req, res, next) => {
+  const pageTitle = 'Requirements Report'
+  res.write(buildHtmlHeader(pageTitle, false))
+  res.write(buildPageHeader(pageTitle))
+  try {
+  } catch (err) {
+    debug(err)
+    res.write(`<em>error</em><!-- ${err} -->`)
+  }
+  res.write(buildHtmlFooter())
+  res.end()
+  return next()
+})
+
+*/
+
+server.get('/cache/stats', async (req, res, next) => {
+  try {
+    res.send({ stats: cache.getStats(), keys: cache.keys() })
+  } catch (err) {
+    debug(err)
+    res.send({ error: err.message })
+  }
+  return next()
+})
+
+server.get('/cache/flush', async (req, res, next) => {
+  try {
+    cache.flushAll()
+    res.send({ result: 'flushed', stats: cache.getStats(), keys: cache.keys() })
+  } catch (err) {
+    debug(err)
+    res.send({ error: err.message })
+  }
+  return next()
+})
 
 server.get('/progress/:rel', async (req, res, next) => {
   const rel = req.params.rel || false
@@ -935,78 +1112,6 @@ server.get('/estimates', async (req, res, next) => {
   }
 })
 
-// Ignore weekends
-function calcFutureDate(dplus) {
-  // debug(`calcFutureDate(${dplus}) called...`)
-  const d = new Date()
-  const dFuture = d.addBusinessDays(Math.round(dplus), true)
-  return (`${dFuture.getMonth() + 1}/${dFuture.getDate()}/${dFuture.getFullYear()}`)
-}
-
-async function getRequirements() {
-  debug('getRequirements() called')
-  if (!cache.has('requirements')) {
-    debug('...fetching from Jira')
-    cache.set('requirements', await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99), 3600)
-  } else {
-    debug('...fetching from cache')
-  }
-  return cache.get('requirements')
-}
-
-async function getGroups(flushCache) {
-  if (!cache.has('groups') || (flushCache && flushCache == 'yes')) {
-    cache.set('groups', await jsr.get('/groups/picker?maxResults=50'))
-  }
-  return(cache.get('groups'))
-}
-
-async function getSmallGroups(flushCache = false) {
-  if (!cache.has('smallGroups') || (flushCache && flushCache == 'yes')) {
-    const groups = await getGroups(false)
-    debug('getSmallGroups.length == ', groups.groups.length)
-    const smallGroups = groups.groups.filter(g => config.userGroups.includes(g.name))
-    for (let gi = 0; gi < smallGroups.length; gi++) {
-      const gname = smallGroups[gi].name
-      smallGroups[gi].members = await getGroupMembers(gname)
-    }
-    cache.set('smallGroups', smallGroups)
-  }
-  return cache.get('smallGroups')
-}
-
-async function getGroupMembers(groupName) {
-  debug(`getGroupMembers(${groupName}) called...`)
-  let groupMembers = []
-  if (!cache.has(`groupMembers-${groupName}`)) {
-    const mbrs = await jsr.get(`/group/member?groupname=${groupName}`)
-    if (config.has('userExclude')) {
-      // Exclude specific users
-      groupMembers = mbrs.values.map((v) => { return v.displayName }).filter(x => !config.userExclude.includes(x))
-    } else {
-      groupMembers = mbrs.values.map((v) => { return v.displayName })
-    }
-    cache.set(`groupMembers-${groupName}`, groupMembers)
-  }
-  return(cache.get(`groupMembers-${groupName}`))
-}
-
-async function getChildren(parentId) {
-  debug(`getChildren(${parentId}) called`)
-  try {
-    if (!cache.has(`children-${parentId}`)) {
-      debug('...fetching from Jira')
-      cache.set(`children-${parentId}`, await jsr._genericJiraSearch(`parentEpic=${parentId} and key != ${parentId} ORDER BY key asc`, 99, ['summary', 'status', 'assignee', 'labels', 'fixVersions', 'issuetype', 'issuelinks']))
-    } else {
-      debug('...fetching from cache')
-    }
-    return (cache.get(`children-${parentId}`))
-  } catch (err) {
-    debug(`getChildren(${parentId}) error: `, err)
-    return (null)
-  }
-}
-
 server.get('/children/:id', async (req, res, next) => {
   try {
     debug(req.params.id, req.params.id.length)
@@ -1251,29 +1356,6 @@ server.get('/dashboard', async (req, res, next) => {
 //   }
 //   return next()
 // })
-
-function buildLink(
-  issueKey,
-  statusName,
-  issueTypeIconUrl,
-  issueSummary,
-  issueOwner,
-  issueStatus,
-  hideName = false
-) {
-  const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
-  const displayTitle = hideName ? '' : title
-  return `<span class='${hideName ? '' : 'issueComboLink lineicon'}'><a href='${config.get('jira.protocol')}://${config.get('jira.host')
-    }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-      statusName
-    )}' src='${issueTypeIconUrl}' title='${cleanText(
-      title
-    )}')/><span class='${hideName ? '' : 'issueName'}'/>${displayTitle}</span></a></span>`
-}
-
-function startHtml(res) {
-  res.writeHead(200, { 'Content-Type': 'text/html' })
-}
 
 server.get('/projects', async (req, res, next) => {
   const fullView = req.query && req.query.full && req.query.full == 'true'
@@ -1734,31 +1816,10 @@ server.get('/burndownStats/:rel', async (req, res, next) => {
   return next()  
 })
 
-server.get('/components', async (req, res, next) => {
-  res.send(await jdr.getComponentList())
-  return next()
-})
-
 server.get('/burndown', async (req, res, next) => {
   // In case someone tries to hit the bare burndown url...
   res.redirect('/burndown/', next)
 })
-
-/**
- * Create simple Bootstrap button for consistency
- *
- * @param {string} label Button text
- * @param {string} [target=false] HREF (if false, not linked)
- * @param {boolean} [active=true] Active button?
- * @returns HTML string - either <a> or <button> depending on the target value
- */
-function simpleButton(label, target = false, active = true) {
-  if (target) {
-    return(`<a href='${target}' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</a>`)
-  } else {
-    return(`<button type='button' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</button>`)
-  }
-}
 
 server.get('/burndown/:rel', async (req, res, next) => {
   let release = req.params.rel ? req.params.rel : false
@@ -1926,6 +1987,11 @@ server.get('/chart', (req, res, next) => {
     res.end()
     return next()
   }
+})
+
+server.get('/components', async (req, res, next) => {
+  res.send(await jdr.getComponentList())
+  return next()
 })
 
 server.get('/links', (req, res, next) => {
