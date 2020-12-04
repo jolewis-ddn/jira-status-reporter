@@ -220,7 +220,7 @@ class JiraDataReader {
    * @returns {array} Release Names
    * @memberof JiraDataReader
    */
-  async getReleaseList() {
+  async getReleaseListFromCache() {
     debug(`getReleaseList() called...`);
     return new Promise((resolve, reject) => {
       let sql = `SELECT distinct(fixVersion) FROM 'story-stats' ORDER BY fixVersion`;

@@ -1824,19 +1824,44 @@ server.get('/burndown', async (req, res, next) => {
 server.get('/burndown/:rel', async (req, res, next) => {
   let release = req.params.rel ? req.params.rel : false
   let component = req.query.component ? req.query.component : false
+  let forecast = req.query.forecast && req.query.forecast === "yes" ? req.query.forecast : false
 
   let jsrCLM = await jsr.getChartLinkMaker(config).reset()
 
   res.write(buildHtmlHeader('Burndown Chart', false))
   res.write(buildPageHeader('Burndown Chart'))
   
-  let releaseList = await jdr.getReleaseList()
+  let releaseList = await jdr.getReleaseListFromCache() // Cached versions
+  let versionData = false
+  let versionReleaseDate = false
+  let workingDaysToRelease = false
 
   // Buttons to burndown chart for each release, including combined
   res.write(`<div style='display: flex; float: none;'>`)
   // Make sure the current page button isn't linked/active
   if (release) {
     res.write(simpleButton('All/Combined', '/burndown/'))
+
+    // Get the release data from Jira
+    versionData = await getVersions()
+    // debug(`versionData == `, versionData)
+    if (forecast && versionData.length) {
+      // List of Jira versions
+      versionData = versionData.filter((v) => v.name === release)
+      if (!versionData.length) {
+        debug(`... versionData is empty`)
+        versionData = false
+      } else {
+        versionReleaseDate = versionData[0].releaseDate
+        debug(`... versionData is NOT empty. versionReleaseDate: ${versionReleaseDate}`)
+        let now = new Date()
+        workingDaysToRelease = now.workingDaysFromNow(versionReleaseDate)
+        debug(`versionData: `, versionData[0].releaseDate, workingDaysToRelease)
+      }
+    } else { // No versionData
+      debug(`ERROR: No versionData!`)
+      versionData = false
+    }  
   } else {
     res.write(simpleButton('All/Combined', false, false))
   }
@@ -1851,10 +1876,8 @@ server.get('/burndown/:rel', async (req, res, next) => {
   })
   res.write(`</div>`)
 
-
   const burndown = await jdr.getBurndownStats(release, component)
 
-  jsrCLM.setCategories(burndown.dates)
   debug(`burndown statuses: `, Object.keys(burndown.stats).join(','))
   // Build the data object based on the burndown data
   const data = {}
@@ -1863,11 +1886,79 @@ server.get('/burndown/:rel', async (req, res, next) => {
     data[status] = burndown.stats[status]
   })
   
+  if (versionData) { // Have a release date!
+    debug(`...Adding dates to burndown.dates to reach ${versionReleaseDate}`)
+    const origBurndownDates = Array.from(burndown.dates)
+    // Extend the dates to the release date
+    burndown.dates = extendDates(burndown.dates, versionReleaseDate)
+    const datesAdded = burndown.dates.length - origBurndownDates.length
+    
+    debug(`burndown.dates: added ${datesAdded} new entries`)
+    jsrCLM.setCategories(burndown.dates)
+
+    let lastTotalEstimate = 0
+    Object.keys(data).forEach((status) => {
+      // debug(`lastTotalEstimate += `, status, data[status].length, data[status][data[status].length - 1])
+      lastTotalEstimate += 1 * (data[status][data[status].length - 1])
+    })
+    debug(`lastTotalEstimate: ${lastTotalEstimate}`)
+
+    data['Forecast'] = Array(burndown.dates.length)
+
+    // Count # of working days between today and release date
+    let workdaySpan = 0
+    let lastActualDay = new Date(origBurndownDates[origBurndownDates.length - 1])
+    lastActualDay.setHours(0,0,0,0)
+    
+    let lastForecastDay = new Date(burndown.dates[burndown.dates.length - 1])
+    lastForecastDay.setHours(0,0,0,0)
+    
+    let loc = origBurndownDates.length
+    while (lastActualDay < lastForecastDay) {
+      // data['Forecast'][loc] = lastTotalEstimate - (5 * (loc - origBurndownDates.length))
+      if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
+        workdaySpan++
+        debug(`increasing workdaySpan to ${workdaySpan}`)
+      }
+      lastActualDay.setDate(lastActualDay.getDate() + 1)
+    }
+    const burndownRate = Math.round(lastTotalEstimate/workdaySpan)
+    let currEstimate = lastTotalEstimate
+    
+    lastActualDay = new Date(burndown.dates[origBurndownDates.length])
+    lastActualDay.setHours(0,0,0,0)
+    lastActualDay.setDate(lastActualDay.getDate() + 1)
+    
+    // Set the forecast value
+    for (let loc = origBurndownDates.length; loc < burndown.dates.length; loc++) {
+      // lastActualDay.setDate(burndown.dates[loc])
+      // lastActualDay.setHours(0,0,0,0)
+
+      debug(`setting forecast on ${burndown.dates[loc]} (lastActualDay: ${lastActualDay}) to ${currEstimate}`)
+      data['Forecast'][loc] = Math.round(currEstimate)
+      if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
+        currEstimate -= burndownRate
+        if (currEstimate < 0) { currEstimate = 0 }
+      }
+      lastActualDay.setDate(lastActualDay.getDate() + 1)
+    }
+    res.write(`<hr>`)
+    res.write(`<ul>`)
+    res.write(`<li><em>Release Date:</em> ${versionReleaseDate}</li>`)
+    res.write(`<li><em>Total Working Days:</em> ${workdaySpan} working days</li>`)
+    res.write(`<li><em>Last Estimate (Total):</em> ${lastTotalEstimate} days</li>`)
+    res.write(`<li><em>Burndown Rate:</em> ${burndownRate} estDays/day</li>`)
+    res.write(`</ul>`)
+  } else { // No release date, so stop the chart at the end of the actual estimates
+    jsrCLM.setCategories(burndown.dates)
+  }
+
+  
   jsrCLM
     .setLineChart()
     .setSize({ h: 600, w: 800 })
     .setFill(false)
-    .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' } ${component ? ' (Component: ' + component + ')' : '' }`, data, "line", 'days')
+    .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' } ${component ? ' (Component: ' + component + ')' : '' }`, data, "stacked-bar", 'days')
     .then((link) => {
       res.write(link)
     })
@@ -1876,12 +1967,19 @@ server.get('/burndown/:rel', async (req, res, next) => {
       res.write(`<EM>Error</EM>: ${err}`)
     })
     .finally(async () => {
+      // Show forecast toggle
+      if (forecast) {
+        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;"><em>Disable Forecast</em></a>`)
+      } else {
+        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes'; return false;"><em>Enable Forecast</em></a>`)
+      }
+      // Show component list
       const componentList = await jdr.getComponentList()
       res.write('<ul>')
-      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname; return false;"><em>No component filter</em></a></li>`)
-      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE'; return false;"><em>No component set</em></a></li>`)
+      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=${forecast}'; return false;"><em>No component filter</em></a></li>`)
+      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE&forecast=${forecast}'; return false;"><em>No component set</em></a></li>`)
       componentList.forEach((c) => {
-        res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}'; return false;">${c}</a></li>`)
+        res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;">${c}</a></li>`)
       })
       res.write(`</ul>`)
       res.write(buildHtmlFooter())
@@ -1889,6 +1987,44 @@ server.get('/burndown/:rel', async (req, res, next) => {
     })
   return next()
 })
+
+/**
+ * Extend an array of dates to some future date
+ *
+ * @param {array} origList Array of dates
+ * @param {string} newEndDate New final date
+ * 
+ * @returns {array} newList Array of dates to new end date
+ */
+function extendDates(origList, newEndDate) {
+  debug(`extendDates called: origList length: `, origList.length, `; origList[origList.length - 1]: `, origList[origList.length - 1], `; newEndDate: `, newEndDate)
+  if (newEndDate <= origList[origList.length - 1]) {
+    debug(`... newEndDate <= last origList entry. Returning origList`)
+    return(origList)
+  } else {
+    const newList = origList
+    let d = new Date(origList[origList.length -1])
+    const offset = d.getTimezoneOffset()
+
+    d = new Date(d.getTime() - (offset * 60 * 1000))
+    d.setDate(d.getDate() + 2)
+
+    let newEndD = new Date(newEndDate)
+    newEndD = new Date(newEndD.getTime() - (offset * 60 * 1000))
+    
+    newEndD.setHours(0,0,0,0)
+    d.setHours(0,0,0,0)
+
+    // debug(`... is newEndD (${newEndD}) >= d (${d})?`)
+    while (newEndD >= d) {
+      newList.push(d.toISOString().split('T')[0])
+      d.setDate(d.getDate() + 1)
+      // debug(`...incrementing d ${d}; newEndD > d ? `, (newEndD > d))
+    }
+    // newList.push("2020-11-30")
+    return(newList)
+  }
+}
 
 server.get('/chart', (req, res, next) => {
   let jsrCLM = jsr.getChartLinkMaker(config).reset()

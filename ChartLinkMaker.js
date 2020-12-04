@@ -190,7 +190,7 @@ class ChartLinkMaker {
    * @memberof ChartLinkMaker
    */
   setCategories(cats) {
-    debug(`setCategories(${cats}) called...`);
+    debug(`setCategories(...${cats.length} items) called...`);
     this.dataCategories = cats;
     return this;
   }
@@ -338,10 +338,19 @@ class ChartLinkMaker {
     }
     return new Promise((resolve, reject) => {
       if (data) {
+        let forecastType = ''
         let dataGroups = ""
         // Workaround for specifying stacked bar chart
         if (chartType === "stacked-bar") {
-          dataGroups = `groups: [ ${this.getGroups(data)} ],`
+          if (Object.keys(data).includes("Forecast")) {
+            const subData = {...data}
+            delete subData["Forecast"]
+            dataGroups = `groups: [ ${this.getGroups(subData)} ],`
+
+            forecastType = 'types: { Forecast: "line", },'
+          } else {
+            dataGroups = `groups: [ ${this.getGroups(data)} ],`
+          }
           chartType = "bar"
         }
 
@@ -371,6 +380,7 @@ class ChartLinkMaker {
               x: "x",
               type: "${chartType}",
               json: ${this.getJson(data)},
+              ${forecastType}
               ${dataGroups}
             },
             color: { pattern: [ 'lightblue', 'MediumSeaGreen', 'CornflowerBlue', 'Pink', 'Orange' ] },
