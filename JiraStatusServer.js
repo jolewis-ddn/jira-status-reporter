@@ -1922,7 +1922,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
       }
       lastActualDay.setDate(lastActualDay.getDate() + 1)
     }
-    const burndownRate = Math.round(lastTotalEstimate/workdaySpan)
+    const burndownRate = Math.ceil(lastTotalEstimate/workdaySpan)
     let currEstimate = lastTotalEstimate
     
     lastActualDay = new Date(burndown.dates[origBurndownDates.length])
