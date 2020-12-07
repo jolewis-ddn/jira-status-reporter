@@ -2154,7 +2154,60 @@ server.get('/links', (req, res, next) => {
     })
 })
 
+/**
+ * Find all the Stories that do not have estimates (either in the Story or in any children)
+ *
+ * @param {string} project Name of project to query
+ * @returns Object result of JQL query
+ */
+async function getProjectStoryEstimates(project = config.get('project')) {
+  if (!cache.has(`story-estimates-${project}`)) {
+    let excludeStatus = ''
+    if (config.has('excludeFromEstimateQueries')) {
+      excludeStatus = ` AND status not in (${config.get('excludeFromEstimateQueries').join(',')})`
+    }
+    cache.set(`story-estimates-${project}`, await jsr._genericJiraSearch(`issuetype=story AND project="${project}" ${excludeStatus}`, 99, ['fixVersions', 'aggregateprogress', 'status', 'assignee']))
+  }
+  return cache.get(`story-estimates-${project}`)
+}
 
+server.get('/unestimated/', async (req, res, next) => {
+  const projStoryEstimates = await getProjectStoryEstimates(config.get('project'))
+  if (req.query && req.query.format == 'html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' })
+    const header = 'Unestimated Stories'
+    res.write(buildHtmlHeader(header, false))
+    res.write(buildPageHeader(header))
+    /* Compile data for table:
+     * results = { <rel_name>: [array_of_Jira_keys...], ... }
+     */
+    const results = {}
+    projStoryEstimates.issues.forEach((issue) => {
+      if (issue.fields.aggregateprogress && issue.fields.aggregateprogress.total === 0) {
+        const relName = issue.fields.fixVersions.length ? issue.fields.fixVersions[0].name : 'No-Release'
+        if (!Object.keys(results).includes(relName)) {
+          results[relName] = []
+        }
+        results[relName].push(issue.key)
+      }
+    })
+    /* Now print out the table
+     * Display the total counts per release, where the count is a link to the Jira project query showing all the Jira issues
+     */
+    res.write(`<table class='table table-sm'><thead><tr>`)
+    res.write(`<th>Release</th><th>Unestimated Story Count</th>`)
+    res.write(`</tr></thead><tbody>`)
+    Object.keys(results).forEach((rel) => {
+      res.write(`<tr><td>${rel}</td><td><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=key%20in%20(${results[rel].join(',')})' target='_blank'>${results[rel].length}</a></td></tr>`)
+    })
+    res.write(`</tbody></table>`)
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send(projStoryEstimates)
+  }
+  return next()
+})
 /*
  ************** CACHE-RELATED ENDPOINTS **************
  */
