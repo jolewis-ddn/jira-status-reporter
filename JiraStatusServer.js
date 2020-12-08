@@ -2156,12 +2156,21 @@ server.get('/links', (req, res, next) => {
     })
 })
 
+/**
+ * Get the JQL phrase to exclude specified Jira issues by Status
+ *
+ * @returns JQL phrase to exclude by status(es)
+ */
 function getStatusExclusionString() {
-  let excludeStatus = ''
-  if (config.has('excludeFromEstimateQueries')) {
-    excludeStatus = ` AND status not in (${config.get('excludeFromEstimateQueries').join(',')})`
+  if (hasStatusExclusionList()) {
+    return(` status not in (${config.get('excludeFromEstimateQueries').join(',')})`)
+  } else {
+    return('')
   }
-  return(excludeStatus)
+}
+
+function hasStatusExclusionList() {
+  return(config.has('excludeFromEstimateQueries'))
 }
 
 /**
@@ -2172,9 +2181,8 @@ function getStatusExclusionString() {
  */
 async function getProjectStoryEstimates(project = config.get('project')) {
   if (!cache.has(`story-estimates-${project}`)) {
-    cache.set(`story-estimates-${project}`, await jsr._genericJiraSearch(`issuetype=story AND project="${project}" ${getStatusExclusionString()}`, 99, ['fixVersions', 'aggregateprogress', 'timeoriginalestimate', 'status', 'assignee']))
+    cache.set(`story-estimates-${project}`, await jsr._genericJiraSearch(`issuetype=story AND project="${project}" ${hasStatusExclusionList() ? ` AND ${getStatusExclusionString()}` : ''}`, 99, ['fixVersions', 'aggregateprogress', 'timeoriginalestimate', 'status', 'assignee']))
   }
-  debug(cache.get(`story-estimates-${project}`))
   return cache.get(`story-estimates-${project}`)
 }
 
@@ -2233,6 +2241,11 @@ server.get('/unestimated/', async (req, res, next) => {
       </tr>
     </thead>
     <tbody>`)
+    
+    // Track Story counts
+    let runningTotal = 0
+    let runningUnEstTotal = 0
+
     Object.keys(results).forEach((rel) => {
       const release = rel === 'No-Release' ? ' is empty' : `="${rel}"`
       res.write(`
@@ -2242,8 +2255,17 @@ server.get('/unestimated/', async (req, res, next) => {
         <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=fixVersion${release}%20AND%20project="${config.get('project')}"%20AND%20issuetype="Story"${getStatusExclusionString()}' target='_blank'>${results[rel].totalCount}</a></td>
         <td class='text-center'>${Math.round((100*results[rel].unestimated.length/results[rel].totalCount))}%</td>
       </tr>`)
+
+      runningTotal += results[rel].totalCount
+      runningUnEstTotal += results[rel].unestimated.length
     })
-    res.write(`</tbody></table>`)
+
+    res.write(`
+    <td><em>Total</em></td>
+    <td class='text-center'>${runningUnEstTotal}</td>
+    <td class='text-center'>${runningTotal}</td>
+    <td class='text-center'>${Math.round((100*runningUnEstTotal/runningTotal))}%</td>
+    </tbody></table>`)
     res.write(buildHtmlFooter())
     res.end()
   } else {
