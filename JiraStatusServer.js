@@ -189,10 +189,10 @@ function buildHtmlHeader(title = '', showButtons = true) {
   }
 
   // Bootstrap 5 alpha
-  const bootstrapCss = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">'
+  // const bootstrapCss = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">'
 
   // Bootstrap 4.5.2
-  // const bootstrapCss = '<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">'
+  const bootstrapCss = '<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">'
 
   const jqueryJs = '<script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>'
 
@@ -211,6 +211,10 @@ function buildHtmlHeader(title = '', showButtons = true) {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/billboard.js/2.0.3/theme/graph.min.css"></link>
         </head>
         <body>
+        
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>mermaid.initialize({startOnLoad:true});</script>
+        
         ${buttons.join('')}
         `
 }
@@ -293,24 +297,22 @@ function buildButtonJs() {
 
 function buildHtmlFooter() {
   // Bootstrap 5 alpha
-  return(`<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW" crossorigin="anonymous"></script>
-  <script>
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl)
-    })
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-  <script>mermaid.initialize({startOnLoad:true});</script>`)
+  // return(`<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW" crossorigin="anonymous"></script>
+  // <script>
+  //   var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-toggle="tooltip"]'))
+  //   var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+  //     return new bootstrap.Tooltip(tooltipTriggerEl)
+  //   })
+  // </script>`)
 
   // Bootstrap 4.5
-  //  return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-  //  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
-  //  <script>
-  //  $(function () {
-  //    $('[data-bs-toggle="tooltip"]').tooltip()
-  //  })
-  //  </script>`
+   return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+   <script>
+   $(function () {
+     $('[data-toggle="tooltip"]').tooltip()
+   })
+   </script>`
 }
 
 /**
@@ -879,7 +881,7 @@ server.get('/progress/:rel', async (req, res, next) => {
       // 1. Header
       // res.write(`<div class="accordion-item">
       // <h2 class="accordion-header" id="component-table">
-      // <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#component-table-data" aria-expanded="true" aria-controls="component-table-data">
+      // <button class="accordion-button" type="button" data-toggle="collapse" data-bs-target="#component-table-data" aria-expanded="true" aria-controls="component-table-data">
       // Component Table
       // </button></h2>`)
       // 2. Body
@@ -944,7 +946,7 @@ server.get('/progress/:rel', async (req, res, next) => {
 
             // User row
             res.write(`<tr>
-              <td class='smright' data-bs-toggle="tooltip" data-bs-html="true" title="${progTooltip}"><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
+              <td class='smright' data-toggle="tooltip" data-html="true" title="${progTooltip}"><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
               <td class='smcenter'>${totalIssueCount}</td>
               <td class='smcenter'>${convertSecondsToDays(prog)}</td>
               <td class='smcenter'>${convertSecondsToDays(remain)}</td>
@@ -963,7 +965,7 @@ server.get('/progress/:rel', async (req, res, next) => {
       // 1. Header
       // res.write(`<div class="accordion-item">
       // <h2 class="accordion-header" id="user-table">
-      // <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#user-table-data" aria-expanded="true" aria-controls="user-table-data">
+      // <button class="accordion-button" type="button" data-toggle="collapse" data-bs-target="#user-table-data" aria-expanded="true" aria-controls="user-table-data">
       // User Table
       // </button></h2>`)
       // 2. Body
@@ -1216,12 +1218,12 @@ server.get('/estimates', async (req, res, next) => {
         } else {
           const days = convertSecondsToDays(assigneeStats[a].total)
           const endDate = calcFutureDate(convertSecondsToDays(assigneeStats[a].total - assigneeStats[a].progress))
-          res.write(`'><span data-bs-toggle="tooltip" data-bs-html="true" title='${endDate}'>${days}d</span></td>`)
+          res.write(`'><span data-toggle="tooltip" data-html="true" title='${endDate}'>${days}d</span></td>`)
         }
         // Completed
         res.write(`<td class='completedCol'>${assigneeStats[a].total > 0 ? Math.round(100 * (assigneeStats[a].progress / assigneeStats[a].total)) : 0}%</td>`)
         // Missing Estimate
-        res.write(`<td class='missingEstCol'><span data-bs-toggle="tooltip" data-bs-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-bs-toggle="tooltip" data-bs-html="true" title="Finish by ${titleContentCount}">${assigneeStats[a].count.length}</span> 
+        res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="Finish by ${titleContentCount}">${assigneeStats[a].count.length}</span> 
           (${assigneeStats[a].empty.length > 0 ? (100 * (assigneeStats[a].empty.length / assigneeStats[a].count.length)).toFixed(0) : 0}%)</td>`)
 
         // Releases details
@@ -1232,7 +1234,7 @@ server.get('/estimates', async (req, res, next) => {
             // debug(`assigneeStats[a]['rel'][${rel}] = `, assigneeStats[a]['rel'][rel])
             const userProgress = assigneeStats[a]['rel'][rel].progress
             const userTotal = assigneeStats[a]['rel'][rel].total
-            res.write(`<!-- ${rel} --><td>${userProgress} of <span data-bs-toggle="tooltip" data-bs-html="true" title="${calcFutureDate(userTotal)}">${userTotal}d</span></td>`)
+            res.write(`<!-- ${rel} --><td>${userProgress} of <span data-toggle="tooltip" data-html="true" title="${calcFutureDate(userTotal)}">${userTotal}d</span></td>`)
           } else {
             res.write('<!-- no data --><td></td>')
           }
