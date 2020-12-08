@@ -2169,6 +2169,25 @@ function getStatusExclusionString() {
   }
 }
 
+/**
+ * Get the Array of Statuses to exclude from status queries
+ *
+ * @returns Array from excludeFromEstimateQueries config value
+ */
+function getStatusExclusionList() {
+  if (hasStatusExclusionList()) {
+    return(config.get('excludeFromEstimateQueries'))
+  } else {
+    return([])
+  }
+}
+
+/**
+ * Are specific Jira Status values to be excluded from estimate queries?
+ * Included in the config file as an array of Status names
+ *
+ * @returns boolean
+ */
 function hasStatusExclusionList() {
   return(config.has('excludeFromEstimateQueries'))
 }
@@ -2193,6 +2212,7 @@ server.get('/unestimated/', async (req, res, next) => {
     const header = 'Unestimated Stories'
     res.write(buildHtmlHeader(header, false))
     res.write(buildPageHeader(header))
+    res.write(hasStatusExclusionList() ? `<p><em>Excluding</em>: ${getStatusExclusionList().join(',')}</p>` : '')
     /* Compile data for table:
      * results = { <rel_name>: [array_of_Jira_keys...], ... }
      */
@@ -2230,7 +2250,6 @@ server.get('/unestimated/', async (req, res, next) => {
      * Display the total counts per release, where the count is a link to the Jira project query showing all the Jira issues
      */
     res.write(`
-    <h2>Open Story Count</h2>
     <table style='width: auto !important;' class='table table-sm'>
     <thead>
       <tr>
@@ -2252,7 +2271,7 @@ server.get('/unestimated/', async (req, res, next) => {
       <tr>
         <td>${rel}</td>
         <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=key%20in%20(${results[rel].unestimated.join(',')})' target='_blank'>${results[rel].unestimated.length}</a></td>
-        <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=fixVersion${release}%20AND%20project="${config.get('project')}"%20AND%20issuetype="Story"${getStatusExclusionString()}' target='_blank'>${results[rel].totalCount}</a></td>
+        <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=fixVersion${release}%20AND%20project="${config.get('project')}"%20AND%20issuetype="Story"${hasStatusExclusionList() ? ` AND ${getStatusExclusionString()}` : ""}' target='_blank'>${results[rel].totalCount}</a></td>
         <td class='text-center'>${Math.round((100*results[rel].unestimated.length/results[rel].totalCount))}%</td>
       </tr>`)
 
