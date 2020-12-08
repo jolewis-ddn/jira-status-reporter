@@ -260,6 +260,8 @@ function buildStylesheet() {
     .problem { background-color: pink; color: black; }
 
     .tooltip-inner { max-width: 500px; text-align: left; }
+
+    .text-center { text-align: center; }
     </style>`
 }
 
@@ -2154,20 +2156,25 @@ server.get('/links', (req, res, next) => {
     })
 })
 
+function getStatusExclusionString() {
+  let excludeStatus = ''
+  if (config.has('excludeFromEstimateQueries')) {
+    excludeStatus = ` AND status not in (${config.get('excludeFromEstimateQueries').join(',')})`
+  }
+  return(excludeStatus)
+}
+
 /**
  * Find all the Stories that do not have estimates (either in the Story or in any children)
  *
  * @param {string} project Name of project to query
- * @returns Object result of JQL query
+ * @returns Object result of JQL query (cached)
  */
 async function getProjectStoryEstimates(project = config.get('project')) {
   if (!cache.has(`story-estimates-${project}`)) {
-    let excludeStatus = ''
-    if (config.has('excludeFromEstimateQueries')) {
-      excludeStatus = ` AND status not in (${config.get('excludeFromEstimateQueries').join(',')})`
-    }
-    cache.set(`story-estimates-${project}`, await jsr._genericJiraSearch(`issuetype=story AND project="${project}" ${excludeStatus}`, 99, ['fixVersions', 'aggregateprogress', 'status', 'assignee']))
+    cache.set(`story-estimates-${project}`, await jsr._genericJiraSearch(`issuetype=story AND project="${project}" ${getStatusExclusionString()}`, 99, ['fixVersions', 'aggregateprogress', 'timeoriginalestimate', 'status', 'assignee']))
   }
+  debug(cache.get(`story-estimates-${project}`))
   return cache.get(`story-estimates-${project}`)
 }
 
@@ -2183,22 +2190,58 @@ server.get('/unestimated/', async (req, res, next) => {
      */
     const results = {}
     projStoryEstimates.issues.forEach((issue) => {
-      if (issue.fields.aggregateprogress && issue.fields.aggregateprogress.total === 0) {
-        const relName = issue.fields.fixVersions.length ? issue.fields.fixVersions[0].name : 'No-Release'
-        if (!Object.keys(results).includes(relName)) {
-          results[relName] = []
-        }
-        results[relName].push(issue.key)
+      const relName = issue.fields.fixVersions.length ? issue.fields.fixVersions[0].name : 'No-Release'
+
+      // Initialize the object
+      if (!Object.keys(results).includes(relName)) {
+        results[relName] = { totalCount: 0, unestimated: [] }
+      }
+
+      results[relName].totalCount++
+
+      /*
+       * Only record the story in the 'unestimated' list if:
+       *
+       * A) the total aggregate progress field is 0
+       *           i.e. Story children have no estimates
+       *
+       * AND
+       *
+       * B) the timeoriginalestimate is null
+       *           i.e. this Story has no estimate
+       *
+       * TODO: Include Story if any of the children haven't been estimated
+       */
+      if ( ( issue.fields.aggregateprogress && issue.fields.aggregateprogress.total === 0)
+          && ( issue.fields.timeoriginalestimate == null )
+          ) {
+        results[relName].unestimated.push(issue.key)
       }
     })
     /* Now print out the table
      * Display the total counts per release, where the count is a link to the Jira project query showing all the Jira issues
      */
-    res.write(`<table class='table table-sm'><thead><tr>`)
-    res.write(`<th>Release</th><th>Unestimated Story Count</th>`)
-    res.write(`</tr></thead><tbody>`)
+    res.write(`
+    <h2>Open Story Count</h2>
+    <table style='width: auto !important;' class='table table-sm'>
+    <thead>
+      <tr>
+        <th>Release</th>
+        <th class='text-center'>Unestimated</th>
+        <th class='text-center'>Total</th>
+        <th class='text-center'>% Unestimated</th>
+      </tr>
+    </thead>
+    <tbody>`)
     Object.keys(results).forEach((rel) => {
-      res.write(`<tr><td>${rel}</td><td><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=key%20in%20(${results[rel].join(',')})' target='_blank'>${results[rel].length}</a></td></tr>`)
+      const release = rel === 'No-Release' ? ' is empty' : `="${rel}"`
+      res.write(`
+      <tr>
+        <td>${rel}</td>
+        <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=key%20in%20(${results[rel].unestimated.join(',')})' target='_blank'>${results[rel].unestimated.length}</a></td>
+        <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=fixVersion${release}%20AND%20project="${config.get('project')}"%20AND%20issuetype="Story"${getStatusExclusionString()}' target='_blank'>${results[rel].totalCount}</a></td>
+        <td class='text-center'>${Math.round((100*results[rel].unestimated.length/results[rel].totalCount))}%</td>
+      </tr>`)
     })
     res.write(`</tbody></table>`)
     res.write(buildHtmlFooter())
