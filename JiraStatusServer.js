@@ -174,9 +174,6 @@ function startHtml(res) {
 }
 
 function buildHtmlHeader(title = '', showButtons = true) {
-  // Bootstrap 5 alpha
-  // return(`<!doctype html><html lang="en"><head><title>${title}</title><meta charset="utf-8"><link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">${buildStylesheet()}</head>`)
-
   let buttons = [`<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>`, `<button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>`, `<button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`]
 
   if (typeof showButtons === 'boolean') {
@@ -191,23 +188,29 @@ function buildHtmlHeader(title = '', showButtons = true) {
     console.error('typeof showButtons === object/array is not yet implemented')
   }
 
-  // Bootstrap 4.5
+  // Bootstrap 5 alpha
+  const bootstrapCss = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">'
+
+  // Bootstrap 4.5.2
+  // const bootstrapCss = '<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">'
+
+  const jqueryJs = '<script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>'
+
   return `<!doctype html><html lang="en"><head><title>${title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        ${JiraStatus.getFontawesomeJsLink()}
 
         <!-- Bootstrap CSS -->
-        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
-        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+        ${bootstrapCss}
+        ${jqueryJs}
         ${buildStylesheet()}
         ${buildButtonJs()}
-        
+
+        ${JiraStatus.getFontawesomeJsLink()}
+
         <script src="https://cdnjs.cloudflare.com/ajax/libs/billboard.js/2.0.3/billboard.pkgd.min.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/billboard.js/2.0.3/theme/graph.min.css"></link>
         </head>
         <body>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-        <script>mermaid.initialize({startOnLoad:true});</script>
         ${buttons.join('')}
         `
 }
@@ -290,16 +293,24 @@ function buildButtonJs() {
 
 function buildHtmlFooter() {
   // Bootstrap 5 alpha
-  // return(`<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+  return(`<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW" crossorigin="anonymous"></script>
+  <script>
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({startOnLoad:true});</script>`)
 
   // Bootstrap 4.5
-  return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
-    <script>
-    $(function () {
-      $('[data-toggle="tooltip"]').tooltip()
-    })
-    </script>`
+  //  return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+  //  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+  //  <script>
+  //  $(function () {
+  //    $('[data-bs-toggle="tooltip"]').tooltip()
+  //  })
+  //  </script>`
 }
 
 /**
@@ -441,6 +452,14 @@ async function getVersions(flushCache = false) {
   return(cache.get('versions'))
 }
 
+/**
+ * Compile per-Component stats on work estimates and completed
+ *
+ * @param {object} issues Result of Jira query -- full dataset
+ * @param {string} versionId Filter for the specific version (also used in the cache key)
+ * @param {boolean} [storyOnly=false] Include only Stories?
+ * @returns Object containing summary stats
+ */
 function compileVersionDetails(issues, versionId, storyOnly = false) {
   const versionDetails = { components: [], issues: issues, componentEstimates: {} }
   const components = [NONE]
@@ -526,7 +545,6 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
         componentEstimates[NONE].count[issue.fields.issuetype.name] += 1
       }
     })
-    // debug(`componentEstimates: `, componentEstimates)
 
     versionDetails.componentEstimates = componentEstimates
     versionDetails.components = components
@@ -536,6 +554,53 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
   } else {
     debug(`...returning versionDetails-${versionId} cached value`)
     return(cache.get(`versionDetails-${versionId}`))
+  }
+}
+
+/**
+ * Compile per-User stats on work estimates and completed
+ *
+ * @param {object} issues Result of Jira query -- full dataset
+ * @returns Object containing summary stats
+ */
+function compileUserDetails(issues) {
+  const userDetails = { openIssues: [], remainingEstimateTotal: 0 }
+  if (!cache.has(`userDetails`)) {
+    debug(`...compiling new userDetails object stats`)
+    issues.forEach((issue) => {
+      /*
+       * Include if there is no exclusion list in the config file
+       * OR
+       * the issue Status is not in exclusion list 
+       */
+      if (!config.has('excludeFromEstimateQueries') || (!config.get('excludeFromEstimateQueries').includes(issue.status.name))) {
+        let assignee = 'none' // Default in case there isn't a valid Assignee
+        if (issue.fields.assignee && issue.fields.assignee.displayName) {
+          assignee = issue.fields.assignee.displayName
+        }
+
+        if (!Object.keys(userDetails).includes(assignee)) {
+          userDetails[assignee] = { openIssues: {}, remainingEstimateTotal: {} }
+        }
+
+        // TODO: Handle multiple fixVersion values (without double-counting?)
+        let release = issue.fields.fixVersions.length ? issue.fields.fixVersions[0].name : 'none'
+
+        // Assume that if the release isn't in the remainingEstimateTotal, it isn't in openIssues either
+        if (!Object.keys(userDetails[assignee].remainingEstimateTotal).includes(release)) {
+          userDetails[assignee].remainingEstimateTotal[release] = 0
+          userDetails[assignee].openIssues[release] = []
+        }
+
+        userDetails[assignee].remainingEstimateTotal[release] += issue.fields.progress.total - issue.fields.progress.progress
+        userDetails[assignee].openIssues[release].push(issue.fields.key)
+      }
+    })
+    cache.set(`userDetails`, userDetails)
+
+  } else {
+    debug(`...returning userDetails cached value`)
+    return(cache.get(`userDetails`))
   }
 }
 
@@ -554,12 +619,12 @@ function calcFutureDate(dplus) {
 /**
  * Create an HTML HREF based on the provided parameters
  *
- * @param {*} issueKey Jira issue key
- * @param {*} statusName Jira Status value
- * @param {*} issueTypeIconUrl Link for type icon
- * @param {*} issueSummary Jira Summary
- * @param {*} issueOwner Jira Assignee
- * @param {*} issueStatus Jira Status
+ * @param {string} issueKey Jira issue key
+ * @param {string} statusName Jira Status value
+ * @param {string} issueTypeIconUrl Link for type icon
+ * @param {object} issueSummary Jira Summary
+ * @param {string} issueOwner Jira Assignee
+ * @param {string} issueStatus Jira Status
  * @param {boolean} [hideName=false] Display the Jira issue name or not
  * @returns HTML snippet with the full HREF
  */
@@ -720,49 +785,68 @@ server.get('/cache/flush', async (req, res, next) => {
 })
 
 server.get('/progress/:rel', async (req, res, next) => {
-  const rel = req.params.rel || false
+  let rel = req.params.rel || false
 
-  debug(`query: `, req.query.exclude)
+  debug(`rel: ${rel}
+  query: `, req.query.exclude)
 
   if (rel) {
     let typesExcluded = []
+
     let jql_suffix = ''
     const pageTitle = 'Progress Report'
     res.write(buildHtmlHeader(pageTitle, false))
     res.write(buildPageHeader(pageTitle))
     try {
+      let prevUserRemainSum = {} // Track user's total remaining work
+
       const versions = await getVersions(false)
-      const version = versions.filter((v) => v.id == rel)[0]
-      // debug(version)
+      let version = versions.filter((v) => v.id == rel)[0]
+      if (!version) { // Try to get release by name
+        version = versions.filter((v) => v.name == rel)[0]
+      }
+
+      if (!version) { // Can't figure out the version, so croak
+        throw new Error('Invalid release version provided. Please check the value and try again. (Either the numeric value or the string name are valid values.)')
+      } else {
+        // Convert the rel value to the numeric version id
+        rel = version.id
+      }
+      
       res.write(`<h2>${version.name}</h2>`)
       res.write(`<h3>Release Date: ${version.releaseDate}</h2>`)
 
       const versionRelatedIssues = await jsr.get(`/version/${rel}/relatedIssueCounts`)
       const versionUnresolvedIssues = await jsr.get(`/version/${rel}/unresolvedIssueCount`)
+
+      // debug(`versionRelatedIssues: `, versionRelatedIssues)
+      // debug(`versionUnresolvedIssues: `, versionUnresolvedIssues)
+
       let versionIssues
       if (!cache.has(`versionIssues-${rel}`)) {
         // Base JQL
         const jql = `project=${config.project} AND fixVersion=${rel} `
 
         // Exclude any types?
-        if (config.releaseExcludeTypes || req.query.exclude) {
-          debug(`req.query.exclude: ${req.query.exclude}`)
+        if ((config.releaseExcludeTypes && config.releaseExcludeTypes.length) || req.query.exclude) {
+          debug(`req.query.exclude: ${req.query.exclude}
+          config.releaseExcludeTypes: ${config.releaseExcludeTypes}`)
           if (req.query.exclude) {
-            debug(`adding ${typeof req.query.exclude} ${req.query.exclude} to types[]`)
+            debug(`req.query.exclude: adding ${typeof req.query.exclude} ${req.query.exclude} to typesExcluded[]`)
             if (typeof req.query.exclude == 'string') {
               typesExcluded.push(req.query.exclude) 
             } else { // Assume array/object
               typesExcluded = typesExcluded.concat(req.query.exclude) 
             }
-            debug(`...typesExcluded: `, typesExcluded)
           }
 
           if (config.releaseExcludeTypes) {
-            debug(`adding ${config.releaseExcludeTypes.length} ${typeof config.releaseExcludeTypes} ${config.releaseExcludeTypes} to types[]`)
+            debug(`config.releaseExcludedTypes: adding ${config.releaseExcludeTypes.length} ${typeof config.releaseExcludeTypes} ${config.releaseExcludeTypes} to typesExcluded[]`)
             typesExcluded = typesExcluded.concat(config.releaseExcludeTypes)
-            // debug(`...typesExcluded: `, typesExcluded)
           }
-          debug(`types: `, typesExcluded)
+
+          debug(`typesExcluded: `, typesExcluded)
+          
           jql_suffix += ` and issuetype not in ("${typesExcluded.join('","')}")`
         }
         debug(`jql: ${jql}${jql_suffix}`)
@@ -789,6 +873,20 @@ server.get('/progress/:rel', async (req, res, next) => {
         res.write(`<em>Showing all issue types</em>`)
       }
 
+      // Start accordion
+      // res.write(`<div class="accordion" id="progress-report">`)
+      // Start Accordion block 1: component-table
+      // 1. Header
+      // res.write(`<div class="accordion-item">
+      // <h2 class="accordion-header" id="component-table">
+      // <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#component-table-data" aria-expanded="true" aria-controls="component-table-data">
+      // Component Table
+      // </button></h2>`)
+      // 2. Body
+      // res.write(`<div id="component-table-data" class="accordion-collapse collapse show" aria-labelledby="component-table" data-bs-parent="#progress-report">
+      // <div class="accordion-body">
+      // `)
+
       // Start main table
       res.write(`<table style='width: auto !important;' class='table table-sm'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
 
@@ -802,45 +900,55 @@ server.get('/progress/:rel', async (req, res, next) => {
           <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].percent)}</td>
           <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
           </tr>`)
-        
+
         // Assignee details/progress
         if (versionDetails.componentEstimates[component].assignees) {
           // debug(`assignees: `, versionDetails.componentEstimates[component].assignees)
           Object.keys(versionDetails.componentEstimates[component].assignees).sort().forEach((assignee) => {
-            let resp = '' // HTML response for rest of user's data
-            let prog = 0  // Temp holder for progress
-            let tot = 0   // Temp holder for total
+            let resp = ''   // HTML response for rest of user's data
+            let prog   = 0  // Temp holder for progress
+            let tot    = 0  // Temp holder for total
+            let remain = 0  // Temp holder for remaining work
 
-            let progTooltip = '<ul>'
+            let progTooltip = `<em><b>Issue Stats for ${assignee}:</b></em><ul>`
+            let progTooltipLen = 0
             let totalIssueCount = 0
+
             Object.keys(versionDetails.componentEstimates[component].assignees[assignee]).forEach((type) => {
-              // debug(`type: ${type}; Value: `, versionDetails.componentEstimates[component].assignees[assignee][type])
+              
+              if (!Object.keys(prevUserRemainSum).includes(assignee)) {
+                prevUserRemainSum[assignee] = { remaining: 0, openItems: [] }
+              }
+
               prog += versionDetails.componentEstimates[component].assignees[assignee][type].progress
               tot += versionDetails.componentEstimates[component].assignees[assignee][type].total
+              remain += versionDetails.componentEstimates[component].assignees[assignee][type].total - versionDetails.componentEstimates[component].assignees[assignee][type].progress
+
+              // Update the remaining estimate for this user
+              prevUserRemainSum[assignee].remaining += versionDetails.componentEstimates[component].assignees[assignee][type].total - versionDetails.componentEstimates[component].assignees[assignee][type].progress
 
               totalIssueCount += versionDetails.componentEstimates[component].assignees[assignee][type].count
 
+              // If this component/user/type has any items, update the tooltip content
               if (versionDetails.componentEstimates[component].assignees[assignee][type].count) {
-                progTooltip += `<li><em>${type}</em>: 
-                  Count: ${versionDetails.componentEstimates[component].assignees[assignee][type].count}; 
-                  Completed: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].progress)}d; 
-                  Total: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].total)}d</li>`
+                progTooltip += `<li><em>${type}</em>: Count: ${versionDetails.componentEstimates[component].assignees[assignee][type].count}; Completed: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].progress)}d; Total: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].total)}d</li>`
+                progTooltipLen++
               }
             })
-            // debug(`totalIssueCount: ${totalIssueCount}`)
-            if (totalIssueCount > 0) {
-              progTooltip += '</ul>'
+            
+            if (progTooltipLen > 0) {
+              progTooltip += '' // '</ul>'
             } else {
               progTooltip = ''
             }
 
             // User row
             res.write(`<tr>
-              <td class='smright' data-toggle="tooltip" data-html="true" title="${progTooltip}"><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
+              <td class='smright' data-bs-toggle="tooltip" data-bs-html="true" title="${progTooltip}"><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
               <td class='smcenter'>${totalIssueCount}</td>
               <td class='smcenter'>${convertSecondsToDays(prog)}</td>
-              <td class='smcenter'>${convertSecondsToDays(tot)}</td>
-              <td class='smcenter'>${tot > 0 ? calcFutureDate(convertSecondsToDays(tot)) : ''}</td>
+              <td class='smcenter'>${convertSecondsToDays(remain)}</td>
+              <td class='smcenter'>${tot > 0 ? calcFutureDate(convertSecondsToDays(prevUserRemainSum[assignee].remaining)) : ''}</td>
               <td class='smcenter'></td>
               </tr>`)
           })
@@ -848,6 +956,42 @@ server.get('/progress/:rel', async (req, res, next) => {
       })
       res.write('</tbody></table>')
       
+      // End Accordion block 1: component-table
+      // res.write('</div></div></div>')
+
+      // Start Accordion block 2: user-table
+      // 1. Header
+      // res.write(`<div class="accordion-item">
+      // <h2 class="accordion-header" id="user-table">
+      // <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#user-table-data" aria-expanded="true" aria-controls="user-table-data">
+      // User Table
+      // </button></h2>`)
+      // 2. Body
+      // res.write(`<div id="user-table-data" class="accordion-collapse collapse show" aria-labelledby="user-table" data-bs-parent="#progress-report">
+      // <div class="accordion-body">
+      // `)
+
+      if (Object.keys(prevUserRemainSum).length) {
+        res.write('<h2>User Remaining Work Forecast</h2>')
+        res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${['User', 'Remaining Work', 'Finish Date'].join('</th><th>')}</th></tr></thead><tbody>`)
+        Object.keys(prevUserRemainSum).sort().forEach((user) => {
+          res.write(`<tr>
+          <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${user == NONE ? ' is empty' : '="' + user + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${user}</a></td>
+          <td>${convertSecondsToDays(prevUserRemainSum[user].remaining)}</td>
+          <td>${calcFutureDate(convertSecondsToDays(prevUserRemainSum[user].remaining))}</td>
+          </tr>`)
+        })
+        res.write(`</tbody></table>`)
+      } else {
+        debug(`prevUserRemainSum NOT found!`)
+      }
+
+      // End Accordion block 2: user-table
+      res.write('</div></div></div>')
+      // End Accordion
+      res.write('</div>')
+
+
     } catch (err) {
       debug(err)
       res.write(`<em>error</em><!-- ${err} -->`)
@@ -1072,12 +1216,12 @@ server.get('/estimates', async (req, res, next) => {
         } else {
           const days = convertSecondsToDays(assigneeStats[a].total)
           const endDate = calcFutureDate(convertSecondsToDays(assigneeStats[a].total - assigneeStats[a].progress))
-          res.write(`'><span data-toggle="tooltip" data-html="true" title='${endDate}'>${days}d</span></td>`)
+          res.write(`'><span data-bs-toggle="tooltip" data-bs-html="true" title='${endDate}'>${days}d</span></td>`)
         }
         // Completed
         res.write(`<td class='completedCol'>${assigneeStats[a].total > 0 ? Math.round(100 * (assigneeStats[a].progress / assigneeStats[a].total)) : 0}%</td>`)
         // Missing Estimate
-        res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="Finish by ${titleContentCount}">${assigneeStats[a].count.length}</span> 
+        res.write(`<td class='missingEstCol'><span data-bs-toggle="tooltip" data-bs-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-bs-toggle="tooltip" data-bs-html="true" title="Finish by ${titleContentCount}">${assigneeStats[a].count.length}</span> 
           (${assigneeStats[a].empty.length > 0 ? (100 * (assigneeStats[a].empty.length / assigneeStats[a].count.length)).toFixed(0) : 0}%)</td>`)
 
         // Releases details
@@ -1088,7 +1232,7 @@ server.get('/estimates', async (req, res, next) => {
             // debug(`assigneeStats[a]['rel'][${rel}] = `, assigneeStats[a]['rel'][rel])
             const userProgress = assigneeStats[a]['rel'][rel].progress
             const userTotal = assigneeStats[a]['rel'][rel].total
-            res.write(`<!-- ${rel} --><td>${userProgress} of <span data-toggle="tooltip" data-html="true" title="${calcFutureDate(userTotal)}">${userTotal}d</span></td>`)
+            res.write(`<!-- ${rel} --><td>${userProgress} of <span data-bs-toggle="tooltip" data-bs-html="true" title="${calcFutureDate(userTotal)}">${userTotal}d</span></td>`)
           } else {
             res.write('<!-- no data --><td></td>')
           }
@@ -1358,6 +1502,22 @@ server.get('/dashboard', async (req, res, next) => {
 //   }
 //   return next()
 // })
+
+server.get('/assignments/:assignee', async (req, res, next) => {
+  const projects = await jsr.getProjects()
+  if (req.query && req.query.format == 'html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' })
+    res.write(buildHtmlHeader('Projects', false))
+    res.write(buildPageHeader('Projects'))
+    res.write(JiraStatus.printList(projects, 'name', true))
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send(projects)
+  }
+  return next()
+})
+
 
 server.get('/projects', async (req, res, next) => {
   const fullView = req.query && req.query.full && req.query.full == 'true'
@@ -2163,7 +2323,7 @@ server.get('/links', (req, res, next) => {
  */
 function getStatusExclusionString() {
   if (hasStatusExclusionList()) {
-    return(` status not in (${config.get('excludeFromEstimateQueries').join(',')})`)
+    return(` status not in (${getStatusExclusionList().join(',')})`)
   } else {
     return('')
   }
@@ -2205,7 +2365,7 @@ async function getProjectStoryEstimates(project = config.get('project')) {
   return cache.get(`story-estimates-${project}`)
 }
 
-server.get('/unestimated/', async (req, res, next) => {
+server.get('/unestimated', async (req, res, next) => {
   const projStoryEstimates = await getProjectStoryEstimates(config.get('project'))
   if (req.query && req.query.format == 'html') {
     res.writeHead(200, { 'Content-Type': 'text/html' })
