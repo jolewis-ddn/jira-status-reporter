@@ -2062,7 +2062,6 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
     let lastTotalEstimate = 0
     Object.keys(data).forEach((status) => {
-      // debug(`lastTotalEstimate += `, status, data[status].length, data[status][data[status].length - 1])
       lastTotalEstimate += 1 * (data[status][data[status].length - 1])
     })
     debug(`lastTotalEstimate: ${lastTotalEstimate}`)
@@ -2082,7 +2081,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // data['Forecast'][loc] = lastTotalEstimate - (5 * (loc - origBurndownDates.length))
       if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
         workdaySpan++
-        debug(`increasing workdaySpan to ${workdaySpan}`)
+        // debug(`increasing workdaySpan to ${workdaySpan}`)
       }
       lastActualDay.setDate(lastActualDay.getDate() + 1)
     }
@@ -2094,11 +2093,11 @@ server.get('/burndown/:rel', async (req, res, next) => {
     lastActualDay.setDate(lastActualDay.getDate() + 1)
     
     // Set the forecast value
-    for (let loc = origBurndownDates.length; loc < burndown.dates.length; loc++) {
+    for (let loc = origBurndownDates.length; loc <= burndown.dates.length; loc++) {
       // lastActualDay.setDate(burndown.dates[loc])
       // lastActualDay.setHours(0,0,0,0)
 
-      debug(`setting forecast on ${burndown.dates[loc]} (lastActualDay: ${lastActualDay}) to ${currEstimate}`)
+      // debug(`setting forecast on ${burndown.dates[loc]} (lastActualDay: ${lastActualDay}) to ${currEstimate}`)
       data['Forecast'][loc] = Math.round(currEstimate)
       if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
         currEstimate -= burndownRate
@@ -2107,7 +2106,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
       lastActualDay.setDate(lastActualDay.getDate() + 1)
     }
     res.write(`<hr>`)
-    res.write(`<ul>`)
+    res.write(`<ul class="list-unstyled">`)
     res.write(`<li><em>Release Date:</em> ${versionReleaseDate}</li>`)
     res.write(`<li><em>Total Working Days:</em> ${workdaySpan} working days</li>`)
     res.write(`<li><em>Last Estimate (Total):</em> ${lastTotalEstimate} days</li>`)
@@ -2132,20 +2131,49 @@ server.get('/burndown/:rel', async (req, res, next) => {
     })
     .finally(async () => {
       // Show forecast toggle
+      res.write(`<p>`)
+      res.write(`<div class="solo-button">`)
       if (forecast) {
-        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;"><em>Disable Forecast</em></a>`)
+        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;" type="button" class="btn btn-outline-success">Disable Forecast</a>`)
       } else {
-        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes'; return false;"><em>Enable Forecast</em></a>`)
+        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes'; return false;" class="btn btn-success">Enable Forecast</a>`)
       }
+      // res.write(`</div>`)
+
       // Show component list
       const componentList = await jdr.getComponentList()
-      res.write('<ul>')
-      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=${forecast}'; return false;"><em>No component filter</em></a></li>`)
-      res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE&forecast=${forecast}'; return false;"><em>No component set</em></a></li>`)
+      // res.write(`<p>`)
+      // res.write(`<div class="btn-group" role="group" aria-label="Component special filter buttons">`) // start button group
+      // All components
+      if (component) { // A component filter has been selected; this link is to remove that selection
+        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=${forecast}'; return false;" type="button" class="btn btn-outline-info">Remove filter</a>`)
+      }
+      res.write(`</p>`)
+
+      // No component set -- should always be available
+      res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-warning">Empty Component</a></li>`)
+      // res.write(`</div>`) // End no/empty filter button group
+
+      // Individual components
       componentList.forEach((c) => {
-        res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;">${c}</a></li>`)
+        // debug(`component: ${component}; c: ${c}; equal? ${component == c}`)
+        if (component != c) {
+          res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-primary">${c}</a>`)
+        } else { // Just print a dead button
+          res.write(`<button type="button" class="btn btn-secondary .disabled" disabled aria-disabled="true">${c}</button>`)
+        }
       })
-      res.write(`</ul>`)
+      // res.write(`</div>`) // end button group
+
+      // Or if you prefer a simple unordered list display instead of buttons...
+      // res.write('<ul>')
+      // res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=${forecast}'; return false;"><em>No component filter</em></a></li>`)
+      // res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE&forecast=${forecast}'; return false;"><em>No component set</em></a></li>`)
+      // componentList.forEach((c) => {
+      //   res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;">${c}</a></li>`)
+      // })
+      // res.write(`</ul>`)
+
       res.write(buildHtmlFooter())
       res.end()
     })
