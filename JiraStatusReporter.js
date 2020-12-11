@@ -455,7 +455,7 @@ class JiraStatusReporter {
     }
 }
       
-  _genericJiraSearch(jql, action, fields = []) {
+  async _genericJiraSearch(jql, action, fields = []) {
     return new Promise((resolve, reject) => {
       debug(`_genericJiraSearch(${jql}) called...`)
       var queryConfig = {}
@@ -489,6 +489,7 @@ class JiraStatusReporter {
 
           // First: Get max # of results
           queryConfig.maxResults = 1
+          debug(`about to get # of results: jql = ${jql}`)
           jira.searchJira(jql, queryConfig).then((results) => {
             debug(`A) results.issues.length = ${results.issues.length}`)
             debug(`...total = ${results.total}`)

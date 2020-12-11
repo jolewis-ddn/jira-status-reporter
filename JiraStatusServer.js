@@ -2482,13 +2482,23 @@ server.get('/unestimated', async (req, res, next) => {
   }
   return next()
 })
+
+server.get('/query', async (req, res, next) => {
+  try {
+    res.send(await jsr._genericJiraSearch(req.query.jql, 99, ['fixVersions']))
+  } catch(err) {
+    res.send(`query err: `, err)
+  }
+  return next()
+})
+
 /*
  ************** CACHE-RELATED ENDPOINTS **************
  */
 
 server.get('/cacheJSR', (req, res, next) => {
   res.send(jdr.getCacheObject(false))
-  return
+  return next()
 })
 
 server.get('/reread-cacheJSR', (req, res, next) => {
