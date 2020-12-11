@@ -437,15 +437,20 @@ function updateStats(stats, issueType, issueStatusName) {
  * Create simple Bootstrap button for consistency
  *
  * @param {string} label Button text
- * @param {string} [target=false] HREF (if false, not linked)
+ * @param {string} [link=false] HREF (if false, not linked)
  * @param {boolean} [active=true] Active button?
  * @returns HTML string - either <a> or <button> depending on the target value
  */
-function simpleButton(label, target = false, active = true) {
-  if (target) {
-    return(`<a href='${target}' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</a>`)
+function simpleButton(label, link = false, active = true, size = 'sm', extraClasses = '', float = '', onClickEvent = false) {
+  // <button type="button" class="btn btn-secondary .disabled" disabled aria-disabled="true">${c}</button>
+  let onclick = onClickEvent ? ` onClick="${onClickEvent}"` : ''
+  let classes = `btn ${size ? 'btn-${size}' : ''} ${float ? 'float-${float}' : ''} btn-link ${extraClasses} ${active ? '' : '.disabled'}`
+  let disabled = active ? '' : 'disabled aria-disabled="true"'
+
+  if (link) {
+    return(`<a href='${link}' class='${classes}' ${disabled} ${onclick}>${label}</a>`)
   } else {
-    return(`<button type='button' class='btn btn-sm float-right btn-link' ${active ? '' : ' disabled'}>${label}</button>`)
+    return(`<button type='button' class='${classes}' ${disabled} ${onclick}>${label}</button>`)
   }
 }
 
@@ -2172,10 +2177,15 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // Show forecast toggle
       res.write(`<p>`)
       res.write(`<div class="solo-button">`)
-      if (forecast) {
-        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;" type="button" class="btn btn-outline-success">Disable Forecast</a>`)
-      } else {
-        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes'; return false;" class="btn btn-success">Enable Forecast</a>`)
+      debug(`versionData: ${versionData}; versionReleaseDate: ${versionReleaseDate}; forecast: ${forecast}`)
+      if (release) { // Only print the forecast button if a release was selected
+        if (forecast) {
+          res.write(simpleButton('Disable Forecast', '#', true, false, 'btn-outline-success', false, `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;`))
+          // res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;" type="button" class="btn btn-outline-success">Disable Forecast</a>`)
+        } else {
+          res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes'; return false;`))
+          // res.write(`<a href="" onClick="" class="btn btn-success">Enable Forecast</a>`)
+        }
       }
       // res.write(`</div>`)
 
@@ -2199,7 +2209,8 @@ server.get('/burndown/:rel', async (req, res, next) => {
         if (component != c) {
           res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-primary">${c}</a>`)
         } else { // Just print a dead button
-          res.write(`<button type="button" class="btn btn-secondary .disabled" disabled aria-disabled="true">${c}</button>`)
+          res.write(simpleButton(c, false, false))
+          // res.write(`<button type="button" class="btn btn-secondary .disabled" disabled aria-disabled="true">${c}</button>`)
         }
       })
       // res.write(`</div>`) // end button group
