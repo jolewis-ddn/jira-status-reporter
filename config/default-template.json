@@ -27,7 +27,7 @@
     "releaseExcludeTypes": [
     ],
     "adminKey": [
-        'some-special-key-here'
+        "some-special-key-here"
     ]
 }
 }
