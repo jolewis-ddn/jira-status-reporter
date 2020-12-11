@@ -66,14 +66,55 @@ server.get(
 )
 
 server.get('/', (req, res, next) => {
-  res.send('ok')
+  const title = 'Jira Status Reporter'
+  res.write(buildHtmlHeader(title, false))
+  res.write(buildPageHeader(title, 'Available Endpoints'))
+  res.write(`<ul>
+  <li><a href='/burndown'>Burndown chart</a> (HTML)</li>
+  <li><a href='/chart?exclude=DEAD'>Chart</a> (excluding DEAD issues) (HTML)</li>
+  <li>Children: Requires Jira key parameter ('children/ABC-1234') (JSON)</li>
+  <li><a href='/components'>Components</a> (JSON)</li>
+  <li>Config (<a href='/config'>JSON</a> or <a href='/config?format=html'>HTML</a>)</li>
+  <li>Dashboard (<a href='/dashboard'>JSON</a> or <a href='/dashboard?format=html'>HTML</a>)</li>
+  <li><a href='/dates'>Dates</a> (JSON)</li>
+  <li>Epics: Requires Jira key parameter ('?id=ABC-1234')</li>
+  <li><a href='/estimates'>Estimates</a> (HTML)</li>
+  <li>Fields (<a href='/fields'>JSON</a> or <a href='/fields?format=html'>HTML</a>)</li>
+  <li>Groups (<a href='/groups'>JSON</a> or <a href='/groups?format=html'>HTML</a>)</li>
+  <li>Links (<a href='/links'>JSON</a> or <a href='/links?format=html'>HTML/Mermaid</a>): Requires Jira key parameter ('?id=ABC-1234')</li>
+  <li>Progress: Requires Jira release ID ('release/111111') (HTML)</li>
+  <li>Projects (<a href='/projects'>JSON</a> or <a href='/projects?format=html'>HTML</a>)</li>
+  <li>Query</li>
+  <li>Releases (<a href='/releases'>JSON</a> or <a href='/releases?format=html'>HTML</a>)</li>
+  <li>Report: Project-specific; Requires Jira project name ('/PROJECT_NAME') (JSON)</li>
+  <li><a href='/requirements'>Requirements</a> (HTML)</li>
+  <li>Unestimated (<a href='/unestimated'>JSON</a> or <a href='/unestimated?format=html'>HTML</a>)</li>`)
+
+  // Print the cache management links if the Admin param is set
+  if (req.query && req.query.admin && req.query.admin == (config.has('adminKey') ? config.get('adminKey') : 'yes')) {
+    res.write(`<h2>Cache Management</h2>
+    <li><a href='/cache/flush'>Flush</a></li>
+    <li><a href='/cache/stats'>Stats</a></li>
+    <li><a href='/cacheJSR'>JSR</a></li>
+    <li><a href='/datafilesJSR'>Data files (JSR)</a></li>
+    <li><a href='/homedir'>Home directory</a></li>
+    <li><a href='/rebuild-cacheJSR'>Rebuild Cache JSR</a></li>
+    <li><a href='/refresh-cacheJSR'>Refresh Cache JSR</a></li>
+    <li><a href='/reread-cacheJSR'>Re-read Cache JSR</a></li>
+    <li><a href='/resetJSR'>Reset JSR</a></li>
+    <li><a href='/series'>Series</a>: Per-Status counts</li>
+    <li><a href='/wipe-cacheJSR'>Wipe Cache JSR</a></li>
+    </ul>`)
+  }
+  res.write(buildHtmlFooter())
+  debug(`done with homepage`)
+  res.end()
   return next()
 })
 
 server.get('/count/', async (req, res, next) => {
   const count = await jsr.bareQueryCount(req.query.q)
   res.send({ count: count })
-  res.end()
   return next()
 })
 
@@ -83,7 +124,6 @@ server.get('/report/:project', (req, res, next) => {
     .then((response) => {
       // debug(`report response = `, response)
       res.send(response)
-      res.end()
       return next()
     })
     .catch((err) => {
@@ -105,9 +145,9 @@ server.get('/config', async (req, res, next) => {
     res.write(buildPageHeader('Config'))
     res.write(JiraStatus.formatConfigHtml(configDetails))
     res.write(buildHtmlFooter())
+    res.end()
   } else {
     res.send(configDetails)
-    res.end()
   }
   return next()
 })
@@ -1270,7 +1310,6 @@ server.get('/children/:id', async (req, res, next) => {
       debug('id.len not > 4')
       res.send(`Error: Invalid Jira issue id`)
     }
-    return next()
   } catch (err) {
     res.status(500).send(`Error: ${err.message}`)
     debug(err)

@@ -85,6 +85,7 @@ function formatCssClassName(jiraName) {
 async function getConfig() {
     const cfg = config.util.toObject()
     cfg.jira.password = '***REMOVED***'
+    cfg.adminKey = '***REMOVED***'
     return cfg
 }
 
