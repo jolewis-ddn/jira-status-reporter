@@ -4,11 +4,11 @@
   "description": "Collection of node scripts to query, store, and report on Jira issues.",
   "main": "JiraStatusServer.js",
   "dependencies": {
-    "@nastyox/rando.js": "^2.0.3",
+    "@nastyox/rando.js": "^2.0.5",
     "commander": "^6.2.0",
-    "config": "^3.3.2",
+    "config": "^3.3.3",
     "date-fns": "^2.16.1",
-    "debug": "^4.2.0",
+    "debug": "^4.3.1",
     "jira-client": "^6.21.1",
     "lodash": "^4.17.20",
     "node-cache": "^5.1.2",
@@ -20,8 +20,8 @@
     "xxhashjs": "^0.2.2"
   },
   "devDependencies": {
-    "ava": "^3.13.0",
-    "eslint": "^7.12.1",
+    "ava": "^3.14.0",
+    "eslint": "^7.15.0",
     "eslint-config-prettier": "^6.15.0",
     "nyc": "^15.1.0",
     "prettier": "2.1.2",
