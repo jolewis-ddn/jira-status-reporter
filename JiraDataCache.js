@@ -5,6 +5,7 @@ const path = require('path');
 const DEFAULT_CACHE_FILENAME = '.jiraCache.json'
 
 const REBUILD = 999
+const UPDATE  = 500
 const REFRESH = 1
 
 class JiraDataCache {
@@ -17,6 +18,13 @@ class JiraDataCache {
 
     getCacheFilename() { return(this.filename) }
     
+    /**
+     * Has this file already been processed and cached?
+     *
+     * @param {string} filename File name (excluding path)
+     * @returns boolean
+     * @memberof JiraDataCache
+     */
     containsFile(filename) {
         debug(`containsFile(${filename}) called...`)
         if (this.cache) {
@@ -35,11 +43,24 @@ class JiraDataCache {
         }
     }
 
+    /**
+     * Create an empty cache
+     *
+     * @returns array Cache
+     * @memberof JiraDataCache
+     */
     makeCache() {
         debug('makeCache() called')
         return(this.saveCache([]))
     }
 
+    /**
+     * Create a new cache with the provided data
+     *
+     * @param {array} data To be stored in the cache
+     * @returns array Cache
+     * @memberof JiraDataCache
+     */
     saveCache(data) {
         debug('saveCache() called')
         fs.writeFileSync(this.filename, JSON.stringify(data))
@@ -49,6 +70,12 @@ class JiraDataCache {
         return(this.cache)
     }
 
+    /**
+     * Is the cache valid?
+     *
+     * @returns boolean
+     * @memberof JiraDataCache
+     */
     _validateCache() {
         if (fs.existsSync(this.filename)) {
             return(true)
@@ -57,6 +84,14 @@ class JiraDataCache {
         }
     }
 
+    /**
+     * Has the cache been processed and loaded?
+     *
+     * @param {boolean} [returnCache=false]
+     * @param {boolean} [failSilently=false]
+     * @returns Cache or null
+     * @memberof JiraDataCache
+     */
     updateCache(returnCache = false, failSilently = false) {
         debug(`updateCache(${returnCache}, ${failSilently}) called...`)
         if (this.loaded) {
@@ -67,6 +102,14 @@ class JiraDataCache {
         }
     }
 
+    /**
+     * Read the cache from the local file
+     *
+     * @param {boolean} [returnCache=false] Return the cache? If false, returns JiraDataReader
+     * @param {boolean} [failSilently=false] Don't warn if the cache had to be created
+     * @returns Cache or JiraDataCache
+     * @memberof JiraDataCache
+     */
     readCache(returnCache = false, failSilently = false) {
         debug('readCache() called')
         if (this._validateCache()) {
@@ -97,6 +140,13 @@ class JiraDataCache {
         }
     }
 
+    /**
+     * Rretrieve the cache, optionally creating it if empty
+     *
+     * @param {boolean} [createIfEmpty=false] Make the cache if it doesn't already exist
+     * @returns Cache or null
+     * @memberof JiraDataCache
+     */
     getCache(createIfEmpty = false) {
         if (this.loaded) {
             return(this.cache)
@@ -111,6 +161,13 @@ class JiraDataCache {
 
     isActive() { return(this.loaded) }
 
+    /**
+     * Remove the cache content and optionally the file
+     *
+     * @param {boolean} [unlinkFile=true] Remove the file
+     * @returns JiraDataCache
+     * @memberof JiraDataCache
+     */
     wipe(unlinkFile = true) {
         debug(`reset(${unlinkFile}) called...`)
         if (unlinkFile) {

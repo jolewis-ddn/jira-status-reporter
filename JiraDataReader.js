@@ -11,8 +11,8 @@ const { convertSecondsToDays } = require("./jiraUtils");
 const NodeCache = require("node-cache");
 
 const JiraDataCache = require("./JiraDataCache");
-const { callbackify } = require("util");
-const { resolve } = require("path");
+// const { callbackify } = require("util");
+// const { resolve } = require("path");
 
 const sqlite3 = require("sqlite3").verbose();
 
@@ -30,6 +30,7 @@ class JiraDataReader {
     this.nodeCache = new NodeCache({ stdTTL: 60 * 24, checkperiod: 1200 })
     this.loaded = this.cache.isActive()
     this.REBUILD = 999
+    this.UPDATE  = 500
     this.REFRESH = 10
     this.db = new sqlite3.Database('./data/jira-stats.db')
     return this
@@ -42,6 +43,11 @@ class JiraDataReader {
   rebuild() {
     return this.REBUILD
   }
+
+  update() {
+    return this.UPDATE
+  }
+
   refresh() {
     return this.REFRESH
   }
@@ -54,14 +60,16 @@ class JiraDataReader {
    * @returns Number of items processed
    * @memberof JiraDataReader
    */
-  async reloadCache(reloadType = this.REFRESH, releaseName = false) {
+  async reloadCache(reloadType = this.REFRESH) {
     debug(`reloadCache(${reloadType}) called...`)
-    let d = this.cache.getCache(true)
-    let flist = glob.sync('./data/*.json')
-    let updates = 0
+    
     if (reloadType == this.REBUILD) {
       await this.clearCache()
     }
+
+    let d = this.cache.getCache(true)
+    let flist = glob.sync('./data/*.json')
+    let updates = 0
     debug(`Beginning db transaction...`)
 
     this.db.run('BEGIN')

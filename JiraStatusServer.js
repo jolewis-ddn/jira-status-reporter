@@ -60,6 +60,15 @@ const cors = corsMiddleware({
 server.use(cors.preflight)
 server.use(cors.actual)
 
+function buildAlert(content, title = false, alertClass="success") {
+  return(`<div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
+  ${title ? `<strong>${title}</strong> `:''}${content}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+  <span aria-hidden="true">&times;</span>
+</button>
+</div>`)
+}
+
 server.get(
   '/docs/*',
   restify.plugins.serveStatic({ directory: './static', default: 'charts.html' })
@@ -69,6 +78,10 @@ server.get('/', (req, res, next) => {
   const title = 'Jira Status Reporter'
   res.write(buildHtmlHeader(title, false))
   res.write(buildPageHeader(title, 'Available Endpoints'))
+  if (req.query.alert) {
+    debug(`req.query.alert: ${req.query.alert}`)
+    res.write(buildAlert(req.query.alert))
+  }
   res.write(`<ul>
   <li><a href='/burndown'>Burndown chart</a> (HTML)</li>
   <li><a href='/chart?exclude=DEAD'>Chart</a> (excluding DEAD issues) (HTML)</li>
@@ -256,6 +269,7 @@ function buildHtmlHeader(title = '', showButtons = true) {
         <script>mermaid.initialize({startOnLoad:true});</script>
         
         ${buttons.join('')}
+        ${buildHomeButton()}
         `
 }
 
@@ -310,6 +324,15 @@ function buildStylesheet() {
 
     .text-center { text-align: center; }
     </style>`
+}
+
+/**
+ * Build the HTML for a simple float-right home button
+ *
+ * @returns string
+ */
+function buildHomeButton() {
+  return(simpleButton('Home','/',true,'sm',false,'right'))
 }
 
 function buildButtonJs() {
@@ -439,12 +462,16 @@ function updateStats(stats, issueType, issueStatusName) {
  * @param {string} label Button text
  * @param {string} [link=false] HREF (if false, not linked)
  * @param {boolean} [active=true] Active button?
+ * @param {string} [size=sm] Bootstrap size
+ * @param {string} [size=''] Extra CSS classes
+ * @param {string} [float='right'/'left'] Float? right/left
+ * @param {string} [onClickEvent=''] Javascript to run on click
  * @returns HTML string - either <a> or <button> depending on the target value
  */
 function simpleButton(label, link = false, active = true, size = 'sm', extraClasses = '', float = '', onClickEvent = false) {
   // <button type="button" class="btn btn-secondary .disabled" disabled aria-disabled="true">${c}</button>
   let onclick = onClickEvent ? ` onClick="${onClickEvent}"` : ''
-  let classes = `btn ${size ? 'btn-${size}' : ''} ${float ? 'float-${float}' : ''} btn-link ${extraClasses} ${active ? '' : '.disabled'}`
+  let classes = `btn ${size ? `btn-${size}` : ''} ${float ? `float-${float}` : ''} btn-link ${extraClasses} ${active ? '' : '.disabled'}`
   let disabled = active ? '' : 'disabled aria-disabled="true"'
 
   if (link) {
@@ -1058,6 +1085,7 @@ server.get('/releases', async (req, res, next) => {
       const pageTitle = 'Releases Report'
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
+
       const COLUMNS = ['Name', 'Description', 'Archived', 'Released', 'Release Date', 'User Release Date']
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
       releases.forEach((rel) => {
@@ -1372,6 +1400,7 @@ server.get('/requirements', async (req, res, next) => {
   const pageTitle = 'Requirements Report'
   res.write(buildHtmlHeader(pageTitle, 1))
   res.write(buildPageHeader(pageTitle))
+
   try {
     let inwardLinks = []
     let teamCount = 0
@@ -2181,10 +2210,8 @@ server.get('/burndown/:rel', async (req, res, next) => {
       if (release) { // Only print the forecast button if a release was selected
         if (forecast) {
           res.write(simpleButton('Disable Forecast', '#', true, false, 'btn-outline-success', false, `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;`))
-          // res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;" type="button" class="btn btn-outline-success">Disable Forecast</a>`)
         } else {
           res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes'; return false;`))
-          // res.write(`<a href="" onClick="" class="btn btn-success">Enable Forecast</a>`)
         }
       }
       // res.write(`</div>`)
@@ -2274,6 +2301,7 @@ server.get('/chart', (req, res, next) => {
 
   debug(JSON.stringify(req.query))
   res.write(buildHtmlHeader('Chart', false))
+
   const typeFilter = req.query.type || false
   if (typeFilter) {
     res.write(`<H1>${typeFilter}</H1>`)
@@ -2383,6 +2411,7 @@ server.get('/links', (req, res, next) => {
         res.writeHead(200, { 'Content-Type': 'text/html' })
         res.write(buildHtmlHeader(title, false))
         res.write(buildPageHeader(title))
+
         res.write(MermaidNodes.buildMermaidLinkChart(issueResult, `/links?format=html&id=`))
         res.write(buildHtmlFooter())
       } else {
@@ -2552,20 +2581,26 @@ server.get('/cacheJSR', (req, res, next) => {
 })
 
 server.get('/reread-cacheJSR', (req, res, next) => {
-  res.send(`reread`)
-  return next()
+  res.redirect(`/?alert=reread%20cache`, next)
+  return
 })
 
 server.get('/refresh-cacheJSR', (req, res, next) => {
   const updates = jdr.reloadCache(jdr.refresh())
-  res.send(`refreshed ${updates}`)
-  return next()
+  res.redirect(`/?alert=refreshed%20${updates}%20cache%20entries`, next)
+  return
+})
+
+server.get('/update-cacheJSR', async (req, res, next) => {
+  const updates = await jdr.reloadCache(jdr.update())
+  res.redirect(`/?alert=updated%20${updates}%20cache%20entries`, next)
+  return
 })
 
 server.get('/rebuild-cacheJSR', async (req, res, next) => {
   const updates = await jdr.reloadCache(jdr.rebuild())
-  res.send(`rebuilt ${updates}`)
-  return next()
+  res.redirect(`/?alert=rebuilt%20${updates}%20cache%20entries`, next)
+  return
 })
 
 server.get('/resetJSR', (req, res, next) => {
@@ -2577,8 +2612,8 @@ server.get('/resetJSR', (req, res, next) => {
 
 server.get('/wipe-cacheJSR', (req, res, next) => {
   jdr.getCacheObject().wipe(true)
-  res.send(`wiped`)
-  return next()
+  res.redirect(`/?alert=wiped%20cache`, next)
+  return
 })
 
 server.get('/datafilesJSR', (req, res, next) => {
