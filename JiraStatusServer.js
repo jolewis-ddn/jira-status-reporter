@@ -76,7 +76,7 @@ server.get(
 
 server.get('/', (req, res, next) => {
   const title = 'Jira Status Reporter'
-  res.write(buildHtmlHeader(title, false))
+  res.write(buildHtmlHeader(title, false, true))
   res.write(buildPageHeader(title, 'Available Endpoints'))
   if (req.query.alert) {
     debug(`req.query.alert: ${req.query.alert}`)
@@ -226,7 +226,7 @@ function startHtml(res) {
   res.writeHead(200, { 'Content-Type': 'text/html' })
 }
 
-function buildHtmlHeader(title = '', showButtons = true) {
+function buildHtmlHeader(title = '', showButtons = true, excludeHome = false) {
   let buttons = [`<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>`, `<button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>`, `<button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`]
 
   if (typeof showButtons === 'boolean') {
@@ -269,7 +269,7 @@ function buildHtmlHeader(title = '', showButtons = true) {
         <script>mermaid.initialize({startOnLoad:true});</script>
         
         ${buttons.join('')}
-        ${buildHomeButton()}
+        ${excludeHome ? '' : buildHomeButton()}
         `
 }
 
