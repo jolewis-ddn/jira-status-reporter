@@ -312,7 +312,10 @@ class JiraDataReader {
       if (componentName) {
         if (releaseName) {
           componentNameFilter = ` AND `
+        } else {
+          componentNameFilter = ` WHERE `
         }
+        
         componentNameFilter += ` component ${
           componentName === 'NONE'
             ? 'is null'

@@ -2059,9 +2059,10 @@ server.get('/burndown', async (req, res, next) => {
 })
 
 server.get('/burndown/:rel', async (req, res, next) => {
+  debug(`/burndown/${req.params.rel} called...`)
   let release = req.params.rel ? req.params.rel : false
   let component = req.query.component ? req.query.component : false
-  let forecast = req.query.forecast && req.query.forecast === "yes" ? req.query.forecast : false
+  let forecast = (req.query.forecast && req.query.forecast === "yes") ? req.query.forecast : false
 
   let jsrCLM = await jsr.getChartLinkMaker(config).reset()
 
@@ -2073,35 +2074,41 @@ server.get('/burndown/:rel', async (req, res, next) => {
   let versionReleaseDate = false
   let workingDaysToRelease = false
 
+  debug(`A: releaseList: `, releaseList)
   // Buttons to burndown chart for each release, including combined
   res.write(`<div style='display: flex; float: none;'>`)
   // Make sure the current page button isn't linked/active
-  if (release) {
+
+  // Get the release data from Jira
+  versionData = await getVersions()
+  // debug(`versionData == `, versionData)
+
+  let enableForecastButton = false
+
+  if (release) { // A specific release was selected
     res.write(simpleButton('All/Combined', '/burndown/'))
 
-    // Get the release data from Jira
-    versionData = await getVersions()
-    // debug(`versionData == `, versionData)
-    if (forecast && versionData.length) {
-      // List of Jira versions
-      versionData = versionData.filter((v) => v.name === release)
-      if (!versionData.length) {
-        debug(`... versionData is empty`)
-        versionData = false
-      } else {
-        versionReleaseDate = versionData[0].releaseDate
-        debug(`... versionData is NOT empty. versionReleaseDate: ${versionReleaseDate}`)
-        let now = new Date()
-        workingDaysToRelease = now.workingDaysFromNow(versionReleaseDate)
-        debug(`versionData: `, versionData[0].releaseDate, workingDaysToRelease)
-      }
+    // Reduce versionData to selected version/release
+    versionData = versionData.filter((v) => v.name === release)
+
+    debug(`*** versionData redux: `, versionData)
+
+    if (versionData.length) {
+      versionReleaseDate = versionData[0].releaseDate
+      debug(`... versionData is NOT empty. versionReleaseDate: ${versionReleaseDate}`)
+      let now = new Date()
+      workingDaysToRelease = now.workingDaysFromNow(versionReleaseDate)
+      workingDaysToRelease > 0 ? enableForecastButton = true : enableForecastButton = false
+      debug(`versionData: `, versionData, workingDaysToRelease, ' days to the release; enableForecastButton? ', enableForecastButton)
+
     } else { // No versionData
       debug(`ERROR: No versionData!`)
       versionData = false
     }  
-  } else {
+  } else { // No specific release was selected, so show "All"
     res.write(simpleButton('All/Combined', false, false))
   }
+
   releaseList.forEach((rel) => {
     let relName = rel === 'NONE' ? 'No release set' : rel
     // Make sure the current page button isn't linked/active
@@ -2123,7 +2130,8 @@ server.get('/burndown/:rel', async (req, res, next) => {
     data[status] = burndown.stats[status]
   })
   
-  if (versionData) { // Have a release date!
+  debug(`B: versionData: ${versionData}`)
+  if (forecast) { // Have a release date!
     debug(`...Adding dates to burndown.dates to reach ${versionReleaseDate}`)
     const origBurndownDates = Array.from(burndown.dates)
     // Extend the dates to the release date
@@ -2189,6 +2197,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     jsrCLM.setCategories(burndown.dates)
   }
 
+  debug(`>>> forecast? `, forecast)
   
   jsrCLM
     .setLineChart()
@@ -2206,12 +2215,14 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // Show forecast toggle
       res.write(`<p>`)
       res.write(`<div class="solo-button">`)
-      debug(`versionData: ${versionData}; versionReleaseDate: ${versionReleaseDate}; forecast: ${forecast}`)
-      if (release) { // Only print the forecast button if a release was selected
+      debug(`C: versionData: ${versionData}; versionReleaseDate: ${versionReleaseDate}; forecast: ${forecast}; release: `, release)
+      if (release && enableForecastButton) {
+      // if (release) { // Only print the forecast button if a release was selected
+      let componentStr = component ? `&component=${component}` : ''
         if (forecast) {
-          res.write(simpleButton('Disable Forecast', '#', true, false, 'btn-outline-success', false, `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no'; return false;`))
+          res.write(simpleButton('Disable Forecast', '#', true, false, 'btn-outline-success', false, `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no${componentStr}'; return false;`))
         } else {
-          res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes'; return false;`))
+          res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes${componentStr}'; return false;`))
         }
       }
       // res.write(`</div>`)

@@ -64,6 +64,7 @@ class JiraStatusReporter {
   }
 
   get(endpoint) {
+    debug(`jsr.get(${endpoint}) called...`)
     return jira.genericGet(endpoint)
   }
 
