@@ -284,6 +284,23 @@ class ChartLinkMaker {
     return(JSON.stringify(`[${'^' + Object.keys(data).map((x) => removeSpaces(x)).join('^,^') + '^'}]`).replace(/"/g, '').replace(/\^/g, '"'))
   }
 
+  enoughDataToPrintChart(data) {
+    let goodToGo = false
+    const k = Object.keys(data)
+    if (k.length) { // Have entries
+      // But are they non-zero
+      let sumOfValues = 0
+      for (let keyNdx = 0; keyNdx < k.length; keyNdx++) {
+        let key = k[keyNdx]
+      // k.forEach((key) => {
+        sumOfValues += data[key].reduce((acc, cur) => { return acc + cur})
+        debug(`sumOfValues after ${key}: ${sumOfValues}`)
+        if (sumOfValues) { return(true) }
+      }
+    }
+    return(goodToGo)
+  }
+
   /**
    * Create the HTML tag for a single chart
    *
@@ -294,50 +311,56 @@ class ChartLinkMaker {
    * @memberof ChartLinkMaker
    */
   async buildChartImgTag(title, data, chartType = "area", xLabel = "") {
-    // debug(
-    //   `buildChartImgTag(${title}, data, ${chartType}) called with data: `,
-    //   data
-    // );
-    if (!data) {
-      // No data, so build from local data
-      this.h = DEFAULT_HEIGHT;
-      this.w = DEFAULT_WIDTH;
-      // TODO: Set these via the config file
-      let inReview = this.dataSeries.filter((x) => {
-        return x.label == "IN REVIEW";
-      })[0].data;
-      let blocked = this.dataSeries.filter((x) => {
-        return x.label == "BLOCKED";
-      })[0].data;
-
-      data = {
-        Open: this.dataSeries.filter((x) => {
-          return x.label == "DEFINED";
-        })[0].data,
-        Active: this.dataSeries
-          .filter((x) => {
-            return x.label == "IN PROGRESS";
-          })[0]
-          .data.map((num, idx) => {
-            return num + inReview[idx];
-          }),
-        Closed: this.dataSeries.filter((x) => {
-          return x.label == "DONE";
-        })[0].data,
-        Stopped: this.dataSeries
-          .filter((x) => {
-            return x.label == "EMERGENCY";
-          })[0]
-          .data.map((num, idx) => {
-            return num + blocked[idx];
-          }),
-      };
-    }
-    if (!title) {
-      title = DEFAULT_CHART_TITLE;
-    }
     return new Promise((resolve, reject) => {
-      if (data) {
+      // debug(
+      //   `buildChartImgTag(${title}, data, ${chartType}) called with data: `,
+      //   data, '; this.dataSeries: ', this.dataSeries
+      // );
+      if (!this.enoughDataToPrintChart(data)) { // No data in function call
+        if (!this.dataSeries.length) { // No data previously provided, so return error msg
+          resolve('<em>No data available</em>')
+        } else {
+          debug(`this.dataSeries.length: `, this.dataSeries.length)
+        }
+        // No data, so build from local data
+        this.h = DEFAULT_HEIGHT;
+        this.w = DEFAULT_WIDTH;
+        // TODO: Set these via the config file
+        let inReview = this.dataSeries.filter((x) => {
+          return x.label == "IN REVIEW";
+        })[0].data;
+        let blocked = this.dataSeries.filter((x) => {
+          return x.label == "BLOCKED";
+        })[0].data;
+
+        data = {
+          Open: this.dataSeries.filter((x) => {
+            return x.label == "DEFINED";
+          })[0].data,
+          Active: this.dataSeries
+            .filter((x) => {
+              return x.label == "IN PROGRESS";
+            })[0]
+            .data.map((num, idx) => {
+              return num + inReview[idx];
+            }),
+          Closed: this.dataSeries.filter((x) => {
+            return x.label == "DONE";
+          })[0].data,
+          Stopped: this.dataSeries
+            .filter((x) => {
+              return x.label == "EMERGENCY";
+            })[0]
+            .data.map((num, idx) => {
+              return num + blocked[idx];
+            }),
+        };
+      }
+      if (!title) {
+        title = DEFAULT_CHART_TITLE;
+      }
+
+      if (Object.keys(data)) {
         let forecastType = ''
         let dataGroups = ""
         // Workaround for specifying stacked bar chart
