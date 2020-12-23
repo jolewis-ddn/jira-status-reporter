@@ -60,6 +60,7 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/dashboard`: Data visualization of current status (no cache)
 * `/epics`: Visualize Epic status (includes linked issues)
 * `/filter`: Visualize issue status using existing Jira filter
+* `/issueTypes`: List of issue types (either project-specific or global)
 * `/links`: Visualize issue links
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
 * `/unestimated`: Table showing the number of unestimated Stories (with a link to Jira)

@@ -76,6 +76,42 @@ class JiraStatusReporter {
     return jira.findIssue(id)
   }
 
+  async getIssueTypes(activeProjectOnly = true) {
+    debug(`getIssueTypes(${activeProjectOnly}) called...`)
+    // Return all types, or just the types for the active project?
+    // TODO: Cache this value
+    const allIssueTypesRaw = await jira.genericGet('issuetype')
+
+    if (activeProjectOnly) {
+      const allIssueTypesClean = {}
+      for (let i = 0; i < allIssueTypesRaw.length; i++) {
+        allIssueTypesClean[allIssueTypesRaw[i]['id']] = {
+          name: allIssueTypesRaw[i]['name'],
+          description: allIssueTypesRaw[i]['description'],
+          iconUrl: allIssueTypesRaw[i]['iconUrl'],
+          subtask: allIssueTypesRaw[i]['subtask'],
+        }
+      }
+      // debug(`allIssueTypesClean: `, allIssueTypesClean)
+
+      // TODO: Cache this value
+      const statuses = await jira.genericGet(`project/${config.get('project')}/statuses`)
+      const response = []
+      for (let j = 0; j < statuses.length; j++) {
+        response.push({
+          id: statuses[j]['id'],
+          iconUrl: allIssueTypesClean[statuses[j]['id']]['iconUrl'],
+          name: statuses[j]['name'],
+          description: allIssueTypesClean[statuses[j]['id']]['description'],
+          subtask: statuses[j]['subtask'],
+        })
+      }
+      return response
+    } else {
+      return allIssueTypesRaw
+    }
+  }
+
   getProject(project) {
     return jira.getProject(project)
   }

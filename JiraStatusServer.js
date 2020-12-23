@@ -94,6 +94,7 @@ server.get('/', (req, res, next) => {
   <li><a href='/estimates'>Estimates</a> (HTML)</li>
   <li>Fields (<a href='/fields'>JSON</a> or <a href='/fields?format=html'>HTML</a>)</li>
   <li>Groups (<a href='/groups'>JSON</a> or <a href='/groups?format=html'>HTML</a>)</li>
+  <li>Issue Types (<a href='/issueTypes'>For ${config.get('project')} only</a> or <a href='/issueTypes?all=yes'>Complete list</a>)</li>
   <li>Links (<a href='/links'>JSON</a> or <a href='/links?format=html'>HTML/Mermaid</a>): Requires Jira key parameter ('?id=ABC-1234')</li>
   <li>Progress: Requires Jira release ID ('release/111111') (HTML)</li>
   <li>Projects (<a href='/projects'>JSON</a> or <a href='/projects?format=html'>HTML</a>)</li>
@@ -2410,6 +2411,58 @@ server.get('/chart', (req, res, next) => {
 server.get('/components', async (req, res, next) => {
   res.send(await jdr.getComponentList())
   return next()
+})
+
+server.get('/issueTypes', async (req, res, next) => {
+  let activeProjectOnly = (req.query.all && req.query.all == 'yes') ? false : true
+  debug(`... activeProjectOnly: ${activeProjectOnly}`)
+  
+  const title = `Issue Types: ${activeProjectOnly ? config.get('project') : 'Complete List'}`
+
+  res.writeHead(200, { 'Content-Type': 'text/html' })
+  res.write(buildHtmlHeader(title, false))
+  res.write(buildPageHeader(title))
+  res.write(`<div class='altLink'>`)
+  if (activeProjectOnly) {
+    res.write(`<a href='?all=yes'>Show all issue types</a>`)
+  } else {
+    res.write(`<a href='?all=no'>Show only ${config.get('project')} issue types</a>`)
+  }
+  res.write(`</div>`)
+  const issueTypes = await jsr.getIssueTypes(activeProjectOnly)
+  res.write(`
+  <table style='width: auto !important;' class='table table-sm'>
+  <thead>
+    <tr>
+      <th class='text-center'>ID</th>
+      <th class='text-center'>Icon</th>
+      <th class='text-center'>Name</th>
+      <th class='text-center'>Description</th>
+      <th class='text-center'>Subtask?</th>
+    </tr>
+  </thead>
+  <tbody>`)
+  // issueTypes.sort((a, b) => { return a.name - b.name })
+  issueTypes.sort((a, b) => { 
+    if (a.name < b.name) { 
+      return -1 
+    }
+    if (a.name > b.name) {
+      return 1 
+    } 
+    return 0 
+  })
+  issueTypes.forEach((t) => {
+    res.write(`<tr>
+      <td>${t.id}</td>
+      <td><img src='${t.iconUrl}'></td>
+      <td>${t.name}</td>
+      <td>${t.description}</td>
+      <td>${t.subtask}</td>
+    </tr>`)
+  })
+  res.write('</tbody></table>')
+  res.write(buildHtmlFooter())
 })
 
 server.get('/links', (req, res, next) => {

@@ -411,7 +411,7 @@ class JiraDataReader {
               summary[it]['aggregateprogress'] = { progress: 0, total: 0 }
             }
           })
-          // debug(`>>> types: `, summary)
+          debug(`>>> types (from the config file): `, summary)
         } else {
           debug(`>>> Using hard-coded issue types...`)
           summary = {
