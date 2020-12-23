@@ -75,7 +75,7 @@ server.get(
 )
 
 server.get('/', (req, res, next) => {
-  const title = 'Jira Status Reporter'
+  const title = 'Jira Status Reporter: ' + config.get('project')
   res.write(buildHtmlHeader(title, false, true))
   res.write(buildPageHeader(title, 'Available Endpoints'))
   if (req.query.alert) {
