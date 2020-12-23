@@ -1,7 +1,10 @@
 'use strict'
 const debug = require('debug')('JSR')
 const JiraApi = require('jira-client')
+
 const config = require('config')
+const dataPath = config.has('dataPath') ? config.get('dataPath') : 'data'
+
 const datefns = require('date-fns')
 
 const jsrFileMgr = require('./JiraStatusReporterFileManager')
@@ -52,7 +55,7 @@ class JiraStatusReporter {
   constructor() {
     debug('jsr constructed')
     this.startAt = 0
-    this.jsrFm = new jsrFileMgr('data')
+    this.jsrFm = new jsrFileMgr(dataPath)
     this.chartLinkMaker = new chartLinkMaker()
   }
 
@@ -96,7 +99,7 @@ class JiraStatusReporter {
     let nextDateMonth = datefns.getMonth(nextDate) + 1
     let nextDateDay = datefns.getDate(nextDate)
 
-    let jql = `project = ${PROJECT_NAME} and status WAS "${status}" DURING ("${statusDateYear}/${statusDateMonth}/${statusDateDay}", "${nextDateYear}/${nextDateMonth}/${nextDateDay}")`
+    let jql = `project="${PROJECT_NAME}" and status WAS "${status}" DURING ("${statusDateYear}/${statusDateMonth}/${statusDateDay}", "${nextDateYear}/${nextDateMonth}/${nextDateDay}")`
     debug(
       `_issuesByStatusOnDate(${status}, ${statusDate}, ${action})... jql: ${jql}`
     )
@@ -458,9 +461,9 @@ class JiraStatusReporter {
       
   async _genericJiraSearch(jql, action, fields = []) {
     return new Promise((resolve, reject) => {
-      debug(`_genericJiraSearch(${jql}) called...`)
+      debug(`_genericJiraSearch(${jql}, ${action}, ${fields}) called...`)
       var queryConfig = {}
-      var compiledResults = {}
+      // var compiledResults = {}
 
       switch (action) {
         case ACTION_COUNT:
@@ -473,7 +476,7 @@ class JiraStatusReporter {
               resolve(response.total)
             })
             .catch((err) => {
-              debug('jql: %s; ERR %O', jql, err.statusCode)
+              debug('ERROR: jql: %s; ERR %O', jql, err.statusCode)
               reject(err)
             })
           // )
@@ -481,7 +484,7 @@ class JiraStatusReporter {
         case ACTION_CONTENTS:
           if (fields) {
             queryConfig.fields = fields
-            debug(`...using specified fields: ${fields}`)
+            debug(`...using specified fields: ${fields} ${fields.length}`)
           } else if (this.fields) {
             queryConfig.fields = this.fields
           } else {
@@ -490,7 +493,8 @@ class JiraStatusReporter {
 
           // First: Get max # of results
           queryConfig.maxResults = 1
-          debug(`about to get # of results: jql = ${jql}`)
+          debug(`about to get # of results: jql = ${jql}; queryConfig: `, queryConfig)
+        
           jira.searchJira(jql, queryConfig).then((results) => {
             debug(`A) results.issues.length = ${results.issues.length}`)
             debug(`...total = ${results.total}`)
@@ -546,6 +550,10 @@ class JiraStatusReporter {
             } else {
               resolve(results)
             }
+          })
+          .catch((err) => {
+            debug('ERROR: jql: %s; ERR %O', jql, err.statusCode)
+            reject(err)
           })
           break
         default:

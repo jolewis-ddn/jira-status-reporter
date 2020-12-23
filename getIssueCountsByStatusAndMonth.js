@@ -5,7 +5,12 @@ const program = new Command()
 program.version('0.0.2')
 
 const sqlite3 = require('sqlite3').verbose()
-const db = new sqlite3.Database('./data/jira-stats.db')
+
+const config = require('config')
+const dataPath = config.has('dataPath') ? config.get('dataPath') : 'data'
+const dataPathPrefix = '.' + path.sep + dataPath + path.sep
+
+const db = new sqlite3.Database(dataPathPrefix + 'jira-stats.db')
 
 const datefns = require('date-fns')
 

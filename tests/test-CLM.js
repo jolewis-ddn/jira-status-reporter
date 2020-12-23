@@ -112,6 +112,5 @@ test('Confirm bar chart content', async (t) => {
     t.regex(chart, /bb.generate/)
     t.regex(chart, /size/)
     t.regex(chart, /title/)
-    t.regex(chart, /data/)
     t.regex(chart, /type: "pie"/)
 })

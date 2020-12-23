@@ -17,7 +17,7 @@ do
     for entry in "${array[@]}"
     do
 	    echo "...$entry $d..."
-	    `node getIssuesByStatusOnDate -s "$entry" -y $yesterday_year -m $yesterday_mon -d $d > "./data/$entry-$yesterday_year-$yesterday_mon-$d.json"`
+	    `node getIssuesByStatusOnDate -s "$entry" -y $yesterday_year -m $yesterday_mon -d $d > "./$1/$entry-$yesterday_year-$yesterday_mon-$d.json"`
 	    sleep 3
     done
 done

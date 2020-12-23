@@ -1,6 +1,9 @@
 #!/bin/bash
 
-array=("ICEBOX" "DEFINED" "IN PROGRESS" "IN REVIEW" "DONE" "EMERGENCY" "BLOCKED" "DEAD")
+arrayRED=("ICEBOX" "DEFINED" "IN PROGRESS" "IN REVIEW" "DONE" "EMERGENCY" "BLOCKED" "DEAD")
+arrayIME=("NEW" "OPEN" "IN PROGRESS" "CODE COMPLETE" "PENDING BUILD" "TEST READY" "TEST IN PROGRESS" "CLOSED" "WON'T FIX" "CAN'T REPRODUCE")
+
+array=("NEW" "OPEN" "IN PROGRESS" "CODE COMPLETE" "PENDING BUILD" "TEST READY" "TEST IN PROGRESS" "CLOSED" "WON'T FIX" "CAN'T REPRODUCE")
 
 today_year=`date '+%Y'`;
 today_mon=`date '+%m'`;
@@ -15,6 +18,6 @@ echo "Fetching all records for $yesterday_year-$yesterday_mon-$yesterday_day..."
 for entry in "${array[@]}"
 do
 	echo "...$entry..."
-	`node getIssuesByStatusOnDate -s "$entry" -y $yesterday_year -m $yesterday_mon -d $yesterday_day > "./data/$entry-$yesterday_year-$yesterday_mon-$yesterday_day.json"`
+	`node getIssuesByStatusOnDate -s "$entry" -y $yesterday_year -m $yesterday_mon -d $yesterday_day > "./$1/$entry-$yesterday_year-$yesterday_mon-$yesterday_day.json"`
 	sleep 3
 done

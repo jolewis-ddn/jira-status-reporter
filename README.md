@@ -34,7 +34,8 @@ Collection of node scripts to query, store, and report on Jira issues.
 ### For cached queries - _optional_
 * Create the database
   * ```
-    sqlite3 ./data/jira-stats.db
+    cd $dataPath
+    sqlite3 jira-stats.db
     >.read ./jira-stats.sql
     >.quit
     ```
@@ -63,6 +64,7 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
 * `/unestimated`: Table showing the number of unestimated Stories (with a link to Jira)
 ### Releases
+* `/burndown`: Burndown charts (with optional forecast) for all issues or specific release and/or Component
 * `/releases`: List of versions (cached); links to /progress
 * `/progress`: Release progress report (parameter: release ID)
 ### Users and Groups
@@ -86,13 +88,14 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/refresh-cacheJSR`: Update the cache with new source data files
 * `/reread-cacheJSR`: Re-read the cache from disk
 * `/resetJSR`: Re-initialize the cache
+* `/update-cacheJSR`: Add missing files to the cache
 * `/wipe-cacheJSR`: Delete the cache
 
 ## Usage example
 
 1. Collect status for a specific month: `./getIssueCountsByMonth.sh <month-number>` (e.g. `6` for June)
 1. Collect stats for a specific status and month: `node getIssueCountsByStatusAndMonth.js -s ICEBOX -m 6`
-1. Pull all Jira issue data for all statuses from yesterday and store as JSON files in `./data/`: `./pullDataForYesterday.sh`
+1. Pull all Jira issue data for all statuses from yesterday and store as JSON files in `./$dataPath/`: `./pullDataForYesterday.sh`
     * ** Warning ** This can result in significant data storage, depending on your Jira project size
 1. Run the status server
   * Production: `npm run server`
@@ -113,11 +116,14 @@ The following elements can be set in the config file:
 * server: Local server port
 * graphicServer
 * project: Jira project as the default
+* dataPath: Relative path to data files (Default: 'data')
 * ignore
 * fa: Font Awesome link (full URL, including `.js`)
 * userGroups: Groups in Jira which are commonly used; membership is fetched only for groups in this list
 * userExclude: Individuals to not include in userGroup membership (type: array)
 * releaseExcludeTypes: Status(es) to exclude from the Progress Report (type: array) [Note: this has the same result as using the `exclude` query parameter, but cannot be overridden by the end user.]
+* adminKey: Parameter to enable/display administrative functions
+* issueTypes: Optional list of specific issue types. (Default: Epic, Story, Task, Sub-task, Bug, Test)
 
 ## Getting help
 1. All node scripts have a help page: `node script.js --help`
@@ -132,7 +138,7 @@ set DEBUG=*
 
 ## Folders
 
-* `./data/`: Where the database and all JSON files will be stored
+* `./$dataPath/`: Where the database and all JSON files will be stored (dataPath is set in Config file; default = 'data')
 * `./.cache/`: Project data (JSR) cache
 
 ## Main Files
@@ -140,7 +146,7 @@ set DEBUG=*
 * `JiraStatusServer.js`: Run a local server for handling queries
 * `JiraStatusReporter.js`: The main Javascript class
 * `*.sh`: Shell-wrappers for the Javascript files
-  * `pullDataForYesterday.sh` queries and stores all Jira issues by Status for the prior calendar day. All data is stored in `./data/*.json` files with the Status and date in the filename.
+  * `pullDataForYesterday.sh` queries and stores all Jira issues by Status for the prior calendar day. All data is stored in `./$dataPath/*.json` files with the Status and date in the filename.
 * `get*.js`: Query (and store) Jira issue details (counts or data)
   * `getIssueCounts*` only return a total number
   * `getIssues*` return the full Jira issue data

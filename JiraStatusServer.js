@@ -520,7 +520,7 @@ async function getVersions(flushCache = false) {
   debug(`getVersions(${flushCache})...`)
   if (!cache.has('versions') || (flushCache && flushCache == 'yes')) {
     debug(`... +++ updating cache...`)
-    cache.set('versions', await jsr.get(`/project/${config.project}/versions`))
+    cache.set('versions', await jsr.get(`project/${config.project}/versions`))
   }
   debug(`... returning from cache...`)
   return(cache.get('versions'))
@@ -889,9 +889,9 @@ server.get('/progress/:rel', async (req, res, next) => {
       
       res.write(`<h2>${version.name}</h2>`)
       res.write(`<h3>Release Date: ${version.releaseDate}</h2>`)
-
-      const versionRelatedIssues = await jsr.get(`/version/${rel}/relatedIssueCounts`)
-      const versionUnresolvedIssues = await jsr.get(`/version/${rel}/unresolvedIssueCount`)
+      
+      const versionRelatedIssues = await jsr.get(`version/${rel}/relatedIssueCounts`)
+      const versionUnresolvedIssues = await jsr.get(`version/${rel}/unresolvedIssueCount`)
 
       // debug(`versionRelatedIssues: `, versionRelatedIssues)
       // debug(`versionUnresolvedIssues: `, versionUnresolvedIssues)

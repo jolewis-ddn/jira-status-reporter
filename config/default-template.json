@@ -1,33 +1,28 @@
 {
-    "jira": {
-        "protocol": "https",
-        "host": "JIRA_HOST_NAME_OR_IP",
-        "username": "JIRA_USER_EMAIL_ADDR",
-        "password": "JIRA_PWD_OR_API_TOKEN",
-        "apiVersion": 2
-    },
-    "server": {
-        "port": SERVER_PORT_NUMBER
-    },
-    "graphicServer": {
-        "protocol": "http",
-        "server": "QUICKCHART_HOST_OR_IP",
-        "port": QUICKCHART_PORT_NUMBER,
-        "script": "QUICKCHART_SCRIPT_DEFAULT_chart"
-    },
-    "project": "DEFAULT_PROJECT_NAME",
-    "ignore": [ "PROJECT_KEY_OR_NAME_TO_IGNORE_OPTIONAL" ],
-    "fa": "URL_TO_FONTAWESOME_WITH_KEY_OPTIONAL",
-    "userGroups": [
-    ],
-    "userExclude": [
-    ],
-    "excludeFromEstimateQueries": [
-    ],
-    "releaseExcludeTypes": [
-    ],
-    "adminKey": [
-        "some-special-key-here"
-    ]
-}
+  "jira": {
+    "protocol": "https",
+    "host": "JIRA_HOST_NAME_OR_IP",
+    "username": "JIRA_USER_EMAIL_ADDR",
+    "password": "JIRA_PWD_OR_API_TOKEN",
+    "apiVersion": 2
+  },
+  "server": {
+    "port": SERVER_PORT_NUMBER
+  },
+  "graphicServer": {
+    "protocol": "http",
+    "server": "QUICKCHART_HOST_OR_IP",
+    "port": QUICKCHART_PORT_NUMBER,
+    "script": "QUICKCHART_SCRIPT_DEFAULT_chart"
+  },
+  "project": "DEFAULT_PROJECT_NAME",
+  "dataPath": "RELATIVE_PATH_TO_DATA_FOLDER",
+  "ignore": ["PROJECT_KEY_OR_NAME_TO_IGNORE_OPTIONAL"],
+  "fa": "URL_TO_FONTAWESOME_WITH_KEY_OPTIONAL",
+  "userGroups": [],
+  "userExclude": [],
+  "excludeFromEstimateQueries": [],
+  "releaseExcludeTypes": [],
+  "adminKey": ["some-special-key-here"],
+  "issueTypes": []
 }

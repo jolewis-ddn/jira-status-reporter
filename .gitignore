@@ -6,7 +6,7 @@ coverage
 
 .cache/*
 
-data/*
+data*/*
 .cache/*
 .jiraCache.json
 *.json

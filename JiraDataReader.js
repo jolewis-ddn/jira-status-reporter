@@ -8,6 +8,10 @@ const path = require("path");
 
 const { convertSecondsToDays } = require("./jiraUtils");
 
+const config = require('config')
+const dataPath = config.has('dataPath') ? config.get('dataPath') : 'data'
+const dataPathPrefix = '.' + path.sep + dataPath + path.sep
+
 const NodeCache = require("node-cache");
 
 const JiraDataCache = require("./JiraDataCache");
@@ -32,7 +36,7 @@ class JiraDataReader {
     this.REBUILD = 999
     this.UPDATE  = 500
     this.REFRESH = 10
-    this.db = new sqlite3.Database('./data/jira-stats.db')
+    this.db = new sqlite3.Database(dataPathPrefix + 'jira-stats.db')
     return this
   }
 
@@ -68,7 +72,7 @@ class JiraDataReader {
     }
 
     let d = this.cache.getCache(true)
-    let flist = glob.sync('./data/*.json')
+    let flist = glob.sync(dataPathPrefix + '*.json')
     let updates = 0
     debug(`Beginning db transaction...`)
 
@@ -386,6 +390,8 @@ class JiraDataReader {
       this.lastFilename = fname
       this.lastFiledate = this._parseFileDate(fname)
 
+      // debug(`lastFiledate: ${this.lastFiledate}`)
+
       let response = {}
 
       if (!this.nodeCache.has(fname)) {
@@ -393,20 +399,37 @@ class JiraDataReader {
         this.lastData = JSON.parse(data)
         // debug(`this.lastData.total = ${this.lastData.total}`);
         // Summarize data
-        let summary = {
-          Epic: { count: 0, issues: [] },
-          Story: {
-            count: 0,
-            issues: [],
-            aggregateprogress: { progress: 0, total: 0 },
-          },
-          Task: { count: 0, issues: [] },
-          'Sub-task': { count: 0, issues: [] },
-          Bug: { count: 0, issues: [] },
-          Test: { count: 0, issues: [] },
-          Requirement: { count: 0, issues: [] },
+        // If the issue types are listed in the config file, use that list
+        // Otherwise, use a hard-coded list
+        // TODO: Pull the list of issue types from Jira
+        let summary = {}
+        if (config.has('issueTypes')) {
+          debug(`>>> Pulling issue types from config file...`)
+          config.get('issueTypes').forEach((it) => {
+            summary[it] = { count: 0, issues: [] }
+            if (it == 'Story') { // Add more details for Stories
+              summary[it]['aggregateprogress'] = { progress: 0, total: 0 }
+            }
+          })
+          // debug(`>>> types: `, summary)
+        } else {
+          debug(`>>> Using hard-coded issue types...`)
+          summary = {
+            Epic: { count: 0, issues: [] },
+            Story: {
+              count: 0,
+              issues: [],
+              aggregateprogress: { progress: 0, total: 0 },
+            },
+            Task: { count: 0, issues: [] },
+            'Sub-task': { count: 0, issues: [] },
+            Bug: { count: 0, issues: [] },
+            Test: { count: 0, issues: [] },
+            Requirement: { count: 0, issues: [] },
+          }
         }
 
+        // debug(`this.lastData.issues.length: ${this.lastData.issues.length}`)
         // Increment the counter and store the issue key
         this.lastData.issues.forEach((i) => {
           // Set the release to the first fixVersion name value
@@ -420,7 +443,8 @@ class JiraDataReader {
             debug(
               `Not Handled: Multiple (${i.fields.fixVersions.length}) releases: `,
               release,
-              i.fields.fixVersions
+              i.fields.fixVersions,
+              i.fields.issuetype.name
             )
           }
 
