@@ -14,9 +14,9 @@ const dataPathPrefix = '.' + path.sep + dataPath + path.sep
 
 const NodeCache = require("node-cache");
 
+// const JSR = require('./JiraStatusReporter')
+
 const JiraDataCache = require("./JiraDataCache");
-// const { callbackify } = require("util");
-// const { resolve } = require("path");
 
 const sqlite3 = require("sqlite3").verbose();
 
@@ -37,6 +37,8 @@ class JiraDataReader {
     this.UPDATE  = 500
     this.REFRESH = 10
     this.db = new sqlite3.Database(dataPathPrefix + 'jira-stats.db')
+    // this.jsr = new JSR()
+
     return this
   }
 
@@ -414,6 +416,10 @@ class JiraDataReader {
           debug(`>>> types (from the config file): `, summary)
         } else {
           debug(`>>> Using hard-coded issue types...`)
+          // Get the data
+          // TODO: Implement the jsr.getIssueTypes(true) call
+          // const issueTypes = await this.jsr.getIssueTypes(true)
+          // debug(issueTypes)
           summary = {
             Epic: { count: 0, issues: [] },
             Story: {
