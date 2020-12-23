@@ -93,7 +93,7 @@ class JiraDataReader {
             summary: raw.summary,
           })
         } catch (err) {
-          console.error(`Error in reloadCache: ${err.message}`)
+          console.error(`Error in reloadCache (while processing ${fname}): ${err.message}`)
         }
       }
       debug(`...done with ${fname}`)

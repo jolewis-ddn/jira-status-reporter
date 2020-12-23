@@ -115,6 +115,6 @@ RED_STATUS.forEach((status) => {
       console.log(JSON.stringify(results));
     })
     .catch((err) => {
-      console.error(`err 1: ${err.statusCode}`);
+      console.error(`err 1: ${err.statusCode} ${err.message}`);
     });
 });
