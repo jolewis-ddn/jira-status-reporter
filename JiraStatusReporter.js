@@ -2,6 +2,11 @@
 const debug = require('debug')('JSR')
 const JiraApi = require('jira-client')
 
+const NodeCache = require('node-cache')
+const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 })
+
+const crypto = require('crypto')
+
 const config = require('config')
 const dataPath = config.has('dataPath') ? config.get('dataPath') : 'data'
 
@@ -98,54 +103,73 @@ class JiraStatusReporter {
     const promises = [] // Per-user query
     let err = ''
 
-    users.forEach(async (user) => {
-      promises.push(
-        jira.searchJira(
-          `project="${project}"
-          AND assignee="${user}"
-          AND status not in (${excludeStatuses.join(',')})
-          AND issuetype not in (${excludeTypes.join(',')})
-          AND fixVersion in ("${fixVersions.join(',')}")`
-        )
-      )
-    })
+    const hash = crypto.createHash('sha256')
 
-    const results = await Promise.all(promises)
-    results.forEach(async (result) => {
-      result.issues.forEach(async (issue) => {
-        const percent = issue.fields.progress.percent
-          ? issue.fields.progress.percent
-          : 0
-        response.push(
-          [
-            issue.fields.assignee.displayName,
-            issue.key,
-            (issue.fields.summary.length > 40 ? issue.fields.summary.substring(0,37) + '...' : issue.fields.summary),
-            issue.fields.issuetype.name,
-            +(issue.fields.progress.progress / 28000).toFixed(2),
-            +(issue.fields.progress.total / 28000).toFixed(2),
-            percent,
-            +((issue.fields.progress.total / 28000).toFixed(2) -
-              (issue.fields.progress.progress / 28000).toFixed(2)).toFixed(2),
-          ]
+    hash.update(
+      fixVersions.join(',') + 
+      users.join(',') + 
+      project + 
+      excludeTypes.join(',') + 
+      excludeStatuses.join(','))
+    const cacheID = `remainingWorkReport-${hash.digest('hex')}`
+    debug(`cacheID = ${cacheID}`)
+
+    if (!cache.has(cacheID)) {
+      debug(`...creating/updating cache`)
+      users.forEach(async (user) => {
+        promises.push(
+          jira.searchJira(
+            `project="${project}"
+            AND assignee="${user}"
+            AND status not in (${excludeStatuses.join(',')})
+            AND issuetype not in (${excludeTypes.join(',')})
+            AND fixVersion in ("${fixVersions.join(',')}")`
+          )
         )
       })
-    })
-    return({
-      data:
-        {
-        headers: config.reports.fields,
-        results: response
+
+      const results = await Promise.all(promises)
+      results.forEach(async (result) => {
+        result.issues.forEach(async (issue) => {
+          const percent = issue.fields.progress.percent
+            ? issue.fields.progress.percent
+            : 0
+          response.push(
+            [
+              issue.fields.assignee.displayName,
+              issue.key,
+              (issue.fields.summary.length > 40 ? issue.fields.summary.substring(0,37) + '...' : issue.fields.summary),
+              issue.fields.issuetype.name,
+              +(issue.fields.progress.progress / 28000).toFixed(2),
+              +(issue.fields.progress.total / 28000).toFixed(2),
+              percent,
+              +((issue.fields.progress.total / 28000).toFixed(2) -
+                (issue.fields.progress.progress / 28000).toFixed(2)).toFixed(2),
+            ]
+          )
+        })
+      })
+
+      cache.set(cacheID, {
+        data:
+          {
+          headers: config.reports.fields,
+          results: response
+          },
+        config: {
+          project: project,
+          users: users,
+          fixVersions: fixVersions,
+          excludeTypes: excludeTypes,
+          excludeStatuses: excludeStatuses
         },
-      config: {
-        project: project,
-        users: users,
-        fixVersions: fixVersions,
-        excludeTypes: excludeTypes,
-        excludeStatuses: excludeStatuses
-      },
-      error: err
-    })
+        error: err
+      })
+    } else {
+      debug(`...returning data from cache`)
+    } // if...!cache.has...
+
+    return(cache.get(cacheID))
   }
 
   async getIssueTypes(activeProjectOnly = true) {
