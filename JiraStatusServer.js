@@ -132,6 +132,107 @@ server.get('/count/', async (req, res, next) => {
   return next()
 })
 
+function getBarColor(estDate, relDate) {
+  // debug(`getBarColor(${estDate}, ${relDate}) called...`)
+  return (estDate < relDate) ? 'green' : 'red'
+}
+
+server.get('/remainingWorkReport/:release', async (req, res, next) => {
+  debug(`/remainingWorkReport(${req.params.release}) called...`)
+
+  const releases = await getVersions(false)
+  const releaseObj = releases.filter(rel => rel.name == req.params.release)[0]
+  const release = releaseObj.name
+  debug(`... processing release: ${releaseObj}`)
+
+  if (release) { // Valid release provided?
+    jsr.getRemainingWorkReport([release])
+    .then(async (results) => {
+      const detailTable = []
+      const userSummary = {}
+      const title = 'Remaining Work Report'
+
+      results.data.results.forEach(async (row) => {
+        detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
+        if (!Object.keys(userSummary).includes(row[0])) {
+          userSummary[row[0]] = { progress: 0, total: 0, remaining: 0 }
+        }
+        userSummary[row[0]].progress += row[3]
+        userSummary[row[0]].total += row[4]
+        userSummary[row[0]].remaining += row[6]
+      })
+
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.write(buildHtmlHeader(title, false))
+      res.write(buildPageHeader(title, release))
+      res.write(`<em>Code Freeze Date</em> ${config.reports.codeFreeze}`)
+      res.write(`<h3>Summary</h3>`)
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'>
+        <thead>
+        <tr>
+          <th>${
+            [
+              'User', 
+              'Progress', 
+              'Total', 
+              'Remaining', 
+              'Finish Date', 
+              'Timespan'
+            ].join('</th><th>')
+          }</th>
+        </tr>
+        </thead>
+        <tbody>`)
+      let sortedUserData = []
+      if (req.query.sort && req.query.sort == "name") {
+        debug(`... sorted by name (ascending)`)
+        sortedUserData = Object.keys(userSummary).sort((a,b) => {
+          return a.toUpperCase() < b.toUpperCase() 
+            ?
+            -1
+            :
+            a.toUpperCase() > b.toUpperCase()
+            ?
+            1
+            :
+            0 // Equal
+        })
+      } else {
+        debug(`... sorted by remaining work (descending)`)
+        sortedUserData = Object.keys(userSummary).sort((a,b) => {
+          return userSummary[b].remaining - userSummary[a].remaining 
+        })
+      }
+
+      const codeFreezeDate = new Date(config.reports.codeFreeze)
+      
+      sortedUserData
+      .forEach(async (user) => {
+        res.write(`<tr>
+          <td>${user}</td>
+          <td>${userSummary[user].progress.toFixed(2)}</td>
+          <td>${userSummary[user].total.toFixed(2)}</td>
+          <td>${userSummary[user].remaining.toFixed(2)}</td>
+          <td>${calcFutureDate(userSummary[user].remaining.toFixed(2))}</td>
+          <td style="vertical-align: middle;"><div style="height: 20px; width: ${userSummary[user].remaining.toFixed(2)*2}px; background-color: ${ getBarColor(new Date().addBusinessDays(userSummary[user].remaining), codeFreezeDate) };"></div></td>
+          </tr>`)
+      })
+      res.write(`</tbody></table>`)
+
+      res.write(`<h3>Item Detail</h3>`)
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${results.data.headers.join('</th><th>')}</th></tr></thead><tbody>`)
+      res.write(detailTable.join(''))
+      res.write(`</tbody></table>`)
+      res.end()
+    })
+  } else { // Invalid release
+    debug(`Invalid release provided: ${req.params.release}`)
+    res.write('Invalid release provided')
+    res.end()
+  }
+  return next()
+})
+
 server.get('/report/:project', (req, res, next) => {
   debug(`/report/${req.params.project} called`)
   JiraStatus.report(req.params.project)

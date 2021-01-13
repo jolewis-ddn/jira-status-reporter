@@ -21,7 +21,7 @@ const jira = new JiraApi({
   username: config.get('jira.username'),
   password: config.get('jira.password'),
   apiVersion: config.get('jira.apiVersion'),
-  strictSSL: true
+  strictSSL: true,
 })
 
 const JQL_EPIC = 'type=Epic'
@@ -47,7 +47,7 @@ const DEFAULT_GET_FIELDS = [
   'issuetype',
   'fixVersions',
   'customfield_10070',
-  'issuelinks'
+  'issuelinks',
 ]
 const DEFAULT_COUNT_FIELDS = ['key']
 
@@ -76,6 +76,70 @@ class JiraStatusReporter {
     return jira.findIssue(id)
   }
 
+  /**
+   * Show how much work is left, per person, for a release
+   *
+   * @param {array} [fixVersions=config.reports.releases] List of releases
+   * @param {array} [users=config.reports.users] List of users
+   * @param {string} [project=config.project] Which project
+   * @param {array} [excludeTypes=config.reports.excludeTypes] Issue types to exclude
+   * @param {array} [excludeStatuses=config.reports.excludeStatuses] Issue statuses to exclude
+   * @returns Object containing data (header (array) and results (array of result rows)) and error
+   * @memberof JiraStatusReporter
+   */
+  async getRemainingWorkReport(
+    fixVersions = config.reports.releases,
+    users = config.reports.users,
+    project = config.project,
+    excludeTypes = config.reports.excludeTypes,
+    excludeStatuses = config.reports.excludeStatuses
+  ) {
+    const response = [] // Jira data collector
+    const promises = [] // Per-user query
+    let err = ''
+
+    users.forEach(async (user) => {
+      promises.push(
+        jira.searchJira(
+          `project="${project}"
+          AND assignee="${user}"
+          AND status not in (${excludeStatuses.join(',')})
+          AND issuetype not in (${excludeTypes.join(',')})
+          AND fixVersion in ("${fixVersions.join(',')}")`
+        )
+      )
+    })
+
+    const results = await Promise.all(promises)
+    results.forEach(async (result) => {
+      result.issues.forEach(async (issue) => {
+        const percent = issue.fields.progress.percent
+          ? issue.fields.progress.percent
+          : 0
+        response.push(
+          [
+            issue.fields.assignee.displayName,
+            issue.key,
+            issue.fields.issuetype.name,
+            +(issue.fields.progress.progress / 28000).toFixed(2),
+            +(issue.fields.progress.total / 28000).toFixed(2),
+            percent,
+            +((issue.fields.progress.total / 28000).toFixed(2) -
+              (issue.fields.progress.progress / 28000).toFixed(2)).toFixed(2),
+          ]
+        )
+      })
+    })
+    return({
+      data:
+        {
+        headers: config.reports.fields,
+        results: response
+        },
+      error: err
+    })
+  }
+
   async getIssueTypes(activeProjectOnly = true) {
     debug(`getIssueTypes(${activeProjectOnly}) called...`)
     // Return all types, or just the types for the active project?
@@ -95,7 +159,9 @@ class JiraStatusReporter {
       // debug(`allIssueTypesClean: `, allIssueTypesClean)
 
       // TODO: Cache this value
-      const statuses = await jira.genericGet(`project/${config.get('project')}/statuses`)
+      const statuses = await jira.genericGet(
+        `project/${config.get('project')}/statuses`
+      )
       const response = []
       for (let j = 0; j < statuses.length; j++) {
         response.push({
@@ -233,7 +299,7 @@ class JiraStatusReporter {
     return this._genericJiraSearch(
       this.jqlAppendProject(project, JQL_EPIC),
       action
-      )
+    )
   }
 
   countDeadIssues(project) {
@@ -300,7 +366,9 @@ class JiraStatusReporter {
   }
 
   getIssuesChangedThisWeekByProjectAndStatus(project, field) {
-    debug(`getIssuesChangedThisWeekByProjectAndStatus(${project}, ${field}) called...`)
+    debug(
+      `getIssuesChangedThisWeekByProjectAndStatus(${project}, ${field}) called...`
+    )
     return this._issuesChangedThisWeekByProjectAndStatus(
       project,
       field,
@@ -410,7 +478,7 @@ class JiraStatusReporter {
       'issuetype',
       'summary',
       'parent',
-      'fixversion'
+      'fixversion',
     ])
     const jql = `parentEpic=${epicId}`
     debug(`getEpicAndChildren(${epicId}) called... jql: ${jql}`)
@@ -425,7 +493,7 @@ class JiraStatusReporter {
       id: issueId,
       status: issue.fields.status.name,
       type: issue.fields.issuetype.name,
-      issuelinks: issue.fields.issuelinks
+      issuelinks: issue.fields.issuelinks,
     }
   }
 
@@ -452,7 +520,8 @@ class JiraStatusReporter {
   }
 
   async getProjects(countIssues) {
-    if (countIssues) { // Get all the issue counts, too
+    if (countIssues) {
+      // Get all the issue counts, too
       let projectData = {}
       let promises = []
       let seq = []
@@ -463,7 +532,11 @@ class JiraStatusReporter {
 
       for (let y = 0; y < projects.length; y++) {
         let p = projects[y]
-        if (config.has('ignore') && (config.get('ignore').includes(p.key) || config.get('ignore').includes(p.name))) {
+        if (
+          config.has('ignore') &&
+          (config.get('ignore').includes(p.key) ||
+            config.get('ignore').includes(p.name))
+        ) {
           debug(`Skipping ${p.name} - set to 'ignore' in config`)
           // projectData[p.name] = { counts: [0,0,0,0,0] }
         } else {
@@ -474,7 +547,7 @@ class JiraStatusReporter {
             seq.push({ name: p.name, issuetype: issuetype })
             if (!names.includes(p.name)) {
               names.push(p.name)
-              projectData[p.name] = { counts: [0,0,0,0,0] }
+              projectData[p.name] = { counts: [0, 0, 0, 0, 0] }
             }
           })
         }
@@ -486,15 +559,18 @@ class JiraStatusReporter {
         let ndx = x
         // debug(`name: ${seq[ndx].name}; type: ${seq[ndx].issuetype}; index: ${types.indexOf(seq[ndx].issuetype)}; result: ${result}`)
         // debug(projectData[seq[ndx].name])
-        projectData[seq[ndx].name].counts[types.indexOf(seq[ndx].issuetype)] = result
+        projectData[seq[ndx].name].counts[
+          types.indexOf(seq[ndx].issuetype)
+        ] = result
       }
       // debug(`finally returning `, projectData)
-      return (projectData)
-    } else { // Just the project names
+      return projectData
+    } else {
+      // Just the project names
       return jira.listProjects()
     }
-}
-      
+  }
+
   async _genericJiraSearch(jql, action, fields = []) {
     return new Promise((resolve, reject) => {
       debug(`_genericJiraSearch(${jql}, ${action}, ${fields}) called...`)
@@ -529,68 +605,73 @@ class JiraStatusReporter {
 
           // First: Get max # of results
           queryConfig.maxResults = 1
-          debug(`about to get # of results: jql = ${jql}; queryConfig: `, queryConfig)
-        
-          jira.searchJira(jql, queryConfig).then((results) => {
-            debug(`A) results.issues.length = ${results.issues.length}`)
-            debug(`...total = ${results.total}`)
-            let compiledResults = {}
+          debug(
+            `about to get # of results: jql = ${jql}; queryConfig: `,
+            queryConfig
+          )
 
-            // Second: Calc # of queries needed
-            queryConfig.maxResults = 99
-            let TOTAL_RESULTS = results.total
-            if (TOTAL_RESULTS > 0) {
-              let runCount = Math.ceil(TOTAL_RESULTS / queryConfig.maxResults)
-              debug(
-                `runCount: (Math.ceil(${queryConfig.maxResults}/${TOTAL_RESULTS})) = ${runCount}`
-              )
+          jira
+            .searchJira(jql, queryConfig)
+            .then((results) => {
+              debug(`A) results.issues.length = ${results.issues.length}`)
+              debug(`...total = ${results.total}`)
+              let compiledResults = {}
 
-              // Third: Queue up queries
-              // Build array of queries/promises to run
-              let jobList = []
-              for (let ctr = 0; ctr < runCount; ctr++) {
-                queryConfig.startAt = ctr * queryConfig.maxResults
-                // debug(`jobList.push(jira.searchJira(${jql}`, queryConfig, `)`)
-                jobList.push(jira.searchJira(jql, queryConfig))
-              }
+              // Second: Calc # of queries needed
+              queryConfig.maxResults = 99
+              let TOTAL_RESULTS = results.total
+              if (TOTAL_RESULTS > 0) {
+                let runCount = Math.ceil(TOTAL_RESULTS / queryConfig.maxResults)
+                debug(
+                  `runCount: (Math.ceil(${queryConfig.maxResults}/${TOTAL_RESULTS})) = ${runCount}`
+                )
 
-              debug(`jobList built... length = ${jobList.length}`)
+                // Third: Queue up queries
+                // Build array of queries/promises to run
+                let jobList = []
+                for (let ctr = 0; ctr < runCount; ctr++) {
+                  queryConfig.startAt = ctr * queryConfig.maxResults
+                  // debug(`jobList.push(jira.searchJira(${jql}`, queryConfig, `)`)
+                  jobList.push(jira.searchJira(jql, queryConfig))
+                }
 
-              // Fourth: Run queries
-              Promise.all(jobList)
-                .then((rawResults) => {
-                  // Fifth: Combine results
-                  compiledResults.total = rawResults[0].total
-                  compiledResults.expand = rawResults[0].expand
-                  compiledResults.startAt = 0
-                  compiledResults.maxResults = compiledResults.total
-                  compiledResults.comment = 'Compiled by JiraStatusReporter'
-                  compiledResults.issues = []
-                  for (let rrctr = 0; rrctr < rawResults.length; rrctr++) {
-                    const element = rawResults[rrctr]
-                    compiledResults.issues = compiledResults.issues.concat(
-                      rawResults[rrctr].issues
+                debug(`jobList built... length = ${jobList.length}`)
+
+                // Fourth: Run queries
+                Promise.all(jobList)
+                  .then((rawResults) => {
+                    // Fifth: Combine results
+                    compiledResults.total = rawResults[0].total
+                    compiledResults.expand = rawResults[0].expand
+                    compiledResults.startAt = 0
+                    compiledResults.maxResults = compiledResults.total
+                    compiledResults.comment = 'Compiled by JiraStatusReporter'
+                    compiledResults.issues = []
+                    for (let rrctr = 0; rrctr < rawResults.length; rrctr++) {
+                      const element = rawResults[rrctr]
+                      compiledResults.issues = compiledResults.issues.concat(
+                        rawResults[rrctr].issues
+                      )
+                    }
+
+                    // Complain if the expected and actual total counts don't match
+                    console.assert(
+                      compiledResults.issues.length == rawResults[0].total
                     )
-                  }
 
-                  // Complain if the expected and actual total counts don't match
-                  console.assert(
-                    compiledResults.issues.length == rawResults[0].total
-                  )
-
-                  resolve(compiledResults)
-                })
-                .catch((err) => {
-                  reject(err)
-                })
-            } else {
-              resolve(results)
-            }
-          })
-          .catch((err) => {
-            debug('ERROR: jql: %s; ERR %O', jql, err.statusCode)
-            reject(err)
-          })
+                    resolve(compiledResults)
+                  })
+                  .catch((err) => {
+                    reject(err)
+                  })
+              } else {
+                resolve(results)
+              }
+            })
+            .catch((err) => {
+              debug('ERROR: jql: %s; ERR %O', jql, err.statusCode)
+              reject(err)
+            })
           break
         default:
           reject(`Unknown action specified: ${action}`)
