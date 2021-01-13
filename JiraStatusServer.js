@@ -100,6 +100,7 @@ server.get('/', (req, res, next) => {
   <li>Projects (<a href='/projects'>JSON</a> or <a href='/projects?format=html'>HTML</a>)</li>
   <li>Query</li>
   <li>Releases (<a href='/releases'>JSON</a> or <a href='/releases?format=html'>HTML</a>)</li>
+  <li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>
   <li>Report: Project-specific; Requires Jira project name ('/PROJECT_NAME') (JSON)</li>
   <li><a href='/requirements'>Requirements</a> (HTML)</li>
   <li>Unestimated (<a href='/unestimated'>JSON</a> or <a href='/unestimated?format=html'>HTML</a>)</li>`)
@@ -143,23 +144,27 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
   const releases = await getVersions(false)
   const releaseObj = releases.filter(rel => rel.name == req.params.release)[0]
   const release = releaseObj.name
-  debug(`... processing release: ${releaseObj}`)
+  debug(`... processing release: `, releaseObj)
 
   if (release) { // Valid release provided?
+    let reportParams = {}
+
     jsr.getRemainingWorkReport([release])
     .then(async (results) => {
       const detailTable = []
       const userSummary = {}
       const title = 'Remaining Work Report'
 
+      reportParams = results.config
+
       results.data.results.forEach(async (row) => {
         detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
         if (!Object.keys(userSummary).includes(row[0])) {
           userSummary[row[0]] = { progress: 0, total: 0, remaining: 0 }
         }
-        userSummary[row[0]].progress += row[3]
-        userSummary[row[0]].total += row[4]
-        userSummary[row[0]].remaining += row[6]
+        userSummary[row[0]].progress += row[4]
+        userSummary[row[0]].total += row[5]
+        userSummary[row[0]].remaining += row[7]
       })
 
       res.writeHead(200, { 'Content-Type': 'text/html' })
@@ -205,11 +210,11 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       }
 
       const codeFreezeDate = new Date(config.reports.codeFreeze)
-      
+
       sortedUserData
       .forEach(async (user) => {
         res.write(`<tr>
-          <td>${user}</td>
+          <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=project="${results.config.project}"%20AND%20assignee="${user}"%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(',')})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(',')})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(',')}")' target='_blank'>${user}</a></td>
           <td>${userSummary[user].progress.toFixed(2)}</td>
           <td>${userSummary[user].total.toFixed(2)}</td>
           <td>${userSummary[user].remaining.toFixed(2)}</td>

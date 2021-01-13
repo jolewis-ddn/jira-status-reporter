@@ -120,6 +120,7 @@ class JiraStatusReporter {
           [
             issue.fields.assignee.displayName,
             issue.key,
+            (issue.fields.summary.length > 40 ? issue.fields.summary.substring(0,37) + '...' : issue.fields.summary),
             issue.fields.issuetype.name,
             +(issue.fields.progress.progress / 28000).toFixed(2),
             +(issue.fields.progress.total / 28000).toFixed(2),
@@ -136,6 +137,13 @@ class JiraStatusReporter {
         headers: config.reports.fields,
         results: response
         },
+      config: {
+        project: project,
+        users: users,
+        fixVersions: fixVersions,
+        excludeTypes: excludeTypes,
+        excludeStatuses: excludeStatuses
+      },
       error: err
     })
   }
