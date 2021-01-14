@@ -159,11 +159,14 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       results.data.results.forEach(async (row) => {
         detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
         if (!Object.keys(userSummary).includes(row[0])) {
-          userSummary[row[0]] = { progress: 0, total: 0, remaining: 0 }
+          userSummary[row[0]] = { progress: 0, total: 0, remaining: 0, unestimatedCount: 0, issueCount: 0 }
         }
         userSummary[row[0]].progress += row[4]
         userSummary[row[0]].total += row[5]
         userSummary[row[0]].remaining += row[7]
+
+        if (row[5] == 0) { userSummary[row[0]].unestimatedCount += 1 }
+        userSummary[row[0]].issueCount += 1
       })
 
       res.writeHead(200, { 'Content-Type': 'text/html' })
@@ -180,6 +183,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
               'Progress', 
               'Total', 
               'Remaining', 
+              '% Unestimated', 
               'Finish Date', 
               'Timespan'
             ].join('</th><th>')
@@ -214,10 +218,11 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       .forEach(async (user) => {
         res.write(`<tr>
           <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=project="${results.config.project}"%20AND%20assignee${user == UNASSIGNED_USER ? ` is empty` : `="${user}"`}%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(',')})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(',')})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(',')}")' target='_blank'>${user}</a></td>
-          <td>${userSummary[user].progress.toFixed(2)}</td>
-          <td>${userSummary[user].total.toFixed(2)}</td>
-          <td>${userSummary[user].remaining.toFixed(2)}</td>
-          <td>${calcFutureDate(userSummary[user].remaining.toFixed(2))}</td>
+          <td class="text-center">${userSummary[user].progress.toFixed(2)}</td>
+          <td class="text-center">${userSummary[user].total.toFixed(2)}</td>
+          <td class="text-center">${userSummary[user].remaining.toFixed(2)}</td>
+          <td class="text-center" data-toggle="tooltip" data-html="true" title="${userSummary[user].unestimatedCount} of ${userSummary[user].issueCount} total">${userSummary[user].issueCount > 0 ? (100*(userSummary[user].unestimatedCount/userSummary[user].issueCount)).toFixed(0) : 0 }%</td>
+          <td class="text-center">${calcFutureDate(userSummary[user].remaining.toFixed(2))}</td>
           <td style="vertical-align: middle;"><div style="height: 20px; width: ${userSummary[user].remaining.toFixed(2)*2}px; background-color: ${ getBarColor(new Date().addBusinessDays(userSummary[user].remaining), codeFreezeDate) };"></div></td>
           </tr>`)
       })
@@ -227,6 +232,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${results.data.headers.join('</th><th>')}</th></tr></thead><tbody>`)
       res.write(detailTable.join(''))
       res.write(`</tbody></table>`)
+      res.write(buildHtmlFooter())
       res.end()
     })
   } else { // Invalid release
