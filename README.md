@@ -62,6 +62,7 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/filter`: Visualize issue status using existing Jira filter
 * `/issueTypes`: List of issue types (either project-specific or global)
 * `/links`: Visualize issue links
+* `/remainingWorkReport`: Per-issue work left for specified release
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
 * `/unestimated`: Table showing the number of unestimated Stories (with a link to Jira)
 ### Releases
@@ -125,6 +126,7 @@ The following elements can be set in the config file:
 * releaseExcludeTypes: Status(es) to exclude from the Progress Report (type: array) [Note: this has the same result as using the `exclude` query parameter, but cannot be overridden by the end user.]
 * adminKey: Parameter to enable/display administrative functions
 * issueTypes: Optional list of specific issue types. (Default: Epic, Story, Task, Sub-task, Bug, Test)
+* unassignedUser: String to represent unassigned items. May be used in various reports (including remainingWorkReport). (Default: 'UNASSIGNED')
 
 ## Getting help
 1. All node scripts have a help page: `node script.js --help`
