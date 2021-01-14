@@ -31,8 +31,7 @@ const dashboard = new Dashboard()
 const LocalStorage = require('node-localstorage').LocalStorage
 let ls = new LocalStorage('./.cache')
 
-// const path = require('path')
-// const JiraDataCache = require('./JiraDataCache');
+const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
 
 const labels = ['Epic', 'Story', 'Task', 'Sub-task', 'Bug', 'Requirement']
 const states = ['Open', 'Active', 'Closed', 'Stopped', 'New']
@@ -214,7 +213,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       sortedUserData
       .forEach(async (user) => {
         res.write(`<tr>
-          <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=project="${results.config.project}"%20AND%20assignee="${user}"%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(',')})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(',')})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(',')}")' target='_blank'>${user}</a></td>
+          <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=project="${results.config.project}"%20AND%20assignee${user == UNASSIGNED_USER ? ` is empty` : `="${user}"`}%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(',')})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(',')})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(',')}")' target='_blank'>${user}</a></td>
           <td>${userSummary[user].progress.toFixed(2)}</td>
           <td>${userSummary[user].total.toFixed(2)}</td>
           <td>${userSummary[user].remaining.toFixed(2)}</td>

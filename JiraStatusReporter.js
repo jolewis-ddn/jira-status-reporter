@@ -30,6 +30,7 @@ const jira = new JiraApi({
 })
 
 const JQL_EPIC = 'type=Epic'
+const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
 
 const { promisify } = require('util')
 const sleep = promisify(setTimeout)
@@ -120,7 +121,7 @@ class JiraStatusReporter {
         promises.push(
           jira.searchJira(
             `project="${project}"
-            AND assignee="${user}"
+            AND assignee${user == UNASSIGNED_USER ? " is empty" : `="${user}"`}
             AND status not in (${excludeStatuses.join(',')})
             AND issuetype not in (${excludeTypes.join(',')})
             AND fixVersion in ("${fixVersions.join(',')}")`
@@ -136,7 +137,7 @@ class JiraStatusReporter {
             : 0
           response.push(
             [
-              issue.fields.assignee.displayName,
+              (issue.fields.assignee ? issue.fields.assignee.displayName : UNASSIGNED_USER),
               issue.key,
               (issue.fields.summary.length > 40 ? issue.fields.summary.substring(0,37) + '...' : issue.fields.summary),
               issue.fields.issuetype.name,
