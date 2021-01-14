@@ -151,7 +151,7 @@ class JiraStatusReporter {
         })
       })
 
-      cache.set(cacheID, {
+      const cacheData = {
         data:
           {
           headers: config.reports.fields,
@@ -164,8 +164,15 @@ class JiraStatusReporter {
           excludeTypes: excludeTypes,
           excludeStatuses: excludeStatuses
         },
+        meta: {
+          cacheDate: new Date(),
+          cacheID: cacheID
+        },
         error: err
-      })
+      }
+      cache.set(cacheID, 'TBD')
+      cacheData.meta.cacheTTL = cache.getTtl(cacheID)
+      cache.set(cacheID, cacheData)
     } else {
       debug(`...returning data from cache`)
     } // if...!cache.has...

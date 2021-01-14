@@ -143,10 +143,10 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
   const releases = await getVersions(false)
   const releaseObj = releases.filter(rel => rel.name == req.params.release)[0]
   const release = releaseObj.name
-  debug(`... processing release: `, releaseObj)
+  // debug(`... processing release: `, releaseObj)
 
   if (release) { // Valid release provided?
-    let reportParams = {}
+    // let reportParams = {}
 
     jsr.getRemainingWorkReport([release])
     .then(async (results) => {
@@ -154,7 +154,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       const userSummary = {}
       const title = 'Remaining Work Report'
 
-      reportParams = results.config
+      // reportParams = results.config
 
       results.data.results.forEach(async (row) => {
         detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
@@ -173,6 +173,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       res.write(buildHtmlHeader(title, false))
       res.write(buildPageHeader(title, release))
       res.write(`<em>Code Freeze Date</em> ${config.reports.codeFreeze}`)
+      res.write(`<div><small class="text-muted">Cache date: ${results.meta.cacheDate} (Expires in ${((results.meta.cacheTTL - new Date().getTime())/1000/60).toFixed(2)} minutes)</small></div>`)
       res.write(`<h3>Summary</h3>`)
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'>
         <thead>
