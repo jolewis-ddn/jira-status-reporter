@@ -222,7 +222,14 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
           <td class="text-center">${userSummary[user].progress.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].total.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].remaining.toFixed(2)}</td>
-          <td class="text-center" data-toggle="tooltip" data-html="true" title="${userSummary[user].unestimatedCount} of ${userSummary[user].issueCount} total">${userSummary[user].issueCount > 0 ? (100*(userSummary[user].unestimatedCount/userSummary[user].issueCount)).toFixed(0) : 0 }%</td>
+          <td class="text-center" data-toggle="tooltip" data-html="true" title="${userSummary[user].unestimatedCount} of ${userSummary[user].issueCount} total">${userSummary[user].issueCount > 0 ? (100*(userSummary[user].unestimatedCount/userSummary[user].issueCount)).toFixed(0) : 0 }%
+          <!-- unestimated blocks -->`)
+          if (userSummary[user].unestimatedCount > 0) {
+            for (let i = 0; i < userSummary[user].unestimatedCount; i++) {
+              res.write(`<span style="vertical-align: middle; height: 10px; width: 10px; background-color: red; padding: 0px 4px 0px 0px; margin: 2px;"></span>`)
+            }
+          }
+          res.write(`</td>
           <td class="text-center">${calcFutureDate(userSummary[user].remaining.toFixed(2))}</td>
           <td style="vertical-align: middle;"><div style="height: 20px; width: ${userSummary[user].remaining.toFixed(2)*2}px; background-color: ${ getBarColor(new Date().addBusinessDays(userSummary[user].remaining), codeFreezeDate) };"></div></td>
           </tr>`)
@@ -697,6 +704,7 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
           }
           
           // debug(c, assignee, issue.fields.issuetype.name, issue.fields.progress.progress)
+          // TODO: Check that issue.fields.progress is defined
           componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
           componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
           componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].count += 1
@@ -2763,7 +2771,7 @@ server.get('/reread-cacheJSR', (req, res, next) => {
 })
 
 server.get('/refresh-cacheJSR', (req, res, next) => {
-  const updates = jdr.reloadCache(jdr.refresh())
+  const updates = await jdr.reloadCache(jdr.refresh())
   res.redirect(`/?alert=refreshed%20${updates}%20cache%20entries`, next)
   return
 })
