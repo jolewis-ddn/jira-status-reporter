@@ -62,7 +62,7 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/filter`: Visualize issue status using existing Jira filter
 * `/issueTypes`: List of issue types (either project-specific or global)
 * `/links`: Visualize issue links
-* `/remainingWorkReport`: Per-issue work left for specified release
+* `/remainingWorkReport`: Per-issue work left for specified release. [See config option "workInSubtasksOnly" for important information impacting this report.]
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
 * `/unestimated`: Table showing the number of unestimated Stories (with a link to Jira)
 ### Releases
@@ -127,6 +127,7 @@ The following elements can be set in the config file:
 * adminKey: Parameter to enable/display administrative functions
 * issueTypes: Optional list of specific issue types. (Default: Epic, Story, Task, Sub-task, Bug, Test)
 * unassignedUser: String to represent unassigned items. May be used in various reports (including remainingWorkReport). (Default: 'UNASSIGNED')
+* workInSubtasksOnly: Boolean indicating whether or not Stories contain work in addition to work in Sub-Tasks. If this value is _true_ then Stories that contain Sub-Tasks do not contain work in themselves (i.e. all work is in the Sub-Tasks). If this value is _false_ then Stories may contain work above and beyond work estimates in the Sub-Tasks. (Stories without Sub-Tasks are always included.) This is currently only honored by the Remaining Work Report, which now shows, at the top of the report, a string indicating this value: "Stories with Sub-Tasks are shown/included" (_false_) or "Stories with Sub-Tasks are not shown/included" (_true_). (Default: _false_)
 
 ## Getting help
 1. All node scripts have a help page: `node script.js --help`
