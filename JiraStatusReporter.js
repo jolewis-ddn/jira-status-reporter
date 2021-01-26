@@ -135,19 +135,21 @@ class JiraStatusReporter {
           const percent = issue.fields.progress.percent
             ? issue.fields.progress.percent
             : 0
-          response.push(
-            [
-              (issue.fields.assignee ? issue.fields.assignee.displayName : UNASSIGNED_USER),
-              issue.key,
-              (issue.fields.summary.length > 40 ? issue.fields.summary.substring(0,37) + '...' : issue.fields.summary),
-              issue.fields.issuetype.name,
-              +(issue.fields.progress.progress / 28000).toFixed(2),
-              +(issue.fields.progress.total / 28000).toFixed(2),
-              percent,
-              +((issue.fields.progress.total / 28000).toFixed(2) -
-                (issue.fields.progress.progress / 28000).toFixed(2)).toFixed(2),
-            ]
-          )
+          if (this.issueBelongsToRemainingWorkReport(issue)) {
+            response.push(
+              [
+                (issue.fields.assignee ? issue.fields.assignee.displayName : UNASSIGNED_USER),
+                issue.key,
+                (issue.fields.summary.length > 40 ? issue.fields.summary.substring(0,37) + '...' : issue.fields.summary),
+                issue.fields.issuetype.name,
+                +(issue.fields.progress.progress / 28000).toFixed(2),
+                +(issue.fields.progress.total / 28000).toFixed(2),
+                percent,
+                +((issue.fields.progress.total / 28000).toFixed(2) -
+                  (issue.fields.progress.progress / 28000).toFixed(2)).toFixed(2),
+              ]
+            )
+          }
         })
       })
 
@@ -178,6 +180,27 @@ class JiraStatusReporter {
     } // if...!cache.has...
 
     return(cache.get(cacheID))
+  }
+
+  issueBelongsToRemainingWorkReport(issue = false) {
+    // debug(`issueBelongsToRemainingWorkReport(...) called...`)
+    if (issue) {
+      if (config.has('workInSubtasksOnly') && config.workInSubtasksOnly) {
+        if (issue.fields.issuetype.name && issue.fields.issuetype.name == 'Story') {
+          if (issue.fields.subtasks.length != 0) {
+            debug(`issueBelongsToRemainingWorkReport(...) returning ${issue.fields.subtasks.length == 0} for ${issue.key}`)
+          }
+          return(issue.fields.subtasks.length == 0)
+        } else {
+          return(true)
+        }
+      } else {
+        return(true)
+      }
+    } else {
+      debug(`...no issue data, so returning false`)
+      return(false)
+    }
   }
 
   async getIssueTypes(activeProjectOnly = true) {

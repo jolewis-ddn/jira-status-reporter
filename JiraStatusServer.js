@@ -172,7 +172,8 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       res.writeHead(200, { 'Content-Type': 'text/html' })
       res.write(buildHtmlHeader(title, false))
       res.write(buildPageHeader(title, release))
-      res.write(`<em>Code Freeze Date</em> ${config.reports.codeFreeze}`)
+      res.write(`<div><em>Code Freeze Date</em> ${config.reports.codeFreeze}</div>`)
+      res.write(`<div><em>Stories with Sub-Tasks</em> are ${config.has('workInSubtasksOnly') && config.workInSubtasksOnly ? '<strong>not</strong>': ''} shown/included</div>`)
       res.write(`<div><small class="text-muted">Cache date: ${results.meta.cacheDate} (Expires in ${((results.meta.cacheTTL - new Date().getTime())/1000/60).toFixed(2)} minutes)</small></div>`)
       res.write(`<h3>Summary</h3>`)
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'>
@@ -2770,7 +2771,7 @@ server.get('/reread-cacheJSR', (req, res, next) => {
   return
 })
 
-server.get('/refresh-cacheJSR', (req, res, next) => {
+server.get('/refresh-cacheJSR', async (req, res, next) => {
   const updates = await jdr.reloadCache(jdr.refresh())
   res.redirect(`/?alert=refreshed%20${updates}%20cache%20entries`, next)
   return
