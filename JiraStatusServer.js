@@ -73,7 +73,7 @@ server.get(
   restify.plugins.serveStatic({ directory: './static', default: 'charts.html' })
 )
 
-server.get('/', (req, res, next) => {
+server.get('/', async (req, res, next) => {
   const title = 'Jira Status Reporter: ' + config.get('project')
   res.write(buildHtmlHeader(title, false, true))
   res.write(buildPageHeader(title, 'Available Endpoints'))
@@ -81,6 +81,10 @@ server.get('/', (req, res, next) => {
     debug(`req.query.alert: ${req.query.alert}`)
     res.write(buildAlert(req.query.alert))
   }
+
+  const releases = await getVersions(false)
+  debug(`... releases: `, releases)
+
   res.write(`<ul>
   <li><a href='/burndown'>Burndown chart</a> (HTML)</li>
   <li><a href='/chart?exclude=DEAD'>Chart</a> (excluding DEAD issues) (HTML)</li>
@@ -95,12 +99,26 @@ server.get('/', (req, res, next) => {
   <li>Groups (<a href='/groups'>JSON</a> or <a href='/groups?format=html'>HTML</a>)</li>
   <li>Issue Types (<a href='/issueTypes'>For ${config.get('project')} only</a> or <a href='/issueTypes?all=yes'>Complete list</a>)</li>
   <li>Links (<a href='/links'>JSON</a> or <a href='/links?format=html'>HTML/Mermaid</a>): Requires Jira key parameter ('?id=ABC-1234')</li>
-  <li>Progress: Requires Jira release ID ('release/111111') (HTML)</li>
-  <li>Projects (<a href='/projects'>JSON</a> or <a href='/projects?format=html'>HTML</a>)</li>
+  <li>Progress: Requires Jira release ID ('release/111111') (HTML)</li>`)
+
+  if (releases.length) {
+    res.write(`<ul><li><em>${config.project} releases:</em> `)
+    res.write(releases.filter((rel) => !rel.released).map((rel) => `<a href='/progress/${rel.id}'>${rel.name} (${rel.id})</a>`).join(', '))
+    res.write(`</li></ul>`)
+  }
+
+  res.write(`<li>Projects (<a href='/projects'>JSON</a> or <a href='/projects?format=html'>HTML</a>)</li>
   <li>Query</li>
   <li>Releases (<a href='/releases'>JSON</a> or <a href='/releases?format=html'>HTML</a>)</li>
-  <li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>
-  <li>Report: Project-specific; Requires Jira project name ('/PROJECT_NAME') (JSON)</li>
+  <li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>`)
+
+  if (releases.length) {
+    res.write(`<ul><li><em>${config.project} releases:</em> `)
+    res.write(releases.filter((rel) => !rel.released).map((rel) => `<a href='/remainingWorkReport/${rel.name}'>${rel.name}</a>`).join(', '))
+    res.write(`</li></ul>`)
+  }
+
+  res.write(`<li>Report: Project-specific; Requires Jira project name ('/PROJECT_NAME', e.g. <a href='/report/${config.project}'>${config.project}</a>) (JSON)</li>
   <li><a href='/requirements'>Requirements</a> (HTML)</li>
   <li>Unestimated (<a href='/unestimated'>JSON</a> or <a href='/unestimated?format=html'>HTML</a>)</li>`)
 
@@ -141,9 +159,10 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
   debug(`/remainingWorkReport(${req.params.release}) called...`)
 
   const releases = await getVersions(false)
+  debug(`... releases: `, releases)
   const releaseObj = releases.filter(rel => rel.name == req.params.release)[0]
-  const release = releaseObj.name
-  // debug(`... processing release: `, releaseObj)
+  const release = releaseObj && releaseObj.name ? releaseObj.name : false
+  debug(`... processing release: `, releaseObj)
 
   if (release) { // Valid release provided?
     // let reportParams = {}
