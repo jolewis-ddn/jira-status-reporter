@@ -121,6 +121,8 @@ The following elements can be set in the config file:
 * dataPath: Relative path to data files (Default: 'data')
 * ignore
 * fa: Font Awesome link (full URL, including `.js`)
+* forecast
+  * teamSize: Additional forecast line on burndown chart based on team size
 * userGroups: Groups in Jira which are commonly used; membership is fetched only for groups in this list
 * userExclude: Individuals to not include in userGroup membership (type: array)
 * releaseExcludeTypes: Status(es) to exclude from the Progress Report (type: array) [Note: this has the same result as using the `exclude` query parameter, but cannot be overridden by the end user.]

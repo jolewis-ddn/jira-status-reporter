@@ -195,6 +195,12 @@ class ChartLinkMaker {
     return this;
   }
 
+  addCategory(cat) {
+    debug(`addCategory(${cat}) called... Adding after ${this.dataCategories[this.dataCategories.length-1]}`)
+    this.dataCategories.push(cat)
+    return this
+  }
+
   /**
    * Make sure the categories are valid and their sizes match the series length/size.
    *
@@ -361,6 +367,7 @@ class ChartLinkMaker {
       }
 
       if (Object.keys(data)) {
+        debug(`data keys: ${Object.keys(data).join(',')}`)
         let forecastType = ''
         let dataGroups = ""
         // Workaround for specifying stacked bar chart
@@ -368,9 +375,10 @@ class ChartLinkMaker {
           if (Object.keys(data).includes("Forecast")) {
             const subData = {...data}
             delete subData["Forecast"]
+            delete subData["Forecast_TeamSize"]
             dataGroups = `groups: [ ${this.getGroups(subData)} ],`
 
-            forecastType = 'types: { Forecast: "line", },'
+            forecastType = `types: { Forecast: "line", Forecast_TeamSize: "line" },`
           } else {
             dataGroups = `groups: [ ${this.getGroups(data)} ],`
           }

@@ -2258,7 +2258,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     const origBurndownDates = Array.from(burndown.dates)
     // Extend the dates to the release date
     burndown.dates = extendDates(burndown.dates, versionReleaseDate)
-    const datesAdded = burndown.dates.length - origBurndownDates.length
+    // const datesAdded = burndown.dates.length - origBurndownDates.length
     
     // debug(`burndown.dates: added ${datesAdded} new entries`)
     jsrCLM.setCategories(burndown.dates)
@@ -2270,6 +2270,12 @@ server.get('/burndown/:rel', async (req, res, next) => {
     // debug(`lastTotalEstimate: ${lastTotalEstimate}`)
 
     data['Forecast'] = Array(burndown.dates.length)
+    let hasForecast2 = component ? false : config.has('forecast') && config.forecast.has('teamSize') && typeof config.forecast.teamSize == 'number'
+    debug(`hasForecast2 = ${hasForecast2}; typeof == ${typeof config.forecast.teamSize}`)
+
+    if (hasForecast2) {
+      data['Forecast_TeamSize'] = Array(burndown.dates.length)
+    }
 
     // Count # of working days between today and release date
     let workdaySpan = 0
@@ -2281,39 +2287,89 @@ server.get('/burndown/:rel', async (req, res, next) => {
     
     let loc = origBurndownDates.length
     while (lastActualDay < lastForecastDay) {
-      // data['Forecast'][loc] = lastTotalEstimate - (5 * (loc - origBurndownDates.length))
       if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
         workdaySpan++
-        // debug(`increasing workdaySpan to ${workdaySpan}`)
       }
       lastActualDay.setDate(lastActualDay.getDate() + 1)
     }
     const burndownRate = Math.ceil(lastTotalEstimate/workdaySpan)
     let currEstimate = lastTotalEstimate
-    
+    let currEstimate2 = currEstimate // Forecast_TeamSize
+
     lastActualDay = new Date(burndown.dates[origBurndownDates.length])
     lastActualDay.setHours(0,0,0,0)
     lastActualDay.setDate(lastActualDay.getDate() + 1)
     
+    // let locCtr = 0
+    let finalForecast2Value = 0
     // Set the forecast value
-    for (let loc = origBurndownDates.length; loc <= burndown.dates.length; loc++) {
-      // lastActualDay.setDate(burndown.dates[loc])
-      // lastActualDay.setHours(0,0,0,0)
-
+    for (loc = origBurndownDates.length; loc <= burndown.dates.length; loc++) {
+      // locCtr++
       // debug(`setting forecast on ${burndown.dates[loc]} (lastActualDay: ${lastActualDay}) to ${currEstimate}`)
       data['Forecast'][loc] = Math.round(currEstimate)
+      if (hasForecast2) {
+        data['Forecast_TeamSize'][loc] = Math.round(currEstimate2)
+      }
+
       if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
         currEstimate -= burndownRate
-        if (currEstimate < 0) { currEstimate = 0 }
+        if (currEstimate < 0) {
+          currEstimate = 0 
+        }
+
+        currEstimate2 -= config.forecast.teamSize
+        if (currEstimate2 < 0) {
+          currEstimate2 = 0
+        }
+
+        if (hasForecast2) {
+          // debug(`forecast2 name: ${forecast2Name}`)
+          // data['Forecast_TeamSize'][loc] = Math.round(currEstimate2)
+          finalForecast2Value = data['Forecast_TeamSize'][loc]
+        }
       }
       lastActualDay.setDate(lastActualDay.getDate() + 1)
     }
+
+    debug(`Forecast_TeamSize ending with ${finalForecast2Value}; ${Math.round(finalForecast2Value/config.forecast.teamSize)} days`)
+
+    debug(`finalForecast2Value: `, finalForecast2Value)
+    // Forecast2 goes beyond the previous end date
+    // so extend the X axis as needed
+    if (hasForecast2) {
+      while (finalForecast2Value > -1 * config.forecast.teamSize) { 
+        jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate() > 9 ? `0${lastActualDay.getDate()}` : lastActualDay.getDate()}`}`)
+        loc += 1
+        if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
+          finalForecast2Value -= config.forecast.teamSize
+          data['Forecast_TeamSize'][loc] = Math.max(Math.round(finalForecast2Value), 0)
+          debug(`setting data['Forecast_TeamSize'][${loc}] to ${data['Forecast_TeamSize'][loc]} on ${lastActualDay}`)
+          // data['x'][loc] = lastActualDay
+        } else {
+          debug(`WEEKEND: setting data['Forecast_TeamSize'][${loc}] to ${data['Forecast_TeamSize'][loc-1]} on ${lastActualDay}`)
+          data['Forecast_TeamSize'][loc] = data['Forecast_TeamSize'][loc-1]
+        }
+        lastActualDay.setDate(lastActualDay.getDate() + 1)
+      }
+      // Cleanup
+      debug(`finalForecast2Value: `, finalForecast2Value)
+      if (hasForecast2) {
+        // Add final data point
+        jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+        data['Forecast_TeamSize'][loc+1] = 0
+      }
+    }
+
+
     res.write(`<hr>`)
     res.write(`<ul class="list-unstyled">`)
     res.write(`<li><em>Release Date:</em> ${versionReleaseDate}</li>`)
     res.write(`<li><em>Total Working Days:</em> ${workdaySpan} working days</li>`)
     res.write(`<li><em>Last Estimate (Total):</em> ${lastTotalEstimate} days</li>`)
     res.write(`<li><em>Burndown Rate:</em> ${burndownRate} estDays/day</li>`)
+    if (hasForecast2) {
+      res.write(`<li><em>Forecast (based on Team Size):</em> ${config.forecast.teamSize} estDays/day</li>`)
+    }
     res.write(`</ul>`)
   } else { // No release date, so stop the chart at the end of the actual estimates
     jsrCLM.setCategories(burndown.dates)
