@@ -2271,7 +2271,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
     data['Forecast'] = Array(burndown.dates.length)
     let hasForecast2 = component ? false : config.has('forecast') && config.forecast.has('teamSize') && typeof config.forecast.teamSize == 'number'
-    debug(`hasForecast2 = ${hasForecast2}; typeof == ${typeof config.forecast.teamSize}`)
+    debug(`hasForecast2 = ${hasForecast2}`)
 
     if (hasForecast2) {
       data['Forecast_TeamSize'] = Array(burndown.dates.length)
@@ -2316,13 +2316,12 @@ server.get('/burndown/:rel', async (req, res, next) => {
         if (currEstimate < 0) {
           currEstimate = 0 
         }
-
-        currEstimate2 -= config.forecast.teamSize
-        if (currEstimate2 < 0) {
-          currEstimate2 = 0
-        }
-
+        
         if (hasForecast2) {
+          currEstimate2 -= config.forecast.teamSize
+          if (currEstimate2 < 0) {
+            currEstimate2 = 0
+          }
           // debug(`forecast2 name: ${forecast2Name}`)
           // data['Forecast_TeamSize'][loc] = Math.round(currEstimate2)
           finalForecast2Value = data['Forecast_TeamSize'][loc]
@@ -2331,13 +2330,14 @@ server.get('/burndown/:rel', async (req, res, next) => {
       lastActualDay.setDate(lastActualDay.getDate() + 1)
     }
 
-    debug(`Forecast_TeamSize ending with ${finalForecast2Value}; ${Math.round(finalForecast2Value/config.forecast.teamSize)} days`)
-
-    debug(`finalForecast2Value: `, finalForecast2Value)
     // Forecast2 goes beyond the previous end date
     // so extend the X axis as needed
     if (hasForecast2) {
-      while (finalForecast2Value > -1 * config.forecast.teamSize) { 
+      debug(`finalForecast2Value: `, finalForecast2Value)
+      debug(`Forecast_TeamSize ending with ${finalForecast2Value}; ${Math.round(finalForecast2Value/config.forecast.teamSize)} days`)
+
+      let continueForecastExtension = finalForecast2Value > 0
+      while (continueForecastExtension && (finalForecast2Value > (-1 * config.forecast.teamSize))) { 
         jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate() > 9 ? `0${lastActualDay.getDate()}` : lastActualDay.getDate()}`}`)
         loc += 1
         if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
@@ -2349,17 +2349,27 @@ server.get('/burndown/:rel', async (req, res, next) => {
           debug(`WEEKEND: setting data['Forecast_TeamSize'][${loc}] to ${data['Forecast_TeamSize'][loc-1]} on ${lastActualDay}`)
           data['Forecast_TeamSize'][loc] = data['Forecast_TeamSize'][loc-1]
         }
+        if (finalForecast2Value < 0) {
+          continueForecastExtension = false
+        }
         lastActualDay.setDate(lastActualDay.getDate() + 1)
       }
       // Cleanup
       debug(`finalForecast2Value: `, finalForecast2Value)
       if (hasForecast2) {
         // Add final data point
+        debug(`jsrCLM.addCategory(${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+
         jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+
+        lastActualDay.setDate(lastActualDay.getDate() + 1)
+
+        jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+        
         data['Forecast_TeamSize'][loc+1] = 0
+        debug(`FINAL: data['Forecast_TeamSize'][${loc+1}] set to 0`)
       }
     }
-
 
     res.write(`<hr>`)
     res.write(`<ul class="list-unstyled">`)
@@ -2368,7 +2378,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     res.write(`<li><em>Last Estimate (Total):</em> ${lastTotalEstimate} days</li>`)
     res.write(`<li><em>Burndown Rate:</em> ${burndownRate} estDays/day</li>`)
     if (hasForecast2) {
-      res.write(`<li><em>Forecast (based on Team Size):</em> ${config.forecast.teamSize} estDays/day</li>`)
+      res.write(`<li><em>Forecast_TeamSize:</em> ${config.forecast.teamSize} days of work completed per day</li>`)
     }
     res.write(`</ul>`)
   } else { // No release date, so stop the chart at the end of the actual estimates
