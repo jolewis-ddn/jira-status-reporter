@@ -3,6 +3,7 @@
 const { Command } = require("commander");
 const program = new Command();
 program.version("0.0.1");
+const config = require("config")
 
 const datefns = require("date-fns");
 
@@ -13,7 +14,7 @@ const JSR = require("./JiraStatusReporter");
 function status(value, previous) {
   return previous.concat([value]);
 }
-program.option("-s, --status <value>", "RED Status(es)", status, []);
+program.option("-s, --status <value>", `${config.project} Status(es)`, status, []);
 program.option(
   "-y, --year <value>",
   "Year to process. Defaults to year of yesterday."
@@ -34,8 +35,8 @@ if (program.status.length == 0) {
   process.exit(10);
 }
 
-const RED_STATUS = program.status;
-debug(`RED_STATUS: ${RED_STATUS}`);
+const STATUS = program.status;
+debug(`STATUS: ${STATUS}`);
 
 const TODAY = new Date();
 const TOMORROW = datefns.addDays(TODAY, 1);
@@ -82,7 +83,7 @@ debug(`Processing Dates: START: ${START_DATE}; END: ${END_DATE}`);
 
 let jsr = new JSR();
 
-RED_STATUS.forEach((status) => {
+STATUS.forEach((status) => {
   debug(`Fetching records for status ${status} on ${START_DATE}...`);
   jsr.setFields([
     "aggregateprogress",

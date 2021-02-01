@@ -1,6 +1,7 @@
 "use strict";
 const debug = require('debug')('MermaidNodes')
 const mermaidConfig = require('./config/mermaid-config')
+const config = require('config')
 
 const JiraStatus = require('./JiraStatus')
 
@@ -33,7 +34,7 @@ function removeSpaces(text) {
     return (text.replace(/\s/g, ""))
 }
 
-const RED_STATUSES = ['ICEBOX', 'DEFINED', 'IN PROGRESS', 'IN REVIEW', 'DONE', 'EMERGENCY', 'BLOCKED', 'DEAD']
+const STATUSES = ['ICEBOX', 'DEFINED', 'IN PROGRESS', 'IN REVIEW', 'DONE', 'EMERGENCY', 'BLOCKED', 'DEAD']
 
 class MermaidNodes {
     /**
@@ -45,7 +46,7 @@ class MermaidNodes {
         this.nodes = []
         this.statuses = {}
 
-        RED_STATUSES.forEach((status) => {
+        STATUSES.forEach((status) => {
             this.statuses[status] = []
         })
     }

@@ -299,7 +299,12 @@ class ChartLinkMaker {
       for (let keyNdx = 0; keyNdx < k.length; keyNdx++) {
         let key = k[keyNdx]
       // k.forEach((key) => {
-        sumOfValues += data[key].reduce((acc, cur) => { return acc + cur})
+        debug(`...data[${key}]: (typeof: ${typeof data[key]})`, data[key])
+        if (typeof data[key] == 'number') {
+          sumOfValues += data[key]
+        } else {
+          sumOfValues += data[key].reduce((acc, cur) => { return acc + cur})
+        }
         debug(`sumOfValues after ${key}: ${sumOfValues}`)
         if (sumOfValues) { return(true) }
       }

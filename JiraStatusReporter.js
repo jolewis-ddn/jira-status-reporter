@@ -349,12 +349,12 @@ class JiraStatusReporter {
     return this._epics(project, ACTION_CONTENTS)
   }
 
-  countRedEpics() {
-    return this.countEpics('RED', ACTION_COUNT)
+  countProjectEpics() {
+    return this.countEpics(config.project, ACTION_COUNT)
   }
 
-  getRedEpics() {
-    return this.getEpics('RED', ACTION_CONTENTS)
+  getProjectEpics() {
+    return this.getEpics(config.project, ACTION_CONTENTS)
   }
 
   _epics(project, action) {

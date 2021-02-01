@@ -101,7 +101,7 @@ server.get('/', async (req, res, next) => {
   <li>Links (<a href='/links'>JSON</a> or <a href='/links?format=html'>HTML/Mermaid</a>): Requires Jira key parameter ('?id=ABC-1234')</li>
   <li>Progress: Requires Jira release ID ('release/111111') (HTML)</li>`)
 
-  if (releases.length) {
+  if (config.has(releases.length)) {
     res.write(`<ul><li><em>${config.project} releases:</em> `)
     res.write(releases.filter((rel) => !rel.released).map((rel) => `<a href='/progress/${rel.id}'>${rel.name} (${rel.id})</a>`).join(', '))
     res.write(`</li></ul>`)
@@ -446,6 +446,8 @@ function buildStylesheet() {
     .wraparound { display: contents; }
     .bundledicon { margin: -2px 4px -2px 4px; }
     .lineicon { margin: -2px 4px 0px 0px; }
+
+    .liHeader { display: inline-block; width: 180px; text-align: right; }
 
     .summaryCol { width: 30%; }
     .linksCol { width: 150px; }
@@ -1960,7 +1962,7 @@ server.get('/epics', (req, res, next) => {
     .then((results) => {
       res.write(buildStylesheet())
 
-      debug(results)
+      // debug(results)
 
       let stats = {
         Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
@@ -1971,6 +1973,8 @@ server.get('/epics', (req, res, next) => {
       }
 
       let details = []
+
+      let ownerData = {}
 
       details.push(`<ul class="list-group list-group-flush">`)
       results.forEach((e) => {
@@ -2045,12 +2049,19 @@ server.get('/epics', (req, res, next) => {
         }
 
         e.issues.forEach((issue, ndx) => {
+          debug(`issue: `, issue)
+
           let owner = 'TBD'
           try {
             owner = issue.fields.assignee.displayName
           } catch (err) {
             owner = 'unassigned'
           }
+          if (!Object.keys(ownerData).includes(owner)) {
+            ownerData[owner] = []
+          }
+          // Update ownerData
+          ownerData[owner].push(issue)
 
           let statusName = 'unknown'
           try {
@@ -2145,19 +2156,19 @@ server.get('/epics', (req, res, next) => {
                 ${resultCtr['Tasks'].join('')}
                 ${resultCtr['Sub-tasks'].join('')}
                 ${resultCtr['Bugs'].join('')}
-                <span class="badge badge-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill" title="${resultCtr['Epics'].length} Epic${resultCtr['Epics'].length == 1 ? "" : "s"}">
                     ${resultCtr['Epics'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill" title="${resultCtr['Stories'].length} Stor${resultCtr['Stories'].length == 1 ? "y" : "ies"}">
                     ${resultCtr['Stories'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill" title="${resultCtr['Tasks'].length} Task${resultCtr['Tasks'].length == 1 ? "": "s"}">
                     ${resultCtr['Tasks'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill" title="${resultCtr['Sub-tasks'].length} Sub-task${resultCtr['Sub-tasks'].length == 1 ? "": "s"}">
                     ${resultCtr['Sub-tasks'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill">
+                <span class="badge badge-dark rounded-pill" title="${resultCtr['Bugs'].length} Bug${resultCtr['Bugs'].length == 1 ? "": "s"}">
                     ${resultCtr['Bugs'].length}
                 </span></div>`)
         details.push(`</li>`)
@@ -2167,11 +2178,39 @@ server.get('/epics', (req, res, next) => {
       debug(`buildPieCharts() called with ${stats}`)
 
       buildPieCharts(stats).then((charts) => {
-        res.write(charts)
-        res.write('<hr>')
+        const DAY_WIDTH = 10 // One day is 10px wide
+
+        debug(`charts: `, charts)
+        // res.write(charts)
+        // res.write('<hr>')
         res.write(buildLegend())
         res.write('<hr>')
         res.write(details.join(''))
+
+        res.write(`<h3>Remaining Work</h3>`)
+        res.write(`<ul>`)
+        Object.keys(ownerData).sort().forEach((owner) => {
+          let totalEstRem = 0
+          let ownerHtml = []
+          ownerData[owner].forEach((j) => {
+            // Skip Stories with Sub-tasks (estimates will be in the Sub-tasks)
+            if ((j.fields.issuetype.name == 'Story' && j.fields.subtasks.length > 0) || j.fields.status.name == 'Done') {
+              debug(`...skipping Story ${j.key} with ${j.fields.subtasks.length} subtasks; Owner: ${owner}`)
+            } else {
+              let estRem = j.fields.progress && j.fields.progress.total ? Math.round((j.fields.progress.total - j.fields.progress.progress)/28800) : 0
+              totalEstRem += estRem
+              ownerHtml.push(`<a href="${config.get('jira.protocol')}://${config.get('jira.host')
+            }/browse/${j.key}"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${estRem ? estRem * DAY_WIDTH : 1}px; background-color: ${estRem ? "green" : "red"};" data-toggle="tooltip" data-html="true" title="${j.key}: ${j.fields.summary}<ul><li>Type: ${j.fields.issuetype.name}</li><li>Status: ${j.fields.status.name}</li><li>Remaining: ${estRem}d</li><li>Total Est: ${Math.round(j.fields.progress.total/28800)}d</ul>"></span></a>`)
+            }
+          })
+          // if (ownerHtml[owner] && ownerHtml[owner].length) {
+          // if (totalEstRem > 0) {
+            res.write(`<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d]</span>: `)
+          // }
+          res.write(ownerHtml.join(''))
+          res.write(`</li>`)
+        })
+        res.write(`</ul>`)
         res.write(buildHtmlFooter())
         res.end()
         return next()

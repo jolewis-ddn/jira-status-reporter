@@ -11,7 +11,7 @@ let jsr = new JSR()
 let mynodes = new MermaidNodes()
 
 function status(value, previous) { return previous.concat([value]) }
-program.requiredOption('-e, --epic <value>', 'Epic Key (e.g. RED-1390')
+program.requiredOption('-e, --epic <value>', 'Epic Key'
 program.parse(process.argv)
 
 const epic = program.epic

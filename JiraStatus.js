@@ -271,61 +271,6 @@ async function report(projectName = false) {
     })
 }
 
-async function reportOld() {
-    return new Promise((resolve, reject) => {
-        Promise.all([
-            jsr.countRedEpics(),
-            jsr.countDeadIssues(),
-            jsr.countOpenIssuesByProject(config.get('project')),
-            jsr.countIssuesDoneThisMonth(config.get('project')),
-            jsr.getIssuesDoneThisMonth(config.get('project')),
-            jsr.countIssuesChangedThisMonthByProjectAndStatus(config.get('project'), 'Status'),
-            jsr.getIssuesChangedThisWeekByProjectAndStatus(config.get('project'), 'Status')
-        ])
-            .then((values) => {
-                const doneData = values[4].issues
-                const doneKeys = []
-                doneData.forEach((data) => {
-                    debug(`doneKeys - adding ${data.key}`)
-                    doneKeys.push(data.key)
-                })
-
-                const statusChangesThisWeek = []
-                values[6].issues.forEach((data) => {
-                    debug(`values[6] pushing ${data.key}`)
-                    let assigneeName = ''
-                    if (data.fields.assignee) {
-                        assigneeName = data.fields.assignee.displayName
-                    }
-                    statusChangesThisWeek.push({
-                        key: data.key,
-                        type: data.fields.issuetype.name,
-                        owner: assigneeName,
-                        updated: data.fields.updated,
-                        status: data.fields.status.name,
-                        summary: data.fields.summary
-                    })
-                })
-
-                response = {
-                    'Epic Count': values[0],
-                    'Dead Issue Count': values[1],
-                    'Open Issues (Count)': values[2],
-                    'Issue Status updates this Month (Count)': values[5],
-                    'Issue Status updates this Week (Count)': values[5],
-                    'Issue Status updates this Week (List)': statusChangesThisWeek,
-                    'Issues Done this Month (Count)': values[3],
-                    'Issues Done this Month (List)': doneKeys.join(',')
-                    // 'Issues Done this Month (Data)': values[4],
-                }
-                resolve(response)
-            })
-            .catch((err) => {
-                reject(err)
-            })
-    })
-}
-
 function printList(data, key = false, numbered = false, format = "html", link = false, linkPrefix = false) {
     if (typeof data == typeof []) { // List of objects
         if (key) {
