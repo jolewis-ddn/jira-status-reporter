@@ -101,7 +101,7 @@ server.get('/', async (req, res, next) => {
   <li>Links (<a href='/links'>JSON</a> or <a href='/links?format=html'>HTML/Mermaid</a>): Requires Jira key parameter ('?id=ABC-1234')</li>
   <li>Progress: Requires Jira release ID ('release/111111') (HTML)</li>`)
 
-  if (config.has(releases.length)) {
+  if (config.has(releases)) {
     res.write(`<ul><li><em>${config.project} releases:</em> `)
     res.write(releases.filter((rel) => !rel.released).map((rel) => `<a href='/progress/${rel.id}'>${rel.name} (${rel.id})</a>`).join(', '))
     res.write(`</li></ul>`)
