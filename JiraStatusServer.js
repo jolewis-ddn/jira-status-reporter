@@ -2049,7 +2049,7 @@ server.get('/epics', (req, res, next) => {
         }
 
         e.issues.forEach((issue, ndx) => {
-          debug(`issue: `, issue)
+          // debug(`issue: `, issue)
 
           let owner = 'TBD'
           try {
@@ -2156,19 +2156,19 @@ server.get('/epics', (req, res, next) => {
                 ${resultCtr['Tasks'].join('')}
                 ${resultCtr['Sub-tasks'].join('')}
                 ${resultCtr['Bugs'].join('')}
-                <span class="badge badge-dark rounded-pill" title="${resultCtr['Epics'].length} Epic${resultCtr['Epics'].length == 1 ? "" : "s"}">
+                <span class="badge badge-dark rounded-pill" title='${resultCtr['Epics'].length} Epic${resultCtr['Epics'].length == 1 ? '' : 's'}'>
                     ${resultCtr['Epics'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title="${resultCtr['Stories'].length} Stor${resultCtr['Stories'].length == 1 ? "y" : "ies"}">
+                <span class="badge badge-dark rounded-pill" title='${resultCtr['Stories'].length} Stor${resultCtr['Stories'].length == 1 ? 'y' : 'ies'}'>
                     ${resultCtr['Stories'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title="${resultCtr['Tasks'].length} Task${resultCtr['Tasks'].length == 1 ? "": "s"}">
+                <span class="badge badge-dark rounded-pill" title='${resultCtr['Tasks'].length} Task${resultCtr['Tasks'].length == 1 ? '': 's'}'>
                     ${resultCtr['Tasks'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title="${resultCtr['Sub-tasks'].length} Sub-task${resultCtr['Sub-tasks'].length == 1 ? "": "s"}">
+                <span class="badge badge-dark rounded-pill" title='${resultCtr['Sub-tasks'].length} Sub-task${resultCtr['Sub-tasks'].length == 1 ? "": "s"}'>
                     ${resultCtr['Sub-tasks'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title="${resultCtr['Bugs'].length} Bug${resultCtr['Bugs'].length == 1 ? "": "s"}">
+                <span class="badge badge-dark rounded-pill" title='${resultCtr['Bugs'].length} Bug${resultCtr['Bugs'].length == 1 ? "": "s"}'>
                     ${resultCtr['Bugs'].length}
                 </span></div>`)
         details.push(`</li>`)
@@ -2180,7 +2180,7 @@ server.get('/epics', (req, res, next) => {
       buildPieCharts(stats).then((charts) => {
         const DAY_WIDTH = 10 // One day is 10px wide
 
-        debug(`charts: `, charts)
+        // debug(`charts: `, charts)
         // res.write(charts)
         // res.write('<hr>')
         res.write(buildLegend())
@@ -2195,12 +2195,12 @@ server.get('/epics', (req, res, next) => {
           ownerData[owner].forEach((j) => {
             // Skip Stories with Sub-tasks (estimates will be in the Sub-tasks)
             if ((j.fields.issuetype.name == 'Story' && j.fields.subtasks.length > 0) || j.fields.status.name == 'Done') {
-              debug(`...skipping Story ${j.key} with ${j.fields.subtasks.length} subtasks; Owner: ${owner}`)
+              debug(`...skipping Story ${j.key} with ${j.fields.subtasks.length} subtasks; Owner: ${owner}; Status: ${j.fields.status.name}`)
             } else {
               let estRem = j.fields.progress && j.fields.progress.total ? Math.round((j.fields.progress.total - j.fields.progress.progress)/28800) : 0
               totalEstRem += estRem
               ownerHtml.push(`<a href="${config.get('jira.protocol')}://${config.get('jira.host')
-            }/browse/${j.key}"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${estRem ? estRem * DAY_WIDTH : 1}px; background-color: ${estRem ? "green" : "red"};" data-toggle="tooltip" data-html="true" title="${j.key}: ${j.fields.summary}<ul><li>Type: ${j.fields.issuetype.name}</li><li>Status: ${j.fields.status.name}</li><li>Remaining: ${estRem}d</li><li>Total Est: ${Math.round(j.fields.progress.total/28800)}d</ul>"></span></a>`)
+            }/browse/${j.key}"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${estRem ? estRem * DAY_WIDTH : 1}px; background-color: ${estRem ? "green" : "red"};" data-toggle="tooltip" data-html="true" title='${j.key}: ${cleanText(j.fields.summary)}<ul><li>Type: ${j.fields.issuetype.name}</li><li>Status: ${j.fields.status.name}</li><li>Remaining: ${estRem}d</li><li>Total Est: ${Math.round(j.fields.progress.total/28800)}d</ul>'></span></a>`)
             }
           })
           // if (ownerHtml[owner] && ownerHtml[owner].length) {
@@ -2217,9 +2217,9 @@ server.get('/epics', (req, res, next) => {
       })
     })
     .catch((err) => {
-      debug(`error`)
+      debug(`error @ JSS 2220`)
       debug(err)
-      res.write('error')
+      res.write('error with Epic query')
       res.end()
       return
     })

@@ -543,7 +543,17 @@ class JiraStatusReporter {
       'parent',
       'fixversion',
     ])
-    const jql = `parentEpic=${epicId}`
+
+    // Default to Jira Server syntax
+    let jql
+    if (config.jira.host.includes('.atlassian.net')) {
+      // Cloud server, so use parentEpic
+      debug(`*** Using Jira Cloud syntax: parentEpic ***`)
+      jql = `parentEpic=${epicId}`
+    } else { // Jira Server, so use "Epic Link"
+      debug(`*** Using Jira Server syntax: "Epic Link" ***`)
+      jql = `id=${epicId} OR "Epic Link"=${epicId}`
+    }
     debug(`getEpicAndChildren(${epicId}) called... jql: ${jql}`)
     return this._genericJiraSearch(jql, ACTION_CONTENTS)
   }
