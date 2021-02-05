@@ -2243,6 +2243,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
   let release = req.params.rel ? req.params.rel : false
   let component = req.query.component ? req.query.component : false
   let forecast = (req.query.forecast && req.query.forecast === "yes") ? req.query.forecast : false
+  let efficiency = (req.query.efficiency ? req.query.efficiency : config.forecast.efficiency ? config.forecast.efficiency : 1)
 
   let jsrCLM = await jsr.getChartLinkMaker(config).reset()
 
@@ -2376,7 +2377,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
         }
         
         if (hasForecast2) {
-          currEstimate2 -= config.forecast.teamSize
+          currEstimate2 -= Math.round(config.forecast.teamSize * efficiency)
           if (currEstimate2 < 0) {
             currEstimate2 = 0
           }
@@ -2399,7 +2400,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
         jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate() > 9 ? `0${lastActualDay.getDate()}` : lastActualDay.getDate()}`}`)
         loc += 1
         if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
-          finalForecast2Value -= config.forecast.teamSize
+          finalForecast2Value -= Math.round(config.forecast.teamSize * efficiency)
           data['Forecast_TeamSize'][loc] = Math.max(Math.round(finalForecast2Value), 0)
           debug(`setting data['Forecast_TeamSize'][${loc}] to ${data['Forecast_TeamSize'][loc]} on ${lastActualDay}`)
           // data['x'][loc] = lastActualDay
@@ -2423,6 +2424,8 @@ server.get('/burndown/:rel', async (req, res, next) => {
         lastActualDay.setDate(lastActualDay.getDate() + 1)
 
         jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+
+        debug(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
         
         data['Forecast_TeamSize'][loc+1] = 0
         debug(`FINAL: data['Forecast_TeamSize'][${loc+1}] set to 0`)
@@ -2436,7 +2439,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     res.write(`<li><em>Last Estimate (Total):</em> ${lastTotalEstimate} days</li>`)
     res.write(`<li><em>Burndown Rate:</em> ${burndownRate} estDays/day</li>`)
     if (hasForecast2) {
-      res.write(`<li><em>Forecast_TeamSize:</em> ${config.forecast.teamSize} days of work completed per day</li>`)
+      res.write(`<li><em>Forecast_TeamSize:</em> ${Math.round(config.forecast.teamSize*efficiency)} estDays/day (Done: ${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}; Team Size: ${config.forecast.teamSize} people; Efficiency Score: ${efficiency})</li>`)
     }
     res.write(`</ul>`)
   } else { // No release date, so stop the chart at the end of the actual estimates
