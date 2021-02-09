@@ -2245,9 +2245,17 @@ server.get('/burndown/:rel', async (req, res, next) => {
   let forecast = (req.query.forecast && req.query.forecast === "yes") ? req.query.forecast : false
   let efficiency = (req.query.efficiency ? req.query.efficiency : config.forecast && config.forecast.efficiency && !isNaN(config.forecast.efficiency) ? config.forecast.efficiency : 1)
 
-  let teamSize = config.has('forecast') && config.forecast.has('teamSize') ? config.forecast.teamSize : false
-  if (component) { 
-    teamSize = config.reports.componentTeams[component] 
+  let teamSize =
+    config.has('forecast') && config.forecast.has('teamSize')
+      ? config.forecast.teamSize
+      : false
+  if (
+    component &&
+    config.has('reports') &&
+    config.reports.has('componentTeams') &&
+    config.reports.componentTeams.has(component)
+  ) {
+    teamSize = config.reports.componentTeams[component]
   }
 
   let jsrCLM = await jsr.getChartLinkMaker(config).reset()
