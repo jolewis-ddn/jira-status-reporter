@@ -6,6 +6,9 @@ const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
 const XXH = require('xxhashjs')
 
+const fs = require('fs')
+const path = require('path')
+
 const NodeCache = require('node-cache')
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 })
 
@@ -1191,14 +1194,34 @@ server.get('/progress/:rel', async (req, res, next) => {
       if (Object.keys(prevUserRemainSum).length) {
         res.write('<h2>User Remaining Work Forecast</h2>')
         res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${['User', 'Remaining Work', 'Finish Date'].join('</th><th>')}</th></tr></thead><tbody>`)
+        let userData = {}
         Object.keys(prevUserRemainSum).sort().forEach((user) => {
+          // Save the data
+          let remainingDays = convertSecondsToDays(prevUserRemainSum[user].remaining)
+          userData[user] = remainingDays
+
           res.write(`<tr>
           <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${user == NONE ? ' is empty' : '="' + user + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${user}</a></td>
-          <td>${convertSecondsToDays(prevUserRemainSum[user].remaining)}</td>
+          <td>${remainingDays}</td>
           <td>${calcFutureDate(convertSecondsToDays(prevUserRemainSum[user].remaining))}</td>
           </tr>`)
         })
         res.write(`</tbody></table>`)
+        let filename =
+          (config.dataPath
+            ? config.dataPath
+            : config.dataDir
+            ? config.dataDir
+            : '.') +
+          path.sep +
+          (config.has('reports') && config.reports.has('remainingWorkReport') 
+            ? config.reports.remainingWorkReport
+            : 'remainingWorkPerUser') +
+          (config.has('dataFileExt')
+            ? config.dataFileExt
+            : '.json')
+        debug(`...writing remaining work per user data to ${filename}`)
+        fs.writeFileSync('remainingWorkPerUser.json', JSON.stringify(userData))
       } else {
         debug(`prevUserRemainSum NOT found!`)
       }
@@ -1736,7 +1759,6 @@ server.get('/assignments/:assignee', async (req, res, next) => {
   return next()
 })
 
-
 server.get('/projects', async (req, res, next) => {
   const fullView = req.query && req.query.full && req.query.full == 'true'
   const projectData = await jsr.getProjects(fullView)
@@ -1982,11 +2004,27 @@ server.get('/epics', (req, res, next) => {
 
         // TODO: Fix this hack
         let epicData = {}
-        if (e.issues[0].key == epicIdRequested) {
-          epicData = e.issues.shift()
-        } else {
-          epicData = e.issues.pop()
+        let epicItemIndex = -1
+        let epicItemIndexToRemove = -1
+        // epicData = e.issues.filter((x) => { x.key == epicIdRequested })
+        // debug(`setting epicData to ${epicData.key} (requested: ${epicIdRequested})`)
+        e.issues.forEach((i) => {
+          epicItemIndex += 1
+          if (i.key == epicIdRequested) {
+            epicData = i
+            epicItemIndexToRemove = epicItemIndex
+          }
+        })
+
+        if (epicItemIndex >= 0) {
+          e.issues.splice(epicItemIndexToRemove, epicItemIndexToRemove)
         }
+
+        // if (e.issues[0].key == epicIdRequested) {
+        //   epicData = e.issues.shift()
+        // } else {
+        //   epicData = e.issues.pop()
+        // }
 
         debug(`processing ${epicData.key}...`)
 
@@ -2223,6 +2261,98 @@ server.get('/epics', (req, res, next) => {
       res.end()
       return
     })
+})
+
+server.get('/epicStatus/:id', async (req, res, next) => {
+  let id = req.params.id
+  let includeRaw = req.query.raw && req.query.raw == 'yes' ? req.query.raw : false
+
+  let response = {
+    id: id,
+    status: 'undefined',
+    progress: { progress: 0, total: 0 },
+    stories: [],
+    users: {}
+  }
+
+  let data = await jsr._genericJiraSearch(
+    `project=${config.project} AND parentEpic="${id}"`,
+    99,
+    [
+      `key`,
+      `progress`,
+      `customfield_10008`,
+      `issuelinks`,
+      `issuetype`,
+      `assignee`,
+      `status`,
+    ]
+  )
+
+  if (includeRaw) {
+    response.raw = data
+  }
+
+  data.issues.forEach((story) => {
+    if (story.key == id) { // No progress info @ Epic level
+      response.status = story.fields.status.name
+    } else {
+      response.stories.push(story.key)
+      if (story.fields.assignee) {
+        if (
+          !Object.keys(response.users).includes(story.fields.assignee.displayName)
+        ) {
+          response.users[story.fields.assignee.displayName] = {
+            progress: 0,
+            total: 0,
+            issues: [],
+          }
+        }
+        response.users[story.fields.assignee.displayName].progress +=
+          story.fields.progress.progress
+        response.users[story.fields.assignee.displayName].total +=
+          story.fields.progress.total
+        response.users[story.fields.assignee.displayName].issues.push(story.key)
+      } else {
+        if (!Object.keys(response.users).includes('Unassigned')) {
+          response.users['Unassigned'] = { progress: 0, total: 0, issues: [] }
+        }
+        response.users['Unassigned'].progress += story.fields.progress.progress
+        response.users['Unassigned'].total += story.fields.progress.total
+        response.users['Unassigned'].issues.push(story.key)
+      }
+
+      response.progress.progress += story.fields.progress.progress
+      response.progress.total += story.fields.progress.total
+    }
+  })
+
+  // Now figure out who has the longest remaining workload
+  let maxRemaining = { user: 'unset', remaining: 0 }
+  Object.keys(response.users).forEach((user) => {
+    if (response.users[user].total - response.users[user].progress > maxRemaining.remaining) {
+      maxRemaining.remaining = response.users[user].total - response.users[user].progress
+      maxRemaining.user = user
+    }
+  })
+  response.maxRemaining = maxRemaining
+  response.processed = new Date().toISOString()
+
+  res.send(response)
+  return next()
+})
+
+server.get('/epicsInRelease/:id', async (req, res, next) => {
+  let epicList = await jsr.getEpicsInRelease(req.params.id)
+
+  // res.write(buildHtmlHeader(`Epics in Release: ${req.params.id}`, false))
+  // res.write(buildPageHeader(`Epics in Release: ${req.params.id}`))
+
+  res.send(epicList)
+
+  // res.write(buildHtmlFooter())
+  // res.end()
+  return next()
 })
 
 server.get('/burndownStats/:rel', async (req, res, next) => {

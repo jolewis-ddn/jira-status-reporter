@@ -1,4 +1,12 @@
 {
+	"ignore": [
+		"data",
+		"coverage",
+		"tests",
+		"logs",
+		".git"
+	],
 	"verbose": true,
-	"ignore": ["logs/*", "data/*"]
+	"watch": [	],
+	"ext": "js,json"
 }

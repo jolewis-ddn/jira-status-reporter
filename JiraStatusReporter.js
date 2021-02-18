@@ -107,11 +107,12 @@ class JiraStatusReporter {
     const hash = crypto.createHash('sha256')
 
     hash.update(
-      fixVersions.join(',') + 
-      users.join(',') + 
-      project + 
-      excludeTypes.join(',') + 
-      excludeStatuses.join(','))
+      fixVersions.join(',') +
+        users.join(',') +
+        project +
+        excludeTypes.join(',') +
+        excludeStatuses.join(',')
+    )
     const cacheID = `remainingWorkReport-${hash.digest('hex')}`
     debug(`cacheID = ${cacheID}`)
 
@@ -121,7 +122,7 @@ class JiraStatusReporter {
         promises.push(
           jira.searchJira(
             `project="${project}"
-            AND assignee${user == UNASSIGNED_USER ? " is empty" : `="${user}"`}
+            AND assignee${user == UNASSIGNED_USER ? ' is empty' : `="${user}"`}
             AND status not in (${excludeStatuses.join(',')})
             AND issuetype not in (${excludeTypes.join(',')})
             AND fixVersion in ("${fixVersions.join(',')}")`
@@ -136,41 +137,44 @@ class JiraStatusReporter {
             ? issue.fields.progress.percent
             : 0
           if (this.issueBelongsToRemainingWorkReport(issue)) {
-            response.push(
-              [
-                (issue.fields.assignee ? issue.fields.assignee.displayName : UNASSIGNED_USER),
-                issue.key,
-                (issue.fields.summary.length > 40 ? issue.fields.summary.substring(0,37) + '...' : issue.fields.summary),
-                issue.fields.issuetype.name,
-                +(issue.fields.progress.progress / 28000).toFixed(2),
-                +(issue.fields.progress.total / 28000).toFixed(2),
-                percent,
-                +((issue.fields.progress.total / 28000).toFixed(2) -
-                  (issue.fields.progress.progress / 28000).toFixed(2)).toFixed(2),
-              ]
-            )
+            response.push([
+              issue.fields.assignee
+                ? issue.fields.assignee.displayName
+                : UNASSIGNED_USER,
+              issue.key,
+              issue.fields.summary.length > 40
+                ? issue.fields.summary.substring(0, 37) + '...'
+                : issue.fields.summary,
+              issue.fields.issuetype.name,
+              +(issue.fields.progress.progress / 28000).toFixed(2),
+              +(issue.fields.progress.total / 28000).toFixed(2),
+              percent,
+              +(
+                (issue.fields.progress.total / 28000).toFixed(2) -
+                (issue.fields.progress.progress / 28000).toFixed(2)
+              ).toFixed(2),
+            ])
           }
         })
       })
 
       const cacheData = {
-        data:
-          {
+        data: {
           headers: config.reports.fields,
-          results: response
-          },
+          results: response,
+        },
         config: {
           project: project,
           users: users,
           fixVersions: fixVersions,
           excludeTypes: excludeTypes,
-          excludeStatuses: excludeStatuses
+          excludeStatuses: excludeStatuses,
         },
         meta: {
           cacheDate: new Date(),
-          cacheID: cacheID
+          cacheID: cacheID,
         },
-        error: err
+        error: err,
       }
       cache.set(cacheID, 'TBD')
       cacheData.meta.cacheTTL = cache.getTtl(cacheID)
@@ -179,27 +183,34 @@ class JiraStatusReporter {
       debug(`...returning data from cache`)
     } // if...!cache.has...
 
-    return(cache.get(cacheID))
+    return cache.get(cacheID)
   }
 
   issueBelongsToRemainingWorkReport(issue = false) {
     // debug(`issueBelongsToRemainingWorkReport(...) called...`)
     if (issue) {
       if (config.has('workInSubtasksOnly') && config.workInSubtasksOnly) {
-        if (issue.fields.issuetype.name && issue.fields.issuetype.name == 'Story') {
+        if (
+          issue.fields.issuetype.name &&
+          issue.fields.issuetype.name == 'Story'
+        ) {
           if (issue.fields.subtasks.length != 0) {
-            debug(`issueBelongsToRemainingWorkReport(...) returning ${issue.fields.subtasks.length == 0} for ${issue.key}`)
+            debug(
+              `issueBelongsToRemainingWorkReport(...) returning ${
+                issue.fields.subtasks.length == 0
+              } for ${issue.key}`
+            )
           }
-          return(issue.fields.subtasks.length == 0)
+          return issue.fields.subtasks.length == 0
         } else {
-          return(true)
+          return true
         }
       } else {
-        return(true)
+        return true
       }
     } else {
       debug(`...no issue data, so returning false`)
-      return(false)
+      return false
     }
   }
 
@@ -550,7 +561,8 @@ class JiraStatusReporter {
       // Cloud server, so use parentEpic
       debug(`*** Using Jira Cloud syntax: parentEpic ***`)
       jql = `parentEpic=${epicId}`
-    } else { // Jira Server, so use "Epic Link"
+    } else {
+      // Jira Server, so use "Epic Link"
       debug(`*** Using Jira Server syntax: "Epic Link" ***`)
       jql = `id=${epicId} OR "Epic Link"=${epicId}`
     }
@@ -642,6 +654,14 @@ class JiraStatusReporter {
       // Just the project names
       return jira.listProjects()
     }
+  }
+
+  async getEpicsInRelease(release) {
+    let epicList = await this._genericJiraSearch(
+      `project="${config.project}" AND issuetype="Epic" AND fixVersion="${release}"`,
+      99, ['assignee']
+    )
+    return epicList.issues.map(e => e.key)
   }
 
   async _genericJiraSearch(jql, action, fields = []) {
