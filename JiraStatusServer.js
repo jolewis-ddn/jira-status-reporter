@@ -1977,15 +1977,13 @@ server.get('/epics', (req, res, next) => {
   let epicIdRequested = req.query.id
   let promises = buildEpicPromisesArray(epicIdRequested)
 
-  res.write(buildHtmlHeader(`Epics: ${epicIdRequested}`))
+  res.write(buildHtmlHeader(`Epics: ${epicIdRequested}`,false))
   res.write(buildPageHeader('Status Page', epicIdRequested))
+
+  let htmlOutput = []
 
   Promise.all(promises)
     .then((results) => {
-      res.write(buildStylesheet())
-
-      // debug(results)
-
       let stats = {
         Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
@@ -1995,7 +1993,6 @@ server.get('/epics', (req, res, next) => {
       }
 
       let details = []
-
       let ownerData = {}
 
       details.push(`<ul class="list-group list-group-flush">`)
@@ -2006,25 +2003,27 @@ server.get('/epics', (req, res, next) => {
         let epicData = {}
         let epicItemIndex = -1
         let epicItemIndexToRemove = -1
-        // epicData = e.issues.filter((x) => { x.key == epicIdRequested })
-        // debug(`setting epicData to ${epicData.key} (requested: ${epicIdRequested})`)
-        e.issues.forEach((i) => {
-          epicItemIndex += 1
-          if (i.key == epicIdRequested) {
-            epicData = i
-            epicItemIndexToRemove = epicItemIndex
-          }
-        })
 
-        if (epicItemIndex >= 0) {
-          e.issues.splice(epicItemIndexToRemove, epicItemIndexToRemove)
+        // Make sure the epic is highlighted properly
+        for (let epicItemIndex = 0; epicItemIndex < e.issues.length; epicItemIndex++) {
+          const i = e.issues[epicItemIndex];
+          
+          // e.issues.forEach((i) => {
+            // epicItemIndex += 1
+            if (i.key == epicIdRequested) {
+              epicData = i
+              epicItemIndexToRemove = epicItemIndex
+            }
+          // })
         }
 
-        // if (e.issues[0].key == epicIdRequested) {
-        //   epicData = e.issues.shift()
-        // } else {
-        //   epicData = e.issues.pop()
-        // }
+        if (epicItemIndex >= 0) {
+          debug(`setting epicData by index: ${epicItemIndex} of total ${e.issues.length} issues; Key == ${epicData.key}`)
+          e.issues.splice(epicItemIndexToRemove, epicItemIndexToRemove)
+        } else {
+          debug(`setting epicData by pop`)
+          epicData = e.issues.pop()
+        }
 
         debug(`processing ${epicData.key}...`)
 
@@ -2215,18 +2214,20 @@ server.get('/epics', (req, res, next) => {
 
       debug(`buildPieCharts() called with ${stats}`)
 
+      // Track cumulative work done and total (calc remaining)
+      let epicWork = { progress: 0, total: 0 }
+
       buildPieCharts(stats).then((charts) => {
         const DAY_WIDTH = 10 // One day is 10px wide
 
         // debug(`charts: `, charts)
         // res.write(charts)
         // res.write('<hr>')
-        res.write(buildLegend())
-        res.write('<hr>')
-        res.write(details.join(''))
+        // htmlOutput.push('<hr>')
+        htmlOutput.push(details.join(''))
 
-        res.write(`<h3>Remaining Work</h3>`)
-        res.write(`<ul>`)
+        htmlOutput.push(`<h3>Remaining Work</h3>`)
+        htmlOutput.push(`<ul>`)
         Object.keys(ownerData).sort().forEach((owner) => {
           let totalEstRem = 0
           let ownerHtml = []
@@ -2237,19 +2238,43 @@ server.get('/epics', (req, res, next) => {
             } else {
               let estRem = j.fields.progress && j.fields.progress.total ? Math.round((j.fields.progress.total - j.fields.progress.progress)/28800) : 0
               totalEstRem += estRem
+
+              epicWork.total += j.fields.progress.total
+              epicWork.progress += j.fields.progress.progress
+
               ownerHtml.push(`<a href="${config.get('jira.protocol')}://${config.get('jira.host')
             }/browse/${j.key}"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${estRem ? estRem * DAY_WIDTH : 1}px; background-color: ${estRem ? "green" : "red"};" data-toggle="tooltip" data-html="true" title='${j.key}: ${cleanText(j.fields.summary)}<ul><li>Type: ${j.fields.issuetype.name}</li><li>Status: ${j.fields.status.name}</li><li>Remaining: ${estRem}d</li><li>Total Est: ${Math.round(j.fields.progress.total/28800)}d</ul>'></span></a>`)
             }
           })
           // if (ownerHtml[owner] && ownerHtml[owner].length) {
           // if (totalEstRem > 0) {
-            res.write(`<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d]</span>: `)
+            htmlOutput.push(`<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d]</span>: `)
           // }
-          res.write(ownerHtml.join(''))
-          res.write(`</li>`)
+          htmlOutput.push(ownerHtml.join(''))
+          htmlOutput.push(`</li>`)
         })
-        res.write(`</ul>`)
-        res.write(buildHtmlFooter())
+        htmlOutput.push(`</ul>`)
+
+        // Add epicWork summary
+        // htmlOutput.push(`<p><B>Total:</B> ${epicWork.total/28800}; <B>Progress</B>: ${epicWork.progress/28800}</p>`)
+        let doneDays = Math.round(epicWork.progress/28800)
+        let doneWidth = Math.round((epicWork.progress/epicWork.total)*100)
+
+        let remainDays = Math.floor((epicWork.total - epicWork.progress)/28800)
+        let remainWidth = Math.round(((epicWork.total - epicWork.progress)/epicWork.total)*100)
+
+        let totalDays = Math.floor(epicWork.total/28800)
+
+        htmlOutput.splice(0,0,`<div style="display:flex;">
+        <div style="vertical-align: middle; display: inline-block; padding: 0px; margin: 20px 0px 20px 0px; height: 20px; width: ${doneWidth}%; background-color: blue;" data-toggle="tooltip" data-html="true" title='${doneDays}d (${doneWidth}%) completed of ${totalDays}d total'></div>
+        <div style="vertical-align: middle; display: inline-block; padding: 0px; margin: 20px 0px 20px 0px; height: 20px; width: ${remainWidth}%; background-color: gray;" data-toggle="tooltip" data-html="true" title='${remainDays}d (${remainWidth}%) remaining of ${totalDays}d total'></div>
+        </div>
+        `)
+
+        htmlOutput.push(buildLegend())
+        
+        htmlOutput.push(buildHtmlFooter())
+        res.write(htmlOutput.join(''))
         res.end()
         return next()
       })
