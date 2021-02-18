@@ -2232,15 +2232,15 @@ server.get('/epics', (req, res, next) => {
           let totalEstRem = 0
           let ownerHtml = []
           ownerData[owner].forEach((j) => {
-            // Skip Stories with Sub-tasks (estimates will be in the Sub-tasks)
+            epicWork.total += j.fields.progress.total
+            epicWork.progress += j.fields.progress.progress
+
+          // Skip Stories with Sub-tasks (estimates will be in the Sub-tasks)
             if ((j.fields.issuetype.name == 'Story' && j.fields.subtasks.length > 0) || j.fields.status.name == 'Done') {
               debug(`...skipping Story ${j.key} with ${j.fields.subtasks.length} subtasks; Owner: ${owner}; Status: ${j.fields.status.name}`)
             } else {
               let estRem = j.fields.progress && j.fields.progress.total ? Math.round((j.fields.progress.total - j.fields.progress.progress)/28800) : 0
               totalEstRem += estRem
-
-              epicWork.total += j.fields.progress.total
-              epicWork.progress += j.fields.progress.progress
 
               ownerHtml.push(`<a href="${config.get('jira.protocol')}://${config.get('jira.host')
             }/browse/${j.key}"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${estRem ? estRem * DAY_WIDTH : 1}px; background-color: ${estRem ? "green" : "red"};" data-toggle="tooltip" data-html="true" title='${j.key}: ${cleanText(j.fields.summary)}<ul><li>Type: ${j.fields.issuetype.name}</li><li>Status: ${j.fields.status.name}</li><li>Remaining: ${estRem}d</li><li>Total Est: ${Math.round(j.fields.progress.total/28800)}d</ul>'></span></a>`)
