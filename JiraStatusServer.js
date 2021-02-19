@@ -2004,26 +2004,30 @@ server.get('/epics', (req, res, next) => {
         let epicItemIndex = -1
         let epicItemIndexToRemove = -1
 
+        debug(`\n>>> Orig Results: ${e.issues.map(i => i.key).join(',')}\n`)
+
         // Make sure the epic is highlighted properly
-        for (let epicItemIndex = 0; epicItemIndex < e.issues.length; epicItemIndex++) {
-          const i = e.issues[epicItemIndex];
-          
-          // e.issues.forEach((i) => {
-            // epicItemIndex += 1
-            if (i.key == epicIdRequested) {
-              epicData = i
-              epicItemIndexToRemove = epicItemIndex
-            }
-          // })
+        for (let i = 0; i < e.issues.length; i++) {
+          const issue = e.issues[i]
+
+          if (issue.key == epicIdRequested) {
+            epicData = issue
+            // epicItemIndexToRemove = epicItemIndex
+            epicItemIndex = i
+            debug(`Found match for requested epic: ${epicIdRequested}`)
+            break
+          }
         }
 
         if (epicItemIndex >= 0) {
           debug(`setting epicData by index: ${epicItemIndex} of total ${e.issues.length} issues; Key == ${epicData.key}`)
-          e.issues.splice(epicItemIndexToRemove, epicItemIndexToRemove)
+          e.issues.splice(epicItemIndex, 1)
         } else {
           debug(`setting epicData by pop`)
           epicData = e.issues.pop()
         }
+
+        debug(`\n>>> Updated Results: ${e.issues.map(i => i.key).join(',')}\n`)
 
         debug(`processing ${epicData.key}...`)
 
