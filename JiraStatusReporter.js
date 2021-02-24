@@ -553,6 +553,8 @@ class JiraStatusReporter {
       'summary',
       'parent',
       'fixversion',
+      'timeestimate',
+      'aggregatetimeestimate'
     ])
 
     // Default to Jira Server syntax

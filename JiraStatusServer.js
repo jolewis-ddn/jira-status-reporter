@@ -1995,6 +1995,8 @@ server.get('/epics', (req, res, next) => {
       let details = []
       let ownerData = {}
 
+      let storyEstimateData = {}
+
       details.push(`<ul class="list-group list-group-flush">`)
       results.forEach((e) => {
         // for getEpicAndChildren(x), the Epic is always the last Issue in the issues list
@@ -2075,6 +2077,18 @@ server.get('/epics', (req, res, next) => {
             break
           case 'Story':
             resultCtr['Stories'].push('')
+            if (epicData.fields.timeestimate && epicData.fields.aggregatetimeestimate
+              &&
+              (epicData.fields.timeestimate > 0)
+              &&
+              (epicData.fields.subtasks.length)
+          ) {
+              debug(`A) Adding estimate data for ${epicData.key}... ${epicData.fields.timeestimate}`)
+              storyEstimateData[`${epicData.key}: ${epicData.fields.summary}`] = {
+                time: epicData.fields.timeestimate, 
+                aggregatetime: epicData.fields.aggregatetimeestimate
+              }
+            }
             break
           case 'Task':
             resultCtr['Tasks'].push('')
@@ -2128,6 +2142,18 @@ server.get('/epics', (req, res, next) => {
               stats = updateStats(stats, 'Epic', statusName)
               break
             case 'Story':
+              debug(`B) Adding estimate data for ${issue.key}... ${issue.fields.timeestimate}`)
+              if (issue.fields.timeestimate && issue.fields.aggregatetimeestimate
+                &&
+                (issue.fields.timeestimate > 0)
+                &&
+                (issue.fields.subtasks.length)
+                ) {
+                storyEstimateData[`${issue.key}: ${issue.fields.summary}`] = {
+                  time: issue.fields.timeestimate,
+                  aggregatetime: issue.fields.aggregatetimeestimate
+                }
+              }
               resultCtr['Stories'].push(
                 `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
                 }/browse/${issue.key
@@ -2277,6 +2303,34 @@ server.get('/epics', (req, res, next) => {
 
         htmlOutput.push(buildLegend())
         
+        // Print Story estimate data
+        htmlOutput.push(`<hr>`)
+        htmlOutput.push(`<h4>Story Estimate Mismatch</h4>`)
+        if (Object.keys(storyEstimateData).length) {
+          res.write(`
+          <table style='width: auto !important;' class='table table-sm'>
+          <thead>
+            <tr>
+              <th class='text-center'>Story ID</th>
+              <th class='text-center'>Story Only Est.</th>
+              <th class='text-center'>Story + Sub-Task Est.</th>
+            </tr>
+          </thead>
+          <tbody>`)
+        
+          Object.keys(storyEstimateData).sort().forEach((story) => {
+            // if (story.aggregateprogress.total !== story.progress.total)
+            // debug(story, storyEstimateData)
+            htmlOutput.push(`<tr><td><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${story})' target='_blank'>${story}</a></td>
+              <td class='text-center'>${convertSecondsToDays(storyEstimateData[story].time)}d</td>
+              <td class='text-center'>${convertSecondsToDays(storyEstimateData[story].aggregatetime)}d</td>
+              </tr>
+            `)
+          })
+          htmlOutput.push(`</tbody></table>`)
+        } else {
+          htmlOutput.push(`None`)
+        }
         htmlOutput.push(buildHtmlFooter())
         res.write(htmlOutput.join(''))
         res.end()
