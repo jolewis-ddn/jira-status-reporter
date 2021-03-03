@@ -3,6 +3,11 @@
 Collection of node scripts to query, store, and report on Jira issues.
 
 ## Features
+* Timeline: See the history of an issue using [vis-timeline](https://github.com/visjs/vis-timeline).
+Here's a full timeline, showing all change events:
+![Full Timeline](./screenshots/timeline-example-full.png)
+Here's a filtered timeline - just add the fields you want to see as the value of the "field" query parameter (e.g. `?field=status,labels,Component,priority,assignee,issuetype`):
+![Filtered Timeline](./screenshots/timeline-example-filtered.png)
 * Estimate Report: See which Stories have/have not been estimated
 ![User Report](./screenshots/estimates-report.png)
 * User Report: See progress on Stories, per Assignee
@@ -64,6 +69,7 @@ Collection of node scripts to query, store, and report on Jira issues.
 * `/links`: Visualize issue links
 * `/remainingWorkReport`: Per-issue work left for specified release. [See config option "workInSubtasksOnly" for important information impacting this report.]
 * `/report`: Simple data report on issue statuses over time (epic count, open issue count, updates this month/week, etc.)
+* `/timeline`: Show the history of an issue (uses [vis-timeline](https://github.com/visjs/vis-timeline))
 * `/unestimated`: Table showing the number of unestimated Stories (with a link to Jira)
 ### Releases
 * `/burndown`: Burndown charts (with optional forecast) for all issues or specific release and/or Component

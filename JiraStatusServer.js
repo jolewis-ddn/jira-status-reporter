@@ -32,6 +32,7 @@ const { convertSecondsToDays } = require("./jiraUtils")
 const dashboard = new Dashboard()
 
 const LocalStorage = require('node-localstorage').LocalStorage
+const { upperCase } = require('lodash')
 let ls = new LocalStorage('./.cache')
 
 const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
@@ -2437,6 +2438,167 @@ server.get('/epicsInRelease/:id', async (req, res, next) => {
   // res.end()
   return next()
 })
+
+function formatField(val, isTime = false, trimString = 30) {
+  if (isTime) {
+    return(`${convertSecondsToDays(val)}d`)
+  } else {
+    if (val) {
+      if (val.length > trimString) {
+        return(`${val.substr(0,trimString-3)}...`)
+      } else {
+        return(val)
+      }
+    } else {
+      return('')
+    }
+  }
+}
+
+function nonEmptyFields(val, val2) {
+  if ((val && val !== '') || (val2 && val2 !== '')) {
+    return true
+  } else {
+    return false
+  }
+}
+
+function getFirstNonEmptyField(val, val2) {
+  if (val && val !== '') {
+    return val
+  } else if (val2 && val2 !== '') {
+    return val2
+  } else {
+    console.error(`getFirstNonEmptyField(${val}, ${val2}) barfing...`)
+    return ''
+  }
+}
+
+server.get('/timeline/:id',async (req, res, next) => {
+  let results = await getHistory(req.params.id)
+  let timelineResults = formatJiraHistoryToTimeline(results, req.query.field)
+  debug(`timelineResults fetched`)
+  res.write(buildHtmlHeader(`Timeline for ${req.params.id}`, false, false))
+  res.write(`<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script><script type="text/javascript" src="//unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
+    <link href="//unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
+    <style type="text/css">
+      #visualization {
+        width: 1000px;
+        height: 400px;
+        border: 1px solid lightgray;
+      }
+  
+      .vis-item.fieldstatus { background-color: pink; }
+      .vis-item.fieldassignee { background-color: #f0f0f0; }
+      .vis-item.fieldtimeestimate { background-color: lightgreen; }
+      .vis-item.fieldtimeoriginalestimate { background-color: lightgreen; }
+      .vis-item.fieldLink { background-color: lightyellow; }
+      .vis-item.fieldComponent { background-color: lightblue; }
+      .vis-item.fieldpriority { background-color: #cfc3cf; }
+      .vis-item.fieldissuetype { background-color: #af7fa0; }
+  
+      .vis-item.lifespan { background-color: aliceblue; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+  <h1>Timeline for ${req.params.id}</h1>
+  <div id="visualization"></div>
+  
+  <script type="text/javascript">
+    // DOM element where the Timeline will be attached
+    var container = document.getElementById('visualization');
+
+    // Create a DataSet (allows two way data-binding)
+    var items = new vis.DataSet(${JSON.stringify(timelineResults)});
+
+    // Configuration for the Timeline
+    var options = { editable: false };
+
+    // Create a Timeline
+    var timeline = new vis.Timeline(container, items, options);
+  </script>`)
+  res.write(buildHtmlFooter())
+  res.end()
+  return next()
+})
+
+server.get('/history/:id', async (req, res, next) => {
+  let results = await getHistory(req.params.id)
+  if (req.query.format && req.query.format == 'timeline') {
+    res.send(formatJiraHistoryToTimeline(results))
+  } else {
+    res.send(results)
+  }
+  return next()
+})
+
+function formatJiraHistoryToTimeline(results, fieldFilter = false) {
+  debug(`formatJiraHistoryToTimeline(results, ${fieldFilter}) called...`)
+  let response = []
+  if (results.values.length) {
+    response.push({
+      id: 0,
+      content: `Lifespan: ${new Date(results.values[0].created).toDateString()}-${new Date(results.values[results.values.length-1].created).toDateString()}`,
+      start: results.values[0].created,
+      end: results.values[results.values.length-1].created,
+      x_type: 'background',
+      className: 'lifespan'
+    })
+
+    results.values.forEach((val) => {
+      let changes = []
+      let fieldName = ''
+      val.items.forEach((i) => {
+        let timeField = false
+        if (i.field == "timeoriginalestimate" 
+          || i.field == "originalestimate" 
+          || i.field == "timeestimate"
+          )
+        {
+          timeField = true
+        }
+      
+        if (!fieldFilter || fieldFilter.includes(i.field)) {
+          if (i.field !== 'Epic Child') {
+            if ((nonEmptyFields(i.from, i.fromString)) && (nonEmptyFields(i.to, i.toString))) {
+              changes.push(`<b>${i.field}</b> changed from ${
+                formatField(getFirstNonEmptyField(i.fromString, i.from), timeField)
+              } to ${
+                formatField(getFirstNonEmptyField(i.toString, i.to), timeField)
+              }`)
+            } else if (nonEmptyFields(i.from, i.fromString)) {
+              changes.push(`<b>${i.field}</b> (${formatField(getFirstNonEmptyField(i.fromString, i.from), timeField)}) removed`)
+            } else if (nonEmptyFields(i.to,i.toString)) {
+              changes.push(`<b>${i.field}</b> set to ${formatField(getFirstNonEmptyField(i.toString, i.to), timeField)}`)
+            } else {
+              debug(`***\n*** Unknown change: `, i, `\n***\tnonEmptyFields(from): ${nonEmptyFields(i.from,i.fromString)}\n\tnonEmptyFields(to): ${nonEmptyFields(i.to,i.toString)}\n\tFirst nonempty (from): ${getFirstNonEmptyField(i.from, i.fromString)}\n\tFirst nonempty (to): ${getFirstNonEmptyField(i.to, i.toString)}\n`)
+            }
+            fieldName = i.field
+          }
+        } else {
+          debug(`Skipping field ${i.field}: Doesn't match fieldFilter ${fieldFilter}`)
+        }
+      }) // val.forEach
+
+      if (changes.length) {
+        response.push({id: val.id, content: `${changes.join(';<br>')}`, start: val.created, className: `field${fieldName}` })
+      }
+    }) // results.forEach
+    return(response)
+  } else { // No revisions
+    console.error(`No edits/updates recorded`)
+    return({err: 'No changes recorded'})
+  }
+}
+
+async function getHistory(id) {
+  try {
+    debug(`Getting history for ${id}...`)
+    return jsr.getHistory(id, 0, 100)
+  } catch(err) {
+    return(`query err: `, err)
+  }
+}
 
 server.get('/burndownStats/:rel', async (req, res, next) => {
   let release = req.params.rel ? req.params.rel : ""

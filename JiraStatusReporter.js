@@ -658,6 +658,10 @@ class JiraStatusReporter {
     }
   }
 
+  async getHistory(id) {
+    return jira.getIssueChangelog(id)
+  }
+
   async getEpicsInRelease(release) {
     let epicList = await this._genericJiraSearch(
       `project="${config.project}" AND issuetype="Epic" AND fixVersion="${release}"`,
