@@ -670,6 +670,16 @@ class JiraStatusReporter {
     return epicList.issues.map(e => e.key)
   }
 
+  async getIssueSummary(id) {
+    const data = await this._genericJiraSearch(`key=${id}`, ACTION_CONTENTS, [`summary`])
+    if(data.issues[0].fields.summary) {
+      return data.issues[0].fields.summary
+    } else {
+      console.error(`Missing Summary for ${id}`)
+      return
+    }
+  }
+
   async _genericJiraSearch(jql, action, fields = []) {
     return new Promise((resolve, reject) => {
       debug(`_genericJiraSearch(${jql}, ${action}, ${fields}) called...`)

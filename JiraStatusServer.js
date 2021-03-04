@@ -2477,8 +2477,10 @@ function getFirstNonEmptyField(val, val2) {
 server.get('/timeline/:id',async (req, res, next) => {
   let results = await getHistory(req.params.id)
   let timelineResults = formatJiraHistoryToTimeline(results, req.query.field)
-  debug(`timelineResults fetched`)
-  res.write(buildHtmlHeader(`Timeline for ${req.params.id}`, false, false))
+  let epicName = await jsr.getIssueSummary(req.params.id)
+
+  debug(`timelineResults fetched for ${epicName}`)
+  res.write(buildHtmlHeader(`Timeline for ${req.params.id}: ${epicName}`, false, false))
   res.write(`<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script><script type="text/javascript" src="//unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
     <link href="//unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
     <style type="text/css">
@@ -2501,7 +2503,7 @@ server.get('/timeline/:id',async (req, res, next) => {
     </style>
   </head>
   <body>
-  <h1>Timeline for ${req.params.id}</h1>
+  <h1>Timeline for ${req.params.id}</h1><h2>${epicName}</h2>
   <div id="visualization"></div>
   
   <script type="text/javascript">
