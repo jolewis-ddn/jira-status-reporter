@@ -559,7 +559,7 @@ class JiraStatusReporter {
 
     // Default to Jira Server syntax
     let jql
-    if (config.jira.host.includes('.atlassian.net')) {
+    if (config.jira.host.endsWith('.atlassian.net')) {
       // Cloud server, so use parentEpic
       debug(`*** Using Jira Cloud syntax: parentEpic ***`)
       jql = `parentEpic=${epicId}`
