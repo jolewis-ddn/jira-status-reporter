@@ -32,7 +32,6 @@ const { convertSecondsToDays } = require("./jiraUtils")
 const dashboard = new Dashboard()
 
 const LocalStorage = require('node-localstorage').LocalStorage
-const { upperCase } = require('lodash')
 let ls = new LocalStorage('./.cache')
 
 const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
@@ -262,7 +261,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       res.write(`</tbody></table>`)
 
       res.write(`<h3>Item Detail</h3>`)
-      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${results.data.headers.join('</th><th>')}</th></tr></thead><tbody>`)
+      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${results.data && results.data.headers ? results.data.headers.join('</th><th>') : ''}</th></tr></thead><tbody>`)
       res.write(detailTable.join(''))
       res.write(`</tbody></table>`)
       res.write(buildHtmlFooter())

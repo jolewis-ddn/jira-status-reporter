@@ -37,10 +37,10 @@ Here's a filtered timeline - just add the fields you want to see as the value of
     * If you enable FontAwesome, you may wish to adjust the faIcons object to point to different icons.
   * All others fields are required
 ### For cached queries - _optional_
-* Create the database
+* Create the database (where DATABASE_NAME is set in the config file (or dataPathPrefix + 'jira-stats.db' by default))
   * ```
     cd $dataPath
-    sqlite3 jira-stats.db
+    sqlite3 DATABASE_NAME
     >.read ./jira-stats.sql
     >.quit
     ```

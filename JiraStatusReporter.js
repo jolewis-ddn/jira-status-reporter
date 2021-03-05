@@ -97,8 +97,14 @@ class JiraStatusReporter {
     fixVersions = config.reports.releases,
     users = config.reports.users,
     project = config.project,
-    excludeTypes = config.reports.excludeTypes,
-    excludeStatuses = config.reports.excludeStatuses
+    excludeTypes = config.has('reports') && 
+    config.reports.has('excludeTypes')
+      ? config.reports.excludeTypes
+      : [],
+    excludeStatuses = config.has('reports') &&
+    config.reports.has('excludeStatuses')
+      ? config.reports.excludeStatuses
+      : []
   ) {
     const response = [] // Jira data collector
     const promises = [] // Per-user query
@@ -119,15 +125,25 @@ class JiraStatusReporter {
     if (!cache.has(cacheID)) {
       debug(`...creating/updating cache`)
       users.forEach(async (user) => {
-        promises.push(
-          jira.searchJira(
-            `project="${project}"
-            AND assignee${user == UNASSIGNED_USER ? ' is empty' : `="${user}"`}
-            AND status not in (${excludeStatuses.join(',')})
-            AND issuetype not in (${excludeTypes.join(',')})
-            AND fixVersion in ("${fixVersions.join(',')}")`
-          )
-        )
+        const JQL_for_promise = `project="${project}"
+        AND assignee${user == UNASSIGNED_USER ? ' is empty' : `="${user}"`}
+        ${
+          excludeStatuses.length
+            ? ` AND status not in (${excludeStatuses.join(',')})`
+            : ''
+        }
+        ${
+          excludeTypes.length
+            ? ` AND issuetype not in (${excludeTypes.join(',')})`
+            : ''
+        }
+        ${
+          fixVersions.length
+            ? ` AND fixVersion in ("${fixVersions.join(',')}")`
+            : ''
+        }`
+        debug(`JQL_for_promise: ${JQL_for_promise}`)
+        promises.push(jira.searchJira(JQL_for_promise))
       })
 
       const results = await Promise.all(promises)
@@ -554,7 +570,7 @@ class JiraStatusReporter {
       'parent',
       'fixversion',
       'timeestimate',
-      'aggregatetimeestimate'
+      'aggregatetimeestimate',
     ])
 
     // Default to Jira Server syntax
@@ -665,14 +681,17 @@ class JiraStatusReporter {
   async getEpicsInRelease(release) {
     let epicList = await this._genericJiraSearch(
       `project="${config.project}" AND issuetype="Epic" AND fixVersion="${release}"`,
-      99, ['assignee']
+      99,
+      ['assignee']
     )
-    return epicList.issues.map(e => e.key)
+    return epicList.issues.map((e) => e.key)
   }
 
   async getIssueSummary(id) {
-    const data = await this._genericJiraSearch(`key=${id}`, ACTION_CONTENTS, [`summary`])
-    if(data.issues[0].fields.summary) {
+    const data = await this._genericJiraSearch(`key=${id}`, ACTION_CONTENTS, [
+      `summary`,
+    ])
+    if (data.issues[0].fields.summary) {
       return data.issues[0].fields.summary
     } else {
       console.error(`Missing Summary for ${id}`)

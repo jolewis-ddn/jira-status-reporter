@@ -23,6 +23,14 @@ const sqlite3 = require("sqlite3").verbose();
 const ALL_RELEASES = "ALL_RELEASES";
 const NO_RELEASE = "NONE";
 
+const DATABASE_FILENAME_DEFAULT = 'jira-stats.db'
+
+const databaseFilename = config.has('dbFilename')
+  ? config.dbFilename
+  : DATABASE_FILENAME_DEFAULT
+const databaseFullname = dataPathPrefix + databaseFilename
+
+debug(`databaseFullname: ${databaseFullname}`)
 /**
  * Save cached data
  *
@@ -36,7 +44,7 @@ class JiraDataReader {
     this.REBUILD = 999
     this.UPDATE  = 500
     this.REFRESH = 10
-    this.db = new sqlite3.Database(dataPathPrefix + 'jira-stats.db')
+    this.db = new sqlite3.Database(databaseFullname)
     // this.jsr = new JSR()
 
     return this
