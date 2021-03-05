@@ -124,6 +124,7 @@ server.get('/', async (req, res, next) => {
 
   res.write(`<li>Report: Project-specific; Requires Jira project name ('/PROJECT_NAME', e.g. <a href='/report/${config.project}'>${config.project}</a>) (JSON)</li>
   <li><a href='/requirements'>Requirements</a> (HTML)</li>
+  <li>Timeline: Requires Jira key parameter ('/timeline/ABC-1234') (HTML)</li>
   <li>Unestimated (<a href='/unestimated'>JSON</a> or <a href='/unestimated?format=html'>HTML</a>)</li>`)
 
   // Print the cache management links if the Admin param is set
