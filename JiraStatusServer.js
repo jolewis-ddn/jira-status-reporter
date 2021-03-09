@@ -2377,9 +2377,18 @@ server.get('/epicStatus/:id', async (req, res, next) => {
     response.raw = data
   }
 
+  // Save details in the "response" object
+  // Blockers are stored in the "response.blockedBy" array
+  response.blockedByCount = 0
+  response.blockedBy = {}
+
   data.issues.forEach((story) => {
+    debug(`>>> Processing story: ${story.key}...`)
     if (story.key == id) { // No progress info @ Epic level
       response.status = story.fields.status.name
+
+      response.progress.progress += story.fields.progress.progress
+      response.progress.total += story.fields.progress.total
     } else {
       response.stories.push(story.key)
       if (story.fields.assignee) {
@@ -2409,9 +2418,54 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       response.progress.progress += story.fields.progress.progress
       response.progress.total += story.fields.progress.total
     }
+
+    // Check on the blockers
+    story.fields.issuelinks.forEach((link) => {
+      debug(`found link: ${link.type.name}`)
+      if (link.type.inward == "is blocked by" && Object.keys(link).includes("inwardIssue")) {
+        response.blockedBy[link.inwardIssue.key] = {
+          summary: link.inwardIssue.fields.summary,
+          progress: 0,
+          total: 0
+        }
+        response.blockedByCount++
+      }
+    })
   })
 
-  // Now figure out who has the longest remaining workload
+  // Process blockers
+  let blockerKeys = Object.keys(response.blockedBy)
+  if (blockerKeys.length) {
+    response.blockedBy["Combined"] = { progress: 0, total: 0 }
+    debug(`Processing blockers: ${blockerKeys.join(',')}`)
+    const blockerJql = `project=${config.project} AND key in (${blockerKeys.join(',')})`
+    debug(`...blockerJql: ${blockerJql}`)
+
+    let blockerData = await jsr._genericJiraSearch(
+      blockerJql,
+      99,
+      [
+        `key`,
+        `aggregateprogress`,
+        `customfield_10008`,
+        `issuetype`,
+        `assignee`,
+        `status`,
+      ]
+    )
+    blockerData.issues.forEach((blockerIssue) => {
+      debug(blockerIssue.key, blockerIssue.fields.aggregateprogress)
+      response.blockedBy[blockerIssue.key].progress = blockerIssue.fields.aggregateprogress.progress
+      response.blockedBy[blockerIssue.key].total = blockerIssue.fields.aggregateprogress.total
+      response.blockedBy["Combined"].progress += blockerIssue.fields.aggregateprogress.progress
+      response.blockedBy["Combined"].total += blockerIssue.fields.aggregateprogress.total
+    })
+
+  } else {
+    debug(`...no blockers found`)
+  }
+
+  // Calculate the longest remaining workload
   let maxRemaining = { user: 'unset', remaining: 0 }
   Object.keys(response.users).forEach((user) => {
     if (response.users[user].total - response.users[user].progress > maxRemaining.remaining) {
@@ -2419,6 +2473,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       maxRemaining.user = user
     }
   })
+
   response.maxRemaining = maxRemaining
   response.processed = new Date().toISOString()
 
