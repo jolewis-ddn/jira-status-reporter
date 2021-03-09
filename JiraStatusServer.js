@@ -2858,6 +2858,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' } ${component ? ' (Component: ' + component + ')' : '' }`, data, "stacked-bar", 'days')
     .then((link) => {
       res.write(link)
+      res.write(`<small style="color: gray; position: inherit; text-align: left; display: block; padding: 0px 30px 0px 15px; font-weight: 100; font-style: inherit; font-size: small; font-family: 'Inconsolata', monospace;">${new Date().toISOString()}</small>`)
     })
     .catch((err) => {
       debug(`Error caught in buildChartImgTag() = ${err}`)
@@ -2877,8 +2878,6 @@ server.get('/burndown/:rel', async (req, res, next) => {
           res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes${componentStr}'; return false;`))
         }
       }
-      // res.write(`</div>`)
-
       // Show component list
       const componentList = await jdr.getComponentList()
       // res.write(`<p>`)
