@@ -2457,6 +2457,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       debug(blockerIssue.key, blockerIssue.fields.aggregateprogress)
       response.blockedBy[blockerIssue.key].progress = blockerIssue.fields.aggregateprogress.progress
       response.blockedBy[blockerIssue.key].total = blockerIssue.fields.aggregateprogress.total
+
       response.blockedBy["Combined"].progress += blockerIssue.fields.aggregateprogress.progress
       response.blockedBy["Combined"].total += blockerIssue.fields.aggregateprogress.total
     })
@@ -2677,6 +2678,8 @@ server.get('/burndown/:rel', async (req, res, next) => {
   let forecast = (req.query.forecast && req.query.forecast === "yes") ? req.query.forecast : false
   let efficiency = (req.query.efficiency ? req.query.efficiency : config.forecast && config.forecast.efficiency && !isNaN(config.forecast.efficiency) ? config.forecast.efficiency : 1)
 
+  let showReleased = (req.query.showReleased && req.query.showReleased === "yes") ? true : false
+
   let teamSize =
     config.has('forecast') && config.forecast.has('teamSize')
       ? config.forecast.teamSize
@@ -2711,6 +2714,13 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
   let enableForecastButton = false
 
+  if (showReleased) {
+    releaseList = versionData.map((v) => v.name)
+  } else {
+    releaseList = versionData.filter((v) => v.released == false).map((v) => v.name)
+  }
+  debug(`new releaseList: `, releaseList)
+
   if (release) { // A specific release was selected
     res.write(simpleButton('All/Combined', '/burndown/'))
 
@@ -2720,6 +2730,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     // debug(`*** versionData redux: `, versionData)
 
     if (versionData.length) {
+      // debug(versionData[0])
       versionReleaseDate = versionData[0].releaseDate
       // debug(`... versionData is NOT empty. versionReleaseDate: ${versionReleaseDate}`)
       let now = new Date()
@@ -2741,7 +2752,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
     if (release === rel) {
       res.write(simpleButton(relName, false, false))
     } else {
-      res.write(simpleButton(relName, `/burndown/${rel}`, false))
+      res.write(simpleButton(relName, `/burndown/${encodeURIComponent(rel)}?showReleased=${showReleased ? 'yes' : 'no'}`, false))
     }
   })
   res.write(`</div>`)
@@ -2968,6 +2979,14 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // })
       // res.write(`</ul>`)
 
+      // showReleased toggle button
+      res.write('<div>')
+      if (showReleased) {
+        res.write(simpleButton('Hide Released Versions', './?showReleased=no', true))
+      } else {
+        res.write(simpleButton('Show Released Versions', './?showReleased=yes', true))
+      }
+      res.write('</div>')
       res.write(buildHtmlFooter())
       res.end()
     })
