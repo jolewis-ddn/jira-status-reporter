@@ -46,6 +46,14 @@ const backgroundColors = [
   'Purple'
 ]
 
+const foregroundColors = [
+  'black',
+  'white',
+  'white',
+  'black',
+  'white'
+]
+
 const backgroundColorStr = "backgroundColor:['"
   .concat(backgroundColors.join("','"))
   .concat("']")
@@ -358,9 +366,9 @@ function buildEpicPromisesArray(epicIds) {
 }
 
 function buildLegend() {
-  let legendStr = "<div class='sticky legend'>"
+  let legendStr = "<div class='sticky legend'><em>Legend:</em>"
   backgroundColors.forEach((c, ndx) => {
-    legendStr += `<span style="background-color: ${c}; padding: 4px; border: 6px; border-color: ${c}; margin: 5px; border-style: solid; border-radius: 8px; z-index: 999;">${states[ndx]}</span>`
+    legendStr += `<button class='btn btn-sm' style='background-color: ${c}; color: ${foregroundColors[ndx]}'>${states[ndx]}</button>`
   })
   legendStr += '</div>'
   return legendStr
@@ -2305,9 +2313,9 @@ server.get('/epics', (req, res, next) => {
         htmlOutput.push(buildLegend())
         
         // Print Story estimate data
-        htmlOutput.push(`<hr>`)
-        htmlOutput.push(`<h4>Story Estimate Mismatch</h4>`)
         if (Object.keys(storyEstimateData).length) {
+          htmlOutput.push(`<hr>`)
+          htmlOutput.push(`<h4>Story Estimate Mismatch</h4>`)
           res.write(`
           <table style='width: auto !important;' class='table table-sm'>
           <thead>
@@ -2329,8 +2337,6 @@ server.get('/epics', (req, res, next) => {
             `)
           })
           htmlOutput.push(`</tbody></table>`)
-        } else {
-          htmlOutput.push(`None`)
         }
         htmlOutput.push(buildHtmlFooter())
         res.write(htmlOutput.join(''))
