@@ -2360,6 +2360,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
   let response = {
     id: id,
     status: 'undefined',
+    summary: 'undefined',
     progress: { progress: 0, total: 0 },
     stories: [],
     users: {}
@@ -2376,6 +2377,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       `issuetype`,
       `assignee`,
       `status`,
+      `summary`
     ]
   )
 
@@ -2412,7 +2414,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
         response.users[story.fields.assignee.displayName].total +=
           story.fields.progress.total
         response.users[story.fields.assignee.displayName].issues.push(story.key)
-      } else {
+      } else { // No assignee
         if (!Object.keys(response.users).includes('Unassigned')) {
           response.users['Unassigned'] = { progress: 0, total: 0, issues: [] }
         }
@@ -2431,8 +2433,10 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       if (link.type.inward == "is blocked by" && Object.keys(link).includes("inwardIssue")) {
         response.blockedBy[link.inwardIssue.key] = {
           summary: link.inwardIssue.fields.summary,
+          assignee: link.inwardIssue.fields.assignee,
           progress: 0,
-          total: 0
+          total: 0,
+          blocks: { id: story.key, summary: story.fields.summary }
         }
         response.blockedByCount++
       }
@@ -2460,9 +2464,13 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       ]
     )
     blockerData.issues.forEach((blockerIssue) => {
-      debug(blockerIssue.key, blockerIssue.fields.aggregateprogress)
+      debug(`blockerIssue: `, blockerIssue.key, blockerIssue.fields.aggregateprogress)
       response.blockedBy[blockerIssue.key].progress = blockerIssue.fields.aggregateprogress.progress
       response.blockedBy[blockerIssue.key].total = blockerIssue.fields.aggregateprogress.total
+
+      response.blockedBy[blockerIssue.key].assignee = blockerIssue.fields.assignee.displayName
+      response.blockedBy[blockerIssue.key].status = blockerIssue.fields.status.name
+      response.blockedBy[blockerIssue.key].type = blockerIssue.fields.issuetype.name
 
       response.blockedBy["Combined"].progress += blockerIssue.fields.aggregateprogress.progress
       response.blockedBy["Combined"].total += blockerIssue.fields.aggregateprogress.total
