@@ -32,6 +32,7 @@ const { convertSecondsToDays } = require("./jiraUtils")
 const dashboard = new Dashboard()
 
 const LocalStorage = require('node-localstorage').LocalStorage
+const { cachedDataVersionTag } = require('v8')
 let ls = new LocalStorage('./.cache')
 
 const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
@@ -1992,347 +1993,441 @@ server.get('/epics', (req, res, next) => {
   let epicIdRequested = req.query.id
   let onlyRelease = req.query.release ? req.query.release : false
 
-  let promises = buildEpicPromisesArray(epicIdRequested)
-
-  res.write(buildHtmlHeader(`Epics: ${epicIdRequested}`,false))
+  res.write(buildHtmlHeader(`Epics: ${epicIdRequested}`, false))
   res.write(buildPageHeader('Status Page', epicIdRequested))
 
-  let htmlOutput = []
+  const cacheName = `epics-html-${epicIdRequested}-${onlyRelease}`
 
-  Promise.all(promises)
-    .then((results) => {
-      let stats = {
-        Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-        Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-        Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-        'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-        Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 }
-      }
+  if (cache.has(cacheName)) {
+    res.write(cache.get(cacheName))
+    res.write(`<small>Cached response; cache expires in ${Math.round((new Date(cache.getTtl(cacheName)) - new Date())/1000,2)} seconds`)
+    res.end()
+    return
+  } else {
+    let promises = buildEpicPromisesArray(epicIdRequested)
+    let htmlOutput = []
 
-      let details = []
-      let ownerData = {}
+    Promise.all(promises)
+      .then((results) => {
+        let stats = {
+          Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+          Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+          Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+          'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+          Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
+        }
 
-      let storyEstimateData = {}
+        let details = []
+        let ownerData = {}
 
-      details.push(`<ul class="list-group list-group-flush">`)
-      results.forEach((e) => {
-        let epicData = {}
-        let epicItemIndex = -1
-        let epicItemIndexToRemove = -1
+        let storyEstimateData = {}
 
-        debug(`\n>>> Orig Results: ${e.issues.map(i => i.key).join(',')}\n`)
+        details.push(`<ul class="list-group list-group-flush">`)
+        results.forEach((e) => {
+          let epicData = {}
+          let epicItemIndex = -1
+          let epicItemIndexToRemove = -1
 
-        // Make sure the epic is highlighted properly
-        for (let i = 0; i < e.issues.length; i++) {
-          const issue = e.issues[i]
+          debug(`\n>>> Orig Results: ${e.issues.map((i) => i.key).join(',')}\n`)
 
-          // debug(`e.fixVersions: `, issue.fields.fixVersions)
-          debug(`includesRelease(fixVersions, ${onlyRelease}) = `, includesRelease(issue.fields.fixVersions))
+          // Make sure the epic is highlighted properly
+          for (let i = 0; i < e.issues.length; i++) {
+            const issue = e.issues[i]
 
-          if (issue.key == epicIdRequested) {
-            epicData = issue
-            // epicItemIndexToRemove = epicItemIndex
-            epicItemIndex = i
-            debug(`Found match for requested epic: ${epicIdRequested}`)
-            break
+            // debug(`e.fixVersions: `, issue.fields.fixVersions)
+            debug(
+              `includesRelease(fixVersions, ${onlyRelease}) = `,
+              includesRelease(issue.fields.fixVersions)
+            )
+
+            if (issue.key == epicIdRequested) {
+              epicData = issue
+              // epicItemIndexToRemove = epicItemIndex
+              epicItemIndex = i
+              debug(`Found match for requested epic: ${epicIdRequested}`)
+              break
+            }
           }
-        }
 
-        if (epicItemIndex >= 0) {
-          debug(`setting epicData by index: ${epicItemIndex} of total ${e.issues.length} issues; Key == ${epicData.key}`)
-          e.issues.splice(epicItemIndex, 1)
-        } else {
-          debug(`setting epicData by pop`)
-          epicData = e.issues.pop()
-        }
-
-        debug(`\n>>> Updated Results: ${e.issues.map(i => i.key).join(',')}\n`)
-
-        debug(`processing ${epicData.key}...`)
-
-        let owner = 'TBD'
-        try {
-          owner = epicData.fields.assignee.displayName
-        } catch (err) {
-          owner = 'unassigned'
-        }
-
-        let statusName = 'unknown'
-        try {
-          statusName = epicData.fields.status.name
-        } catch (err) {
-          debug(`... unrecognized status for ${epicData.key}!`)
-          statusName = 'unknown'
-        }
-
-        let resultCtr = {
-          Epics: [],
-          Stories: [],
-          Tasks: [],
-          'Sub-tasks': [],
-          Bugs: []
-        }
-
-        details.push(
-          `<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`
-        )
-        details.push(
-          `<a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${epicData.key
-          }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-            statusName
-          )}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanText(
-            epicData.key
-          )}: ${cleanText(
-            epicData.fields.summary
-          )} (${owner}; ${statusName})'/></a>`
-        )
-        details.push(`<span class='issueName'>${epicData.key}: ${epicData.fields.summary}</span>`)
-        stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
-        switch (epicData.fields.issuetype.name) {
-          case 'Epic':
-            resultCtr['Epics'].push('')
-            break
-          case 'Story':
-            resultCtr['Stories'].push('')
-            if (epicData.fields.timeestimate && epicData.fields.aggregatetimeestimate
-              &&
-              (epicData.fields.timeestimate > 0)
-              &&
-              (epicData.fields.subtasks.length)
-          ) {
-              debug(`A) Adding estimate data for ${epicData.key}... ${epicData.fields.timeestimate}`)
-              storyEstimateData[`${epicData.key}: ${epicData.fields.summary}`] = {
-                time: epicData.fields.timeestimate, 
-                aggregatetime: epicData.fields.aggregatetimeestimate
-              }
-            }
-            break
-          case 'Task':
-            resultCtr['Tasks'].push('')
-            break
-          case 'Sub-Task':
-            resultCtr['Sub-tasks'].push('')
-            break
-          case 'Bugs':
-            resultCtr['Bugs'].push('')
-            break
-          default:
-            break
-        }
-
-        e.issues.forEach((issue, ndx) => {
-          // debug(`issue: `, issue)
-
-          // Check for onlyRelease & the fixVersion
-          if (!onlyRelease || includesRelease(issue.fields.fixVersions, onlyRelease)) {
-            debug(`Processing ${issue.key} - onlyRelease: ${onlyRelease}...`)
-
-            let owner = 'TBD'
-            try {
-              owner = issue.fields.assignee.displayName
-            } catch (err) {
-              owner = 'unassigned'
-            }
-            if (!Object.keys(ownerData).includes(owner)) {
-              ownerData[owner] = []
-            }
-            // Update ownerData
-            ownerData[owner].push(issue)
-
-            let statusName = 'unknown'
-            try {
-              statusName = issue.fields.status.name
-            } catch (err) {
-              statusName = 'unknown'
-            }
-
-            switch (issue.fields.issuetype.name) {
-              case 'Epic':
-                resultCtr['Epics'].push(
-                  `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
-                  }/browse/${issue.key
-                  }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-                    issue.fields.status.name
-                  )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
-                    issue.key
-                  )}: ${cleanText(
-                    issue.fields.summary
-                  )} (${owner}; ${statusName})'/></a>`
-                )
-                debug(`Epic ${issue.key}...`)
-                stats = updateStats(stats, 'Epic', statusName)
-                break
-              case 'Story':
-                debug(`B) Adding estimate data for ${issue.key}... ${issue.fields.timeestimate}`)
-                if (issue.fields.timeestimate && issue.fields.aggregatetimeestimate
-                  &&
-                  (issue.fields.timeestimate > 0)
-                  &&
-                  (issue.fields.subtasks.length)
-                  ) {
-                  storyEstimateData[`${issue.key}: ${issue.fields.summary}`] = {
-                    time: issue.fields.timeestimate,
-                    aggregatetime: issue.fields.aggregatetimeestimate
-                  }
-                }
-                resultCtr['Stories'].push(
-                  `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
-                  }/browse/${issue.key
-                  }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-                    issue.fields.status.name
-                  )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
-                    issue.key
-                  )}: ${cleanText(
-                    issue.fields.summary
-                  )} (${owner}; ${statusName})'/></a>`
-                )
-                debug(`Story ${issue.key}...`)
-                stats = updateStats(stats, 'Story', statusName)
-                break
-              case 'Task':
-                resultCtr['Tasks'].push(
-                  `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
-                  }/browse/${issue.key
-                  }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-                    issue.fields.status.name
-                  )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
-                    issue.key
-                  )}: ${cleanText(
-                    issue.fields.summary
-                  )} (${owner}; ${statusName})'/></a>`
-                )
-                debug(`Task ${issue.key}...`)
-                stats = updateStats(stats, 'Task', statusName)
-                break
-              case 'Sub-task':
-                resultCtr['Sub-tasks'].push(
-                  `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
-                  }/browse/${issue.key
-                  }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-                    issue.fields.status.name
-                  )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
-                    issue.key
-                  )}: ${cleanText(
-                    issue.fields.summary
-                  )} (${owner}; ${statusName})'/></a>`
-                )
-                debug(`Sub-task ${issue.key}...`)
-                stats = updateStats(stats, 'Sub-task', statusName)
-                break
-              case 'Bug':
-                resultCtr['Bugs'].push(
-                  `<a href='${config.get('jira.protocol')}://${config.get('jira.host')
-                  }/browse/${issue.key
-                  }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-                    issue.fields.status.name
-                  )}' src='${issue.fields.issuetype.iconUrl}' title='${cleanText(
-                    issue.key
-                  )}: ${cleanText(
-                    issue.fields.summary
-                  )} (${owner}; ${statusName})'/></a>`
-                )
-                debug(`Bug ${issue.key}...`)
-                stats = updateStats(stats, 'Bug', statusName)
-                break
-              default:
-                debug(`unrecognized issuetype: ${issue.fields.issuetype.name}`)
-            }
+          if (epicItemIndex >= 0) {
+            debug(
+              `setting epicData by index: ${epicItemIndex} of total ${e.issues.length} issues; Key == ${epicData.key}`
+            )
+            e.issues.splice(epicItemIndex, 1)
           } else {
-            debug(`Skipping ${issue.key} - onlyRelease: ${onlyRelease}...`)
+            debug(`setting epicData by pop`)
+            epicData = e.issues.pop()
           }
 
-        })
-        details.push(`<div class="children">
+          debug(
+            `\n>>> Updated Results: ${e.issues.map((i) => i.key).join(',')}\n`
+          )
+
+          debug(`processing ${epicData.key}...`)
+
+          let owner = 'TBD'
+          try {
+            owner = epicData.fields.assignee.displayName
+          } catch (err) {
+            owner = 'unassigned'
+          }
+
+          let statusName = 'unknown'
+          try {
+            statusName = epicData.fields.status.name
+          } catch (err) {
+            debug(`... unrecognized status for ${epicData.key}!`)
+            statusName = 'unknown'
+          }
+
+          let resultCtr = {
+            Epics: [],
+            Stories: [],
+            Tasks: [],
+            'Sub-tasks': [],
+            Bugs: [],
+          }
+
+          details.push(
+            `<li class="list-group-item d-flex justify-content-between align-items" style="align-self: start;">`
+          )
+          details.push(
+            `<a href='${config.get('jira.protocol')}://${config.get(
+              'jira.host'
+            )}/browse/${
+              epicData.key
+            }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+              statusName
+            )}' src='${epicData.fields.issuetype.iconUrl}' title='${cleanText(
+              epicData.key
+            )}: ${cleanText(
+              epicData.fields.summary
+            )} (${owner}; ${statusName})'/></a>`
+          )
+          details.push(
+            `<span class='issueName'>${epicData.key}: ${epicData.fields.summary}</span>`
+          )
+          stats = updateStats(stats, epicData.fields.issuetype.name, statusName)
+          switch (epicData.fields.issuetype.name) {
+            case 'Epic':
+              resultCtr['Epics'].push('')
+              break
+            case 'Story':
+              resultCtr['Stories'].push('')
+              if (
+                epicData.fields.timeestimate &&
+                epicData.fields.aggregatetimeestimate &&
+                epicData.fields.timeestimate > 0 &&
+                epicData.fields.subtasks.length
+              ) {
+                debug(
+                  `A) Adding estimate data for ${epicData.key}... ${epicData.fields.timeestimate}`
+                )
+                storyEstimateData[
+                  `${epicData.key}: ${epicData.fields.summary}`
+                ] = {
+                  time: epicData.fields.timeestimate,
+                  aggregatetime: epicData.fields.aggregatetimeestimate,
+                }
+              }
+              break
+            case 'Task':
+              resultCtr['Tasks'].push('')
+              break
+            case 'Sub-Task':
+              resultCtr['Sub-tasks'].push('')
+              break
+            case 'Bugs':
+              resultCtr['Bugs'].push('')
+              break
+            default:
+              break
+          }
+
+          e.issues.forEach((issue, ndx) => {
+            // debug(`issue: `, issue)
+
+            // Check for onlyRelease & the fixVersion
+            if (
+              !onlyRelease ||
+              includesRelease(issue.fields.fixVersions, onlyRelease)
+            ) {
+              debug(`Processing ${issue.key} - onlyRelease: ${onlyRelease}...`)
+
+              let owner = 'TBD'
+              try {
+                owner = issue.fields.assignee.displayName
+              } catch (err) {
+                owner = 'unassigned'
+              }
+              if (!Object.keys(ownerData).includes(owner)) {
+                ownerData[owner] = []
+              }
+              // Update ownerData
+              ownerData[owner].push(issue)
+
+              let statusName = 'unknown'
+              try {
+                statusName = issue.fields.status.name
+              } catch (err) {
+                statusName = 'unknown'
+              }
+
+              switch (issue.fields.issuetype.name) {
+                case 'Epic':
+                  resultCtr['Epics'].push(
+                    `<a href='${config.get('jira.protocol')}://${config.get(
+                      'jira.host'
+                    )}/browse/${
+                      issue.key
+                    }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+                      issue.fields.status.name
+                    )}' src='${
+                      issue.fields.issuetype.iconUrl
+                    }' title='${cleanText(issue.key)}: ${cleanText(
+                      issue.fields.summary
+                    )} (${owner}; ${statusName})'/></a>`
+                  )
+                  debug(`Epic ${issue.key}...`)
+                  stats = updateStats(stats, 'Epic', statusName)
+                  break
+                case 'Story':
+                  debug(
+                    `B) Adding estimate data for ${issue.key}... ${issue.fields.timeestimate}`
+                  )
+                  if (
+                    issue.fields.timeestimate &&
+                    issue.fields.aggregatetimeestimate &&
+                    issue.fields.timeestimate > 0 &&
+                    issue.fields.subtasks.length
+                  ) {
+                    storyEstimateData[
+                      `${issue.key}: ${issue.fields.summary}`
+                    ] = {
+                      time: issue.fields.timeestimate,
+                      aggregatetime: issue.fields.aggregatetimeestimate,
+                    }
+                  }
+                  resultCtr['Stories'].push(
+                    `<a href='${config.get('jira.protocol')}://${config.get(
+                      'jira.host'
+                    )}/browse/${
+                      issue.key
+                    }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+                      issue.fields.status.name
+                    )}' src='${
+                      issue.fields.issuetype.iconUrl
+                    }' title='${cleanText(issue.key)}: ${cleanText(
+                      issue.fields.summary
+                    )} (${owner}; ${statusName})'/></a>`
+                  )
+                  debug(`Story ${issue.key}...`)
+                  stats = updateStats(stats, 'Story', statusName)
+                  break
+                case 'Task':
+                  resultCtr['Tasks'].push(
+                    `<a href='${config.get('jira.protocol')}://${config.get(
+                      'jira.host'
+                    )}/browse/${
+                      issue.key
+                    }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+                      issue.fields.status.name
+                    )}' src='${
+                      issue.fields.issuetype.iconUrl
+                    }' title='${cleanText(issue.key)}: ${cleanText(
+                      issue.fields.summary
+                    )} (${owner}; ${statusName})'/></a>`
+                  )
+                  debug(`Task ${issue.key}...`)
+                  stats = updateStats(stats, 'Task', statusName)
+                  break
+                case 'Sub-task':
+                  resultCtr['Sub-tasks'].push(
+                    `<a href='${config.get('jira.protocol')}://${config.get(
+                      'jira.host'
+                    )}/browse/${
+                      issue.key
+                    }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+                      issue.fields.status.name
+                    )}' src='${
+                      issue.fields.issuetype.iconUrl
+                    }' title='${cleanText(issue.key)}: ${cleanText(
+                      issue.fields.summary
+                    )} (${owner}; ${statusName})'/></a>`
+                  )
+                  debug(`Sub-task ${issue.key}...`)
+                  stats = updateStats(stats, 'Sub-task', statusName)
+                  break
+                case 'Bug':
+                  resultCtr['Bugs'].push(
+                    `<a href='${config.get('jira.protocol')}://${config.get(
+                      'jira.host'
+                    )}/browse/${
+                      issue.key
+                    }' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+                      issue.fields.status.name
+                    )}' src='${
+                      issue.fields.issuetype.iconUrl
+                    }' title='${cleanText(issue.key)}: ${cleanText(
+                      issue.fields.summary
+                    )} (${owner}; ${statusName})'/></a>`
+                  )
+                  debug(`Bug ${issue.key}...`)
+                  stats = updateStats(stats, 'Bug', statusName)
+                  break
+                default:
+                  debug(
+                    `unrecognized issuetype: ${issue.fields.issuetype.name}`
+                  )
+              }
+            } else {
+              debug(`Skipping ${issue.key} - onlyRelease: ${onlyRelease}...`)
+            }
+          })
+          details.push(`<div class="children">
                 ${resultCtr['Epics'].join('')}
                 ${resultCtr['Stories'].join('')}
                 ${resultCtr['Tasks'].join('')}
                 ${resultCtr['Sub-tasks'].join('')}
                 ${resultCtr['Bugs'].join('')}
-                <span class="badge badge-dark rounded-pill" title='${resultCtr['Epics'].length} Epic${resultCtr['Epics'].length == 1 ? '' : 's'}'>
+                <span class="badge badge-dark rounded-pill" title='${
+                  resultCtr['Epics'].length
+                } Epic${resultCtr['Epics'].length == 1 ? '' : 's'}'>
                     ${resultCtr['Epics'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title='${resultCtr['Stories'].length} Stor${resultCtr['Stories'].length == 1 ? 'y' : 'ies'}'>
+                <span class="badge badge-dark rounded-pill" title='${
+                  resultCtr['Stories'].length
+                } Stor${resultCtr['Stories'].length == 1 ? 'y' : 'ies'}'>
                     ${resultCtr['Stories'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title='${resultCtr['Tasks'].length} Task${resultCtr['Tasks'].length == 1 ? '': 's'}'>
+                <span class="badge badge-dark rounded-pill" title='${
+                  resultCtr['Tasks'].length
+                } Task${resultCtr['Tasks'].length == 1 ? '' : 's'}'>
                     ${resultCtr['Tasks'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title='${resultCtr['Sub-tasks'].length} Sub-task${resultCtr['Sub-tasks'].length == 1 ? "": "s"}'>
+                <span class="badge badge-dark rounded-pill" title='${
+                  resultCtr['Sub-tasks'].length
+                } Sub-task${resultCtr['Sub-tasks'].length == 1 ? '' : 's'}'>
                     ${resultCtr['Sub-tasks'].length}
                 </span>
-                <span class="badge badge-dark rounded-pill" title='${resultCtr['Bugs'].length} Bug${resultCtr['Bugs'].length == 1 ? "": "s"}'>
+                <span class="badge badge-dark rounded-pill" title='${
+                  resultCtr['Bugs'].length
+                } Bug${resultCtr['Bugs'].length == 1 ? '' : 's'}'>
                     ${resultCtr['Bugs'].length}
                 </span></div>`)
-        details.push(`</li>`)
-      })
-      details.push(`</ul>`)
-
-      debug(`buildPieCharts() called with ${stats}`)
-
-      // Track cumulative work done and total (calc remaining)
-      let epicWork = { progress: 0, total: 0 }
-
-      buildPieCharts(stats).then((charts) => {
-        const DAY_WIDTH = 10 // One day is 10px wide
-
-        // debug(`charts: `, charts)
-        // res.write(charts)
-        // res.write('<hr>')
-        // htmlOutput.push('<hr>')
-        htmlOutput.push(details.join(''))
-
-        htmlOutput.push(`<h3>Remaining Work</h3>`)
-        htmlOutput.push(`<ul>`)
-        Object.keys(ownerData).sort().forEach((owner) => {
-          let totalEstRem = 0
-          let ownerHtml = []
-          ownerData[owner].forEach((j) => {
-            epicWork.total += j.fields.progress.total
-            epicWork.progress += j.fields.progress.progress
-
-          // Skip Stories with Sub-tasks (estimates will be in the Sub-tasks)
-            if ((j.fields.issuetype.name == 'Story' && j.fields.subtasks.length > 0) || j.fields.status.name == 'Done') {
-              debug(`...skipping Story ${j.key} with ${j.fields.subtasks.length} subtasks; Owner: ${owner}; Status: ${j.fields.status.name}`)
-            } else {
-              let estRem = j.fields.progress && j.fields.progress.total ? Math.round((j.fields.progress.total - j.fields.progress.progress)/28800) : 0
-              totalEstRem += estRem
-
-              ownerHtml.push(`<a href="${config.get('jira.protocol')}://${config.get('jira.host')
-            }/browse/${j.key}"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${estRem ? estRem * DAY_WIDTH : 1}px; background-color: ${estRem ? "green" : "red"};" data-toggle="tooltip" data-html="true" title='${j.key}: ${cleanText(j.fields.summary)}<ul><li>Type: ${j.fields.issuetype.name}</li><li>Status: ${j.fields.status.name}</li><li>Remaining: ${estRem}d</li><li>Total Est: ${Math.round(j.fields.progress.total/28800)}d</ul>'></span></a>`)
-            }
-          })
-          // if (ownerHtml[owner] && ownerHtml[owner].length) {
-          // if (totalEstRem > 0) {
-            htmlOutput.push(`<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d]</span>: `)
-          // }
-          htmlOutput.push(ownerHtml.join(''))
-          htmlOutput.push(`</li>`)
+          details.push(`</li>`)
         })
-        htmlOutput.push(`</ul>`)
+        details.push(`</ul>`)
 
-        // Add epicWork summary
-        // htmlOutput.push(`<p><B>Total:</B> ${epicWork.total/28800}; <B>Progress</B>: ${epicWork.progress/28800}</p>`)
-        let doneDays = Math.round(epicWork.progress/28800)
-        let doneWidth = Math.round((epicWork.progress/epicWork.total)*100)
+        debug(`buildPieCharts() called with ${stats}`)
 
-        let remainDays = Math.floor((epicWork.total - epicWork.progress)/28800)
-        let remainWidth = Math.round(((epicWork.total - epicWork.progress)/epicWork.total)*100)
+        // Track cumulative work done and total (calc remaining)
+        let epicWork = { progress: 0, total: 0 }
 
-        let totalDays = Math.floor(epicWork.total/28800)
+        buildPieCharts(stats).then((charts) => {
+          const DAY_WIDTH = 10 // One day is 10px wide
 
-        htmlOutput.splice(0,0,`<div style="display:flex;">
+          // debug(`charts: `, charts)
+          // res.write(charts)
+          // res.write('<hr>')
+          // htmlOutput.push('<hr>')
+          htmlOutput.push(details.join(''))
+
+          htmlOutput.push(`<h3>Remaining Work</h3>`)
+          htmlOutput.push(`<ul>`)
+          Object.keys(ownerData)
+            .sort()
+            .forEach((owner) => {
+              let totalEstRem = 0
+              let ownerHtml = []
+              ownerData[owner].forEach((j) => {
+                epicWork.total += j.fields.progress.total
+                epicWork.progress += j.fields.progress.progress
+
+                // Skip Stories with Sub-tasks (estimates will be in the Sub-tasks)
+                if (
+                  (j.fields.issuetype.name == 'Story' &&
+                    j.fields.subtasks.length > 0) ||
+                  j.fields.status.name == 'Done'
+                ) {
+                  debug(
+                    `...skipping Story ${j.key} with ${j.fields.subtasks.length} subtasks; Owner: ${owner}; Status: ${j.fields.status.name}`
+                  )
+                } else {
+                  let estRem =
+                    j.fields.progress && j.fields.progress.total
+                      ? Math.round(
+                          (j.fields.progress.total -
+                            j.fields.progress.progress) /
+                            28800
+                        )
+                      : 0
+                  totalEstRem += estRem
+
+                  ownerHtml.push(
+                    `<a href="${config.get('jira.protocol')}://${config.get(
+                      'jira.host'
+                    )}/browse/${
+                      j.key
+                    }"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${
+                      estRem ? estRem * DAY_WIDTH : 1
+                    }px; background-color: ${
+                      estRem ? 'green' : 'red'
+                    };" data-toggle="tooltip" data-html="true" title='${
+                      j.key
+                    }: ${cleanText(j.fields.summary)}<ul><li>Type: ${
+                      j.fields.issuetype.name
+                    }</li><li>Status: ${
+                      j.fields.status.name
+                    }</li><li>Remaining: ${estRem}d</li><li>Total Est: ${Math.round(
+                      j.fields.progress.total / 28800
+                    )}d</ul>'></span></a>`
+                  )
+                }
+              })
+              // if (ownerHtml[owner] && ownerHtml[owner].length) {
+              // if (totalEstRem > 0) {
+              htmlOutput.push(
+                `<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d]</span>: `
+              )
+              // }
+              htmlOutput.push(ownerHtml.join(''))
+              htmlOutput.push(`</li>`)
+            })
+          htmlOutput.push(`</ul>`)
+
+          // Add epicWork summary
+          // htmlOutput.push(`<p><B>Total:</B> ${epicWork.total/28800}; <B>Progress</B>: ${epicWork.progress/28800}</p>`)
+          let doneDays = Math.round(epicWork.progress / 28800)
+          let doneWidth = Math.round((epicWork.progress / epicWork.total) * 100)
+
+          let remainDays = Math.floor(
+            (epicWork.total - epicWork.progress) / 28800
+          )
+          let remainWidth = Math.round(
+            ((epicWork.total - epicWork.progress) / epicWork.total) * 100
+          )
+
+          let totalDays = Math.floor(epicWork.total / 28800)
+
+          htmlOutput.splice(
+            0,
+            0,
+            `<div style="display:flex;">
         <div style="vertical-align: middle; display: inline-block; padding: 0px; margin: 20px 0px 20px 0px; height: 20px; width: ${doneWidth}%; background-color: blue;" data-toggle="tooltip" data-html="true" title='${doneDays}d (${doneWidth}%) completed of ${totalDays}d total'></div>
         <div style="vertical-align: middle; display: inline-block; padding: 0px; margin: 20px 0px 20px 0px; height: 20px; width: ${remainWidth}%; background-color: gray;" data-toggle="tooltip" data-html="true" title='${remainDays}d (${remainWidth}%) remaining of ${totalDays}d total'></div>
         </div>
-        `)
+        `
+          )
 
-        htmlOutput.push(buildLegend())
-        
-        // Print Story estimate data
-        if (Object.keys(storyEstimateData).length) {
-          htmlOutput.push(`<hr>`)
-          htmlOutput.push(`<h4>Story Estimate Mismatch</h4>`)
-          res.write(`
+          htmlOutput.push(buildLegend())
+
+          // Print Story estimate data
+          if (Object.keys(storyEstimateData).length) {
+            htmlOutput.push(`<hr>`)
+            htmlOutput.push(`<h4>Story Estimate Mismatch</h4>`)
+            // res.write(`
+            htmlOutput.push(`
           <table style='width: auto !important;' class='table table-sm'>
           <thead>
             <tr>
@@ -2342,31 +2437,44 @@ server.get('/epics', (req, res, next) => {
             </tr>
           </thead>
           <tbody>`)
-        
-          Object.keys(storyEstimateData).sort().forEach((story) => {
-            // if (story.aggregateprogress.total !== story.progress.total)
-            // debug(story, storyEstimateData)
-            htmlOutput.push(`<tr><td><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${story})' target='_blank'>${story}</a></td>
-              <td class='text-center'>${convertSecondsToDays(storyEstimateData[story].time)}d</td>
-              <td class='text-center'>${convertSecondsToDays(storyEstimateData[story].aggregatetime)}d</td>
+
+            Object.keys(storyEstimateData)
+              .sort()
+              .forEach((story) => {
+                // if (story.aggregateprogress.total !== story.progress.total)
+                // debug(story, storyEstimateData)
+                htmlOutput.push(`<tr><td><a href='${config.get(
+                  'jira.protocol'
+                )}://${config.get(
+                  'jira.host'
+                )}/browse/${story})' target='_blank'>${story}</a></td>
+              <td class='text-center'>${convertSecondsToDays(
+                storyEstimateData[story].time
+              )}d</td>
+              <td class='text-center'>${convertSecondsToDays(
+                storyEstimateData[story].aggregatetime
+              )}d</td>
               </tr>
             `)
-          })
-          htmlOutput.push(`</tbody></table>`)
-        }
-        htmlOutput.push(buildHtmlFooter())
-        res.write(htmlOutput.join(''))
-        res.end()
-        return next()
+              })
+            htmlOutput.push(`</tbody></table>`)
+          }
+          htmlOutput.push(buildHtmlFooter())
+          cache.set(cacheName, htmlOutput.join(''))
+
+          res.write(htmlOutput.join(''))
+          res.end()
+          return next()
+        })
       })
-    })
-    .catch((err) => {
-      debug(`error @ JSS 2220`)
-      debug(err)
-      res.write('error with Epic query')
-      res.end()
-      return
-    })
+      .catch((err) => {
+        debug(`error @ JSS 2220`)
+        debug(err)
+        res.write('error with Epic query')
+        res.end()
+        return
+      })
+  } // if (cache.has(`epics-html-${epicIdRequested}-${onlyRelease}`)) {
 })
 
 server.get('/epicStatus/:id', async (req, res, next) => {
