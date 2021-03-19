@@ -64,6 +64,9 @@ Here's a filtered timeline - just add the fields you want to see as the value of
 * `/chart`: Visualize timeseries data using cache
 * `/dashboard`: Data visualization of current status (no cache)
 * `/epics`: Visualize Epic status (includes linked issues)
+   * Parameters:
+      * `id`: Jira key value (Required; no default)
+      * `release`: Only include issues that have a matching fixVersion.Name value. No value supplied = no filter (Optional; no default)
 * `/filter`: Visualize issue status using existing Jira filter
 * `/issueTypes`: List of issue types (either project-specific or global)
 * `/links`: Visualize issue links

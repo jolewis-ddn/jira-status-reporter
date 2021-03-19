@@ -568,7 +568,7 @@ class JiraStatusReporter {
       'issuetype',
       'summary',
       'parent',
-      'fixversion',
+      'fixVersions',
       'timeestimate',
       'aggregatetimeestimate',
     ])
