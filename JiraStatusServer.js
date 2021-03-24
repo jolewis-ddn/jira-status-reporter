@@ -33,6 +33,7 @@ const dashboard = new Dashboard()
 
 const LocalStorage = require('node-localstorage').LocalStorage
 const { cachedDataVersionTag } = require('v8')
+const { stringify } = require('querystring')
 let ls = new LocalStorage('./.cache')
 
 const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
@@ -1724,6 +1725,12 @@ server.get('/requirements', async (req, res, next) => {
   return next()
 })
 
+server.get('/created/:createdDate', async (req, res, next) => {
+  res.write(JSON.stringify(await jdr.getItemsCreatedOnDate(req.params.createdDate)))
+  res.end()
+  return next()
+})
+
 server.get('/dashboard', async (req, res, next) => {
   await dashboard.build()
   if (req.query && req.query.format == 'html') {
@@ -2592,7 +2599,12 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       response.blockedBy[blockerIssue.key].progress = blockerIssue.fields.aggregateprogress.progress
       response.blockedBy[blockerIssue.key].total = blockerIssue.fields.aggregateprogress.total
 
-      response.blockedBy[blockerIssue.key].assignee = blockerIssue.fields.assignee.displayName
+      if (blockerIssue.fields.assignee) {
+        response.blockedBy[blockerIssue.key].assignee = blockerIssue.fields.assignee.displayName
+      } else {
+        response.blockedBy[blockerIssue.key].assignee = UNASSIGNED_USER
+      }
+      
       response.blockedBy[blockerIssue.key].status = blockerIssue.fields.status.name
       response.blockedBy[blockerIssue.key].type = blockerIssue.fields.issuetype.name
 

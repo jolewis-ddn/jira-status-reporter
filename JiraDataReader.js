@@ -6,6 +6,7 @@ const fs = require("fs");
 const glob = require("glob");
 const path = require("path");
 
+const utilities = require('./utilities');
 const { convertSecondsToDays } = require("./jiraUtils");
 
 const config = require('config')
@@ -17,6 +18,7 @@ const NodeCache = require("node-cache");
 // const JSR = require('./JiraStatusReporter')
 
 const JiraDataCache = require("./JiraDataCache");
+const { CANCELLED } = require("dns");
 
 const sqlite3 = require("sqlite3").verbose();
 
@@ -64,6 +66,41 @@ class JiraDataReader {
 
   refresh() {
     return this.REFRESH
+  }
+
+  async getItemsCreatedOnDate(d) {
+    debug(`getItemsCreatedOnDate(${d}) called...`)
+    return new Promise((resolve, reject) => {
+      try {
+        let createdDate
+        if (typeof d == Date) {
+          createdDate = d
+        } else {
+          createdDate = new Date(d)
+        }
+        createdDate.setDate(createdDate.getDate()+1)
+        createdDate.setHours(0)
+        createdDate.setMinutes(0)
+        createdDate.setSeconds(0)
+        
+        const createdDateStr = `${createdDate.getFullYear()}-${utilities.padToTwoCharacters(createdDate.getMonth() + 1)}-${utilities.padToTwoCharacters(createdDate.getDate())}`
+        
+        let prevDay = new Date()
+        prevDay.setDate(createdDate.getDate() - 1)
+        const prevDayStr = `${prevDay.getFullYear()}-${utilities.padToTwoCharacters(prevDay.getMonth() + 1)}-${utilities.padToTwoCharacters(prevDay.getDate())}`
+        debug(`prevDayStr = ${prevDayStr}`)
+        
+        const sql = `select key, total, min(date) as earliestDate from 'story-stats' where key in (select key from 'story-stats' where date='${createdDateStr}') and key not in (select key from 'story-stats' where date='${prevDayStr}') group by key order by key`
+        debug(`sql: ${sql}`)
+
+        this.db.all(sql, (dberr, rows) => {
+          if (dberr) { reject(dberr) }
+          resolve({ sql: sql, data: rows })
+        })
+      } catch (err) {
+        reject(err)
+      }
+    })
   }
 
   /**
