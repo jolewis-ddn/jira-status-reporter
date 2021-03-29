@@ -329,7 +329,7 @@ class ChartLinkMaker {
       // );
       if (!this.enoughDataToPrintChart(data)) { // No data in function call
         if (!this.dataSeries.length) { // No data previously provided, so return error msg
-          resolve('<em>No data available</em>')
+          resolve({ err: 'No data available' })
         } else {
           debug(`this.dataSeries.length: `, this.dataSeries.length)
         }

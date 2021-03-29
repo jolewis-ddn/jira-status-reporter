@@ -355,6 +355,7 @@ class JiraDataReader {
    */
   async getBurndownStats(releaseName = false, componentName = false) {
     debug(`getBurndownStats(${releaseName}) called...`)
+    let ncache = this.nodeCache
     return new Promise((resolve, reject) => {
       let releaseNameFilter = ''
       if (releaseName) {
@@ -379,45 +380,52 @@ class JiraDataReader {
       let sql = `SELECT status, date, sum(total)-sum(progress) as remaining FROM 'story-stats' ${releaseNameFilter} ${componentNameFilter} GROUP BY date, status ORDER BY status, date`
       debug(sql)
 
-      this.db.all(sql, async (err, rows) => {
-        if (err != null) {
-          reject(err)
-        } else {
-          debug(`# of rows returned: `, rows.length)
-          // Now that we have the data, it has to be reformatted per status
-          // TODO: Fix implicit assumption that the first status has an entry for every day
+      if (!ncache.has(sql)) {
+        this.db.all(sql, async (err, rows) => {
+          if (err != null) {
+            reject(err)
+          } else {
+            debug(`# of rows returned: `, rows.length)
+            // Now that we have the data, it has to be reformatted per status
+            // TODO: Fix implicit assumption that the first status has an entry for every day
 
-          let burndownStatDaily = {}
-          let burndownStatDates = await this.getDateList()
+            let burndownStatDaily = {}
+            let burndownStatDates = await this.getDateList()
 
-          /* Example results...
-            { status: 'In Progress', date: '2020-11-01', remaining: 3513600 },
-            { status: 'In Progress', date: '2020-11-02', remaining: 2513600 },
-            { status: 'In Progress', date: '2020-11-03', remaining: 1513600 },
-            { status: 'In Progress', date: '2020-11-04', remaining:  369600 },
-            ...
-            */
-          rows.forEach((row) => {
-            // debug(`in rows.forEach(`, row, `)`);
-            // if (!burndownStatDates.includes(row.date)) {
-            //   burndownStatDates.push(row.date);
-            // }
-            if (!Object.keys(burndownStatDaily).includes(row.status)) {
-              // Build an array the same length as the dates array, filled with 0s
-              burndownStatDaily[row.status] = Array(
-                burndownStatDates.length
-              ).fill(0)
-            }
-            // burndownStatDaily[row.status].push(
-            //   convertSecondsToDays(row.remaining)
-            // );
-            burndownStatDaily[row.status][
-              burndownStatDates.indexOf(row.date)
-            ] = convertSecondsToDays(row.remaining)
-          })
-          resolve({ stats: burndownStatDaily, dates: burndownStatDates })
-        }
-      })
+            /* Example results...
+              { status: 'In Progress', date: '2020-11-01', remaining: 3513600 },
+              { status: 'In Progress', date: '2020-11-02', remaining: 2513600 },
+              { status: 'In Progress', date: '2020-11-03', remaining: 1513600 },
+              { status: 'In Progress', date: '2020-11-04', remaining:  369600 },
+              ...
+              */
+            rows.forEach((row) => {
+              // debug(`in rows.forEach(`, row, `)`);
+              // if (!burndownStatDates.includes(row.date)) {
+              //   burndownStatDates.push(row.date);
+              // }
+              if (!Object.keys(burndownStatDaily).includes(row.status)) {
+                // Build an array the same length as the dates array, filled with 0s
+                burndownStatDaily[row.status] = Array(
+                  burndownStatDates.length
+                ).fill(0)
+              }
+              // burndownStatDaily[row.status].push(
+              //   convertSecondsToDays(row.remaining)
+              // );
+              burndownStatDaily[row.status][
+                burndownStatDates.indexOf(row.date)
+              ] = convertSecondsToDays(row.remaining)
+            })
+            debug(`...setting cache for burndownStats: nodeCache(${sql})`)
+            this.nodeCache.set(sql, { stats: burndownStatDaily, dates: burndownStatDates, meta: { cacheDate: new Date() } })
+            resolve(this.nodeCache.get(sql))
+          }
+        })
+      } else {
+        debug(`...returning burndownStats from cache...`)
+        resolve(this.nodeCache.get(sql))
+      }
     })
   }
 

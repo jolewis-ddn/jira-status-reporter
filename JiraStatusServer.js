@@ -3067,33 +3067,88 @@ server.get('/burndown/:rel', async (req, res, next) => {
   // debug(`>>> forecast? `, forecast)
   // debug(`>>> data.length: `, data)
   
+  let chartResponse = { status: 'pending' }
+
   jsrCLM
     .setLineChart()
     .setSize({ h: 600, w: 800 })
     .setFill(false)
     .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' } ${component ? ' (Component: ' + component + ')' : '' }`, data, "stacked-bar", 'days')
     .then((link) => {
-      res.write(link)
-      res.write(`<small style="color: gray; position: inherit; text-align: left; display: block; padding: 0px 30px 0px 15px; font-weight: 100; font-style: inherit; font-size: small; font-family: 'Inconsolata', monospace;">${new Date().toISOString()}</small>`)
+      if (typeof link === typeof {}) {
+        res.write(link.err)
+        chartResponse.status = 'error'
+        chartResponse.error = link.err
+      } else {
+        res.write(link)
+        chartResponse.status = 'ok'
+      }
+      res.write(getSmallTimestamp())
     })
     .catch((err) => {
       debug(`Error caught in buildChartImgTag() = ${err}`)
       res.write(`<EM>Error</EM>: ${err}`)
     })
     .finally(async () => {
-      // Show forecast toggle
-      res.write(`<p>`)
-      res.write(`<div class="solo-button">`)
-      // debug(`C: versionData: ${versionData}; versionReleaseDate: ${versionReleaseDate}; forecast: ${forecast}; release: `, release)
-      if (release && enableForecastButton) {
-        // if (release) { // Only print the forecast button if a release was selected
-        let componentStr = component ? `&component=${component}` : ''
-        if (forecast) {
-          res.write(simpleButton('Disable Forecast', '#', true, false, 'btn-outline-success', false, `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no${componentStr}'; return false;`))
-        } else {
-          res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes${componentStr}'; return false;`))
+      res.write(bsAccordionStart('accordion1'))
+      if (chartResponse.status == 'ok') {
+        // Show summary stats table
+        let burndownStats = await jdr.getBurndownStats(release, component)
+        let burndownStatsTotals = [ 0, 0, 0, 0, 0 ]
+        let burndownStatsHtml = []
+        burndownStatsHtml.push(`<table class='table table-sm'>
+          <thead><tr><th>Status</th>
+          <th>${burndownStats.dates[burndownStats.dates.length-1]} (Yesterday)</th>
+          <th>${burndownStats.dates[burndownStats.dates.length-7]} (7d ago)</th>
+          <th>${burndownStats.dates[burndownStats.dates.length-14]} (14d ago)</th>
+          <th>${burndownStats.dates[burndownStats.dates.length-30]} (30d ago)</th>
+          <th>${burndownStats.dates[burndownStats.dates.length-60]} (60d ago)</th>
+          </thead>`)
+          burndownStatsHtml.push(`<tbody>`)
+        Object.keys(burndownStats.stats).sort().forEach((status) => {
+          burndownStatsHtml.push(`<tr>
+            <td class='text-center'>${status}</td>
+            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-1]}</td>
+            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-7]}</td>
+            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-14]}</td>
+            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-30]}</td>
+            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-60]}</td>
+            </tr>`)
+        
+          burndownStatsTotals[0] += Math.round(burndownStats.stats[status][burndownStats.dates.length-1])
+          burndownStatsTotals[1] += Math.round(burndownStats.stats[status][burndownStats.dates.length-7])
+          burndownStatsTotals[2] += Math.round(burndownStats.stats[status][burndownStats.dates.length-14])
+          burndownStatsTotals[3] += Math.round(burndownStats.stats[status][burndownStats.dates.length-30])
+          burndownStatsTotals[4] += Math.round(burndownStats.stats[status][burndownStats.dates.length-60])
+        })
+
+        burndownStatsHtml.push(`<tr>
+          <td class='text-center'>Total</td>
+          <td class='text-center'>${burndownStatsTotals[0]}</td>
+          <td class='text-center'>${burndownStatsTotals[1]}</td>
+          <td class='text-center'>${burndownStatsTotals[2]}</td>
+          <td class='text-center'>${burndownStatsTotals[3]}</td>
+          <td class='text-center'>${burndownStatsTotals[4]}</td>
+          </tr>`)
+
+        burndownStatsHtml.push(`</tbody></thead></table>`)
+        res.write(bsAccordionAdd(1, 'Burndown Stats', 'accordion1', burndownStatsHtml.join('')))
+
+        // Show forecast toggle
+        res.write(`<p>`)
+        res.write(`<div class="solo-button">`)
+        // debug(`C: versionData: ${versionData}; versionReleaseDate: ${versionReleaseDate}; forecast: ${forecast}; release: `, release)
+        if (release && enableForecastButton) {
+          // if (release) { // Only print the forecast button if a release was selected
+          let componentStr = component ? `&component=${component}` : ''
+          if (forecast) {
+            res.write(simpleButton('Disable Forecast', '#', true, false, 'btn-outline-success', false, `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no${componentStr}'; return false;`))
+          } else {
+            res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes${componentStr}'; return false;`))
+          }
         }
       }
+
       // Show component list
       const componentList = await jdr.getComponentList()
       // res.write(`<p>`)
@@ -3107,7 +3162,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // No component set -- should always be available
       res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-warning">Empty Component</a></li>`)
       // res.write(`</div>`) // End no/empty filter button group
-
+      
       // Individual components
       componentList.forEach((c) => {
         // debug(`component: ${component}; c: ${c}; equal? ${component == c}`)
@@ -3130,18 +3185,52 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // res.write(`</ul>`)
 
       // showReleased toggle button
-      res.write('<div>')
+      let releasedLinkHtml = `<div>`
       if (showReleased) {
-        res.write(simpleButton('Hide Released Versions', './?showReleased=no', true))
+        releasedLinkHtml += simpleButton('Hide Released Versions', './?showReleased=no', true)
       } else {
-        res.write(simpleButton('Show Released Versions', './?showReleased=yes', true))
+        releasedLinkHtml += simpleButton('Show Released Versions', './?showReleased=yes', true)
       }
-      res.write('</div>')
+      releasedLinkHtml += '</div>'
+      // res.write(bsAccordionAdd(2, 'Show Released Versions', 'accordion1', releasedLinkHtml))
+      res.write(releasedLinkHtml)
+      res.write(bsAccordionEnd())
+
       res.write(buildHtmlFooter())
       res.end()
     })
   return next()
 })
+
+function bsAccordionStart(id = 'genericAccordion') {
+  return(`<div class='accordion' id='accordion${id}'>`)
+}
+
+function bsAccordionAdd(id = 1, itemTitle = 'Accordion Item', accordionId = 'genericAccordion', content = '') {
+  return(`
+  <div class='card'>
+    <p>
+      <h2 class="mb-0">
+        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#collapse${id}" aria-expanded="false" aria-controls="collapse${id}">
+          ${itemTitle}
+        </button>
+      </h2>
+    </p>
+    <div id="collapse${id}" class="collapse" aria-labelledby="heading${id}" data-parent="#accordion${accordionId}">
+      <div class="card card-body">
+        ${content}
+      </div>
+    </div>
+  </div>`)
+}
+
+function bsAccordionEnd() {
+  return(`</div>`)
+}
+
+function getSmallTimestamp() {
+  return(`<small style="color: gray; position: inherit; text-align: left; display: block; padding: 0px 30px 0px 15px; font-weight: 100; font-style: inherit; font-size: small; font-family: 'Inconsolata', monospace;">${new Date().toISOString()}</small>`)
+}
 
 /**
  * Extend an array of dates to some future date
