@@ -85,17 +85,19 @@ class JiraDataReader {
         
         const createdDateStr = `${createdDate.getFullYear()}-${utilities.padToTwoCharacters(createdDate.getMonth() + 1)}-${utilities.padToTwoCharacters(createdDate.getDate())}`
         
-        let prevDay = new Date()
+        let prevDay = new Date(createdDate)
         prevDay.setDate(createdDate.getDate() - 1)
         const prevDayStr = `${prevDay.getFullYear()}-${utilities.padToTwoCharacters(prevDay.getMonth() + 1)}-${utilities.padToTwoCharacters(prevDay.getDate())}`
         debug(`prevDayStr = ${prevDayStr}`)
         
+        // resolve(`${createdDate} / ${createdDateStr} to ${prevDay} / ${prevDayStr}`)
+
         const sql = `select key, total, min(date) as earliestDate from 'story-stats' where key in (select key from 'story-stats' where date='${createdDateStr}') and key not in (select key from 'story-stats' where date='${prevDayStr}') group by key order by key`
         debug(`sql: ${sql}`)
 
         this.db.all(sql, (dberr, rows) => {
           if (dberr) { reject(dberr) }
-          resolve({ sql: sql, data: rows })
+          resolve({ sql: sql, createdDate: createdDate, data: rows })
         })
       } catch (err) {
         reject(err)

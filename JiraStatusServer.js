@@ -2604,7 +2604,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       } else {
         response.blockedBy[blockerIssue.key].assignee = UNASSIGNED_USER
       }
-      
+
       response.blockedBy[blockerIssue.key].status = blockerIssue.fields.status.name
       response.blockedBy[blockerIssue.key].type = blockerIssue.fields.issuetype.name
 
@@ -3502,7 +3502,8 @@ server.get('/unestimated', async (req, res, next) => {
 
 server.get('/query', async (req, res, next) => {
   try {
-    res.send(await jsr._genericJiraSearch(req.query.jql, 99, ['fixVersions']))
+    let fields = req.query.fields ? req.query.fields : ['fixVersions']
+    res.send(await jsr._genericJiraSearch(req.query.jql, 99, fields ))
   } catch(err) {
     res.send(`query err: `, err)
   }
