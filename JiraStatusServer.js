@@ -86,6 +86,16 @@ server.get(
   restify.plugins.serveStatic({ directory: './static', default: 'charts.html' })
 )
 
+server.get(
+  '/js/*',
+  restify.plugins.serveStatic({ directory: './static/', default: '' })
+)
+
+server.get(
+  '/css/*',
+  restify.plugins.serveStatic({ directory: './static/', default: '' })
+)
+
 server.get('/', async (req, res, next) => {
   const title = 'Jira Status Reporter: ' + config.get('project')
   res.write(buildHtmlHeader(title, false, true))
@@ -399,9 +409,9 @@ function buildHtmlHeader(title = '', showButtons = true, excludeHome = false) {
   // const bootstrapCss = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">'
 
   // Bootstrap 4.5.2
-  const bootstrapCss = '<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">'
+  const bootstrapCss = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css" integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">'
 
-  const jqueryJs = '<script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>'
+  const jqueryJs = '<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>'
 
   return `<!doctype html><html lang="en"><head><title>${title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -414,8 +424,8 @@ function buildHtmlHeader(title = '', showButtons = true, excludeHome = false) {
 
         ${JiraStatus.getFontawesomeJsLink()}
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/billboard.js/2.0.3/billboard.pkgd.min.js"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/billboard.js/2.0.3/theme/graph.min.css"></link>
+        <script src="/js/billboard.pkgd.min.js"></script>
+        <link rel="stylesheet" href="/css/graph.min.css"></link>
         </head>
         <body>
         
@@ -526,7 +536,7 @@ function buildHtmlFooter() {
 
   // Bootstrap 4.5
    return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js" integrity="sha384-+YQ4JLhjyBLPDQt//I+STsc9iw4uQqACwlvpslubQzn4u2UU2UFM80nGisd026JF" crossorigin="anonymous"></script>
    <script>
    $(function () {
      $('[data-toggle="tooltip"]').tooltip()
@@ -3090,12 +3100,12 @@ server.get('/burndown/:rel', async (req, res, next) => {
       res.write(`<EM>Error</EM>: ${err}`)
     })
     .finally(async () => {
+      let burndownStatsHtml = []
       res.write(bsAccordionStart('accordion1'))
       if (chartResponse.status == 'ok') {
         // Show summary stats table
         let burndownStats = await jdr.getBurndownStats(release, component)
         let burndownStatsTotals = [ 0, 0, 0, 0, 0 ]
-        let burndownStatsHtml = []
         burndownStatsHtml.push(`<table class='table table-sm'>
           <thead><tr><th>Status</th>
           <th>${burndownStats.dates[burndownStats.dates.length-1]} (Yesterday)</th>
@@ -3104,7 +3114,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
           <th>${burndownStats.dates[burndownStats.dates.length-30]} (30d ago)</th>
           <th>${burndownStats.dates[burndownStats.dates.length-60]} (60d ago)</th>
           </thead>`)
-          burndownStatsHtml.push(`<tbody>`)
+        burndownStatsHtml.push(`<tbody>`)
         Object.keys(burndownStats.stats).sort().forEach((status) => {
           burndownStatsHtml.push(`<tr>
             <td class='text-center'>${status}</td>
@@ -3132,10 +3142,9 @@ server.get('/burndown/:rel', async (req, res, next) => {
           </tr>`)
 
         burndownStatsHtml.push(`</tbody></thead></table>`)
-        res.write(bsAccordionAdd(1, 'Burndown Stats', 'accordion1', burndownStatsHtml.join('')))
 
         // Show forecast toggle
-        res.write(`<p>`)
+        // res.write(`<p>`)
         res.write(`<div class="solo-button">`)
         // debug(`C: versionData: ${versionData}; versionReleaseDate: ${versionReleaseDate}; forecast: ${forecast}; release: `, release)
         if (release && enableForecastButton) {
@@ -3194,6 +3203,10 @@ server.get('/burndown/:rel', async (req, res, next) => {
       releasedLinkHtml += '</div>'
       // res.write(bsAccordionAdd(2, 'Show Released Versions', 'accordion1', releasedLinkHtml))
       res.write(releasedLinkHtml)
+
+      res.write(bsAccordionAdd(1, 'Burndown Stats', 'accordion1', burndownStatsHtml.join('')))
+      res.write(bsAccordionAdd(2, 'Image', 'accordion1', `<img id="exported"></img>`))
+
       res.write(bsAccordionEnd())
 
       res.write(buildHtmlFooter())
@@ -3209,15 +3222,15 @@ function bsAccordionStart(id = 'genericAccordion') {
 function bsAccordionAdd(id = 1, itemTitle = 'Accordion Item', accordionId = 'genericAccordion', content = '') {
   return(`
   <div class='card'>
-    <p>
+    <div class="card-header" id="heading${id}">
       <h2 class="mb-0">
-        <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#collapse${id}" aria-expanded="false" aria-controls="collapse${id}">
+        <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse" data-target="#collapse${id}" aria-expanded="false" aria-controls="collapse${id}">
           ${itemTitle}
         </button>
       </h2>
-    </p>
+    </div>
     <div id="collapse${id}" class="collapse" aria-labelledby="heading${id}" data-parent="#accordion${accordionId}">
-      <div class="card card-body">
+      <div class="card-body">
         ${content}
       </div>
     </div>

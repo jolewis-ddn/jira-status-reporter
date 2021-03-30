@@ -397,8 +397,8 @@ class ChartLinkMaker {
           var chart = bb.generate({
             bindto: "#chart-${id}",
             size: { height: ${this.h ? this.h : DEFAULT_HEIGHT}, width: ${
-          this.w ? this.w : DEFAULT_WIDTH
-        } },
+              this.w ? this.w : DEFAULT_WIDTH
+            } },
             title: { text: '${title}' },
             axis: {
               ${xLabel ? 'y: { label: "' + xLabel + '" },' : '' }
@@ -423,6 +423,18 @@ class ChartLinkMaker {
             xFormat: "%Y-%m-%d",
             ${subchartContent}
           });
+
+          window.onload = saveStaticChart();
+
+          function saveStaticChart() {
+            chart.config("title.text", "asdf", true);
+            setTimeout(function() {
+              chart.export(null, function(dataUrl) { 
+                var img = document.getElementById("exported");
+                img.src = dataUrl;
+              })
+            }, 500);
+          }
         </script>`;
         resolve(chartHtml);
       } else {
