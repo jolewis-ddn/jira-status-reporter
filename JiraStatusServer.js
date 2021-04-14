@@ -3205,7 +3205,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
       res.write(releasedLinkHtml)
 
       res.write(bsAccordionAdd(1, 'Burndown Stats', 'accordion1', burndownStatsHtml.join('')))
-      res.write(bsAccordionAdd(2, 'Image', 'accordion1', `<img id="exported"></img>`))
+      // res.write(bsAccordionAdd(2, 'Image', 'accordion1', `<img id="exported"></img>`))
 
       res.write(bsAccordionEnd())
 

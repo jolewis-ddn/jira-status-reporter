@@ -424,17 +424,17 @@ class ChartLinkMaker {
             ${subchartContent}
           });
 
-          window.onload = saveStaticChart();
+          // window.onload = saveStaticChart();
 
-          function saveStaticChart() {
-            chart.config("title.text", "asdf", true);
-            setTimeout(function() {
-              chart.export(null, function(dataUrl) { 
-                var img = document.getElementById("exported");
-                img.src = dataUrl;
-              })
-            }, 500);
-          }
+          // function saveStaticChart() {
+          //   chart.config("title.text", "asdf", true);
+          //   setTimeout(function() {
+          //     chart.export(null, function(dataUrl) { 
+          //       var img = document.getElementById("exported");
+          //       img.src = dataUrl;
+          //     })
+          //   }, 500);
+          // }
         </script>`;
         resolve(chartHtml);
       } else {
