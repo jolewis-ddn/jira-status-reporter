@@ -3605,7 +3605,10 @@ server.get('/unestimated', async (req, res, next) => {
 server.get('/query', async (req, res, next) => {
   try {
     let fields = req.query.fields ? req.query.fields : ['fixVersions']
-    res.send(await jsr._genericJiraSearch(req.query.jql, 99, fields ))
+    let showChanges = req.query.changes && (req.query.changes == "yes" || req.query.changes == "true") ? true : false
+    debug(`showChanges: ${showChanges}`)
+
+    res.send(await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges ))
   } catch(err) {
     res.send(`query err: `, err)
   }

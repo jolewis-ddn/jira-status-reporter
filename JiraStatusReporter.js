@@ -699,11 +699,14 @@ class JiraStatusReporter {
     }
   }
 
-  async _genericJiraSearch(jql, action, fields = []) {
+  async _genericJiraSearch(jql, action, fields = [], showChanges = false) {
     return new Promise((resolve, reject) => {
-      debug(`_genericJiraSearch(${jql}, ${action}, ${fields}) called...`)
+      debug(`_genericJiraSearch(${jql}, ${action}, ${fields}, ${showChanges}) called...`)
       var queryConfig = {}
-      // var compiledResults = {}
+
+      if (showChanges) {
+        queryConfig.expand = ["changelog"]
+      }
 
       switch (action) {
         case ACTION_COUNT:
