@@ -34,6 +34,7 @@ const dashboard = new Dashboard()
 const LocalStorage = require('node-localstorage').LocalStorage
 const { cachedDataVersionTag } = require('v8')
 const { stringify } = require('querystring')
+const { calcMovingAverage } = require('./utilities')
 let ls = new LocalStorage('./.cache')
 
 const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
@@ -2919,14 +2920,33 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
   const burndown = await jdr.getBurndownStats(release, component)
 
+  // Total of counts by day
+  let sumOfCounts = []
+  for (let i = 0; i < burndown.stats[Object.keys(burndown.stats)[0]].length; i++) {
+    sumOfCounts[i] = 0.0
+  }
+  // debug(`sumOfCounts: length = ${sumOfCounts.length}`)
+
   // debug(`burndown statuses: `, Object.keys(burndown.stats).join(','))
   // Build the data object based on the burndown data
   const data = {}
   Object.keys(burndown.stats).forEach((status) => {
     status.replace(/\s/g, '')
     data[status] = burndown.stats[status]
+    for (let i = 0; i < data[status].length; i++) {
+      sumOfCounts[i] += data[status][i]
+    }
   })
+
+  // Now clean up the sumOfCounts values to 2 decimal places
+  // TODO: Fix the original value assignment, above
+  sumOfCounts = sumOfCounts.map((x) => { return +Number.parseFloat(x).toFixed(2)})
   
+  data[`mvgAvg7`] = calcMovingAverage(sumOfCounts, 7, null)
+  data[`mvgAvg30`] = calcMovingAverage(sumOfCounts, 30, null)
+
+  // debug(`sumOfCountsMvgAvg = `, sumOfCountsMvgAvg)
+
   // debug(`B: versionData: ${versionData}`)
   if (forecast) { // Have a release date!
     // debug(`...Adding dates to burndown.dates to reach ${versionReleaseDate}`)
@@ -2940,7 +2960,9 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
     let lastTotalEstimate = 0
     Object.keys(data).forEach((status) => {
-      lastTotalEstimate += 1 * (data[status][data[status].length - 1])
+      if (status !== `mvgAvg7` && status !== `mvgAvg30`) {
+        lastTotalEstimate += 1 * (data[status][data[status].length - 1])
+      }
     })
     // debug(`lastTotalEstimate: ${lastTotalEstimate}`)
 

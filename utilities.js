@@ -10,4 +10,29 @@ function padToTwoCharacters(x, padWithChar = "0") {
     }
 }
 
+/*
+ * Calculate moving average
+ * Uses forEach loop
+ * Slightly more performant for smaller periods 
+ */
+function calcMovingAverage(arr, per, emptyVal = 0) {
+	if (arr.length <= per) {
+		throw new Error(`Array must be longer than the period ${per}. Supplied array is only ${arr.length} elements.`)
+	}
+	console.time('calcMovingAverage')
+	let ndx = -1
+	let resp = []
+	arr.forEach((n) => {
+		ndx++
+		if (ndx >= per-1) {
+			resp.push(arr.slice(ndx-per+1, ndx+1).reduce((a,c) => a+c)/per)
+		} else {
+			resp.push(emptyVal)
+		}
+	})
+	console.timeEnd('calcMovingAverage')
+	return(resp)
+}
+
 exports.padToTwoCharacters = padToTwoCharacters;
+exports.calcMovingAverage = calcMovingAverage;

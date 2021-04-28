@@ -327,6 +327,15 @@ class ChartLinkMaker {
       //   `buildChartImgTag(${title}, data, ${chartType}) called with data: `,
       //   data, '; this.dataSeries: ', this.dataSeries
       // );
+      
+      // TODO: Update chart to show 2nd axis moving averge
+      if (Object.keys(data).includes(`mvgAvg7`)) { 
+        delete data[`mvgAvg7`]
+      }
+      if (Object.keys(data).includes(`mvgAvg30`)) { 
+        delete data[`mvgAvg30`]
+      }
+
       if (!this.enoughDataToPrintChart(data)) { // No data in function call
         if (!this.dataSeries.length) { // No data previously provided, so return error msg
           resolve({ err: 'No data available' })
