@@ -35,4 +35,5 @@ item-counts.js
 *.csv
 
 processChangeData.js
+*.bat
 
