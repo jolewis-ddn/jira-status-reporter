@@ -15,6 +15,19 @@
     "port": QUICKCHART_PORT_NUMBER,
     "script": "QUICKCHART_SCRIPT_DEFAULT_chart"
   },
+  "reports": {
+    "users": [],
+    "fields": [
+      "Username",
+      "Issue",
+      "Summary",
+      "Type",
+      "Progress",
+      "Total",
+      "Percent",
+      "Remaining"
+    ]
+  },
   "project": "DEFAULT_PROJECT_NAME",
   "dataPath": "RELATIVE_PATH_TO_DATA_FOLDER",
   "ignore": ["PROJECT_KEY_OR_NAME_TO_IGNORE_OPTIONAL"],
@@ -24,5 +37,6 @@
   "excludeFromEstimateQueries": [],
   "releaseExcludeTypes": [],
   "adminKey": ["some-special-key-here"],
-  "issueTypes": []
+  "issueTypes": [],
+  "workInSubtasksOnly": true
 }

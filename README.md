@@ -36,13 +36,13 @@ Here's a filtered timeline - just add the fields you want to see as the value of
     `"fa": "https://kit.fontawesome.com/0123456789.js"`
     * If you enable FontAwesome, you may wish to adjust the faIcons object to point to different icons.
   * All others fields are required
-### For cached queries - _optional_
+### For cached queries
 * Create the database (where DATABASE_NAME is set in the config file (or dataPathPrefix + 'jira-stats.db' by default))
   * ```
     cd $dataPath
     sqlite3 DATABASE_NAME
-    >.read ./jira-stats.sql
-    >.quit
+    >.read ../jira-stats.sql
+    >
     ```
 ## Running
 `node app.js`
