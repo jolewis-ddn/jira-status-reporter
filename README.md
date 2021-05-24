@@ -42,7 +42,7 @@ Here's a filtered timeline - just add the fields you want to see as the value of
     cd $dataPath
     sqlite3 DATABASE_NAME
     >.read ../jira-stats.sql
-    >
+    >.quit
     ```
 ## Running
 `node app.js`
