@@ -37,3 +37,6 @@ item-counts.js
 processChangeData.js
 *.bat
 
+output*
+
+testLinkSummarizer.js  

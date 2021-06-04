@@ -2922,8 +2922,12 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
   // Total of counts by day
   let sumOfCounts = []
-  for (let i = 0; i < burndown.stats[Object.keys(burndown.stats)[0]].length; i++) {
-    sumOfCounts[i] = 0.0
+  if (burndown.stats && Object.keys(burndown.stats)[0]) {
+    for (let i = 0; i < burndown.stats[Object.keys(burndown.stats)[0]].length; i++) {
+      sumOfCounts[i] = 0.0
+    }
+  } else {
+    console.error(`Failed fetching burndown stats: data record is empty.`)
   }
   // debug(`sumOfCounts: length = ${sumOfCounts.length}`)
 
