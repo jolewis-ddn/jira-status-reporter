@@ -2957,8 +2957,9 @@ server.get('/burndown/:rel', async (req, res, next) => {
   // TODO: Fix the original value assignment, above
   sumOfCounts = sumOfCounts.map((x) => { return +Number.parseFloat(x).toFixed(2)})
   
-  data[`mvgAvg7`] = calcMovingAverage(sumOfCounts, 7, null)
-  data[`mvgAvg30`] = calcMovingAverage(sumOfCounts, 30, null)
+  // TODO: Add moving averages to chart as new line
+  // data[`mvgAvg7`] = calcMovingAverage(sumOfCounts, 7, null)
+  // data[`mvgAvg30`] = calcMovingAverage(sumOfCounts, 30, null)
 
   // debug(`sumOfCountsMvgAvg = `, sumOfCountsMvgAvg)
 
