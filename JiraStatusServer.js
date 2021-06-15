@@ -63,7 +63,7 @@ const BAR_COLORS = {
   'Icebox': backgroundColors[0],
   'Defined': backgroundColors[0],
   'In Progress': backgroundColors[1],
-  'In Review': backgroundColors[0],
+  'In Review': backgroundColors[1],
 }
 
 const backgroundColorStr = "backgroundColor:['"
