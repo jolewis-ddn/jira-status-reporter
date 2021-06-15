@@ -57,6 +57,15 @@ const foregroundColors = [
   'white'
 ]
 
+const BAR_COLORS = {
+  'Blocked': backgroundColors[3],
+  'Emergency': backgroundColors[3],
+  'Icebox': backgroundColors[0],
+  'Defined': backgroundColors[0],
+  'In Progress': backgroundColors[1],
+  'In Review': backgroundColors[0],
+}
+
 const backgroundColorStr = "backgroundColor:['"
   .concat(backgroundColors.join("','"))
   .concat("']")
@@ -2382,15 +2391,17 @@ server.get('/epics', (req, res, next) => {
                       : 0
                   totalEstRem += estRem
 
+                  let barColor = estRem ? BAR_COLORS[j.fields.status.name] : 'red'
+
                   ownerHtml.push(
                     `<a href="${config.get('jira.protocol')}://${config.get(
                       'jira.host'
                     )}/browse/${
                       j.key
-                    }"><span style="vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${
+                    }"><span style="border: 1px; border-color: #a99494; border-style: solid; vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${
                       estRem ? estRem * DAY_WIDTH : 1
                     }px; background-color: ${
-                      estRem ? 'green' : 'red'
+                      barColor
                     };" data-toggle="tooltip" data-html="true" title='${
                       j.key
                     }: ${cleanText(j.fields.summary)}<ul><li>Type: ${
