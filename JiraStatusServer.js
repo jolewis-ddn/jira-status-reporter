@@ -120,6 +120,7 @@ server.get('/', async (req, res, next) => {
 
   res.write(`<ul>
   <li><a href='/burndown'>Burndown chart</a> (HTML)</li>
+  <li><a href='/docs/blockerReport.html'>Blocker Report</a> Requires Jira key parameter ('?id=ABC-3816') (HTML)</li>
   <li><a href='/chart?exclude=DEAD'>Chart</a> (excluding DEAD issues) (HTML)</li>
   <li>Children: Requires Jira key parameter ('children/ABC-1234') (JSON)</li>
   <li><a href='/components'>Components</a> (JSON)</li>
@@ -3642,7 +3643,7 @@ server.get('/unestimated', async (req, res, next) => {
 
 server.get('/query', async (req, res, next) => {
   try {
-    let fields = req.query.fields ? req.query.fields : ['fixVersions']
+    let fields = req.query.fields ? req.query.fields.split(';') : ['fixVersions']
     let showChanges = req.query.changes && (req.query.changes == "yes" || req.query.changes == "true") ? true : false
     debug(`showChanges: ${showChanges}`)
 

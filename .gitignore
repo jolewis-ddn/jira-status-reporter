@@ -1,12 +1,8 @@
-getCreatedReport.js
-
 .vscode/*
 node_modules
 
 .nyc_output
 coverage
-
-.cache/*
 
 data*/*
 .cache/*
@@ -14,29 +10,26 @@ data*/*
 *.json
 *.html
 
-scratch.js
-
 config/*
-
-auth*.js
 
 *.mmd
 vite-app/*
 
 static/*
 
-JiraStatusServer-*
-
-item-counts.js
-
 .lite_workspace.lua
 
 *.sh
 *.csv
-
-processChangeData.js
 *.bat
 
 output*
 
+auth*.js
+getCreatedReport.js
+processChangeData.js
 testLinkSummarizer.js  
+JiraStatusServer-*
+item-counts.js
+scratch.js
+
