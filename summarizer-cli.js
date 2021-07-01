@@ -60,6 +60,7 @@ async function fetchAndProcessData() {
               <tr>
               <th>Key</th>
               <th>Summary</th>
+              <th>Assignee</th>
               <th>Parent</th>
               <th>Status</th>
               <th>Issue Links</th>
@@ -86,6 +87,7 @@ async function fetchAndProcessData() {
     let newRow = {
       key: i.key,
       summary: i.fields.summary,
+      assignee: i.fields.assignee ? i.fields.assignee.displayName : '',
       name: i.fields.issuetype ? i.fields.issuetype.name : '???',
       parent: {
         value: i.fields.parent ? i.fields.parent.key : '',
@@ -121,6 +123,7 @@ async function fetchAndProcessData() {
       simpleRow([
         `<a href='${config.jira.protocol}:${config.jira.host}/browse/${newRow.key}' target='_blank'>${newRow.key}</a>`,
         `<img src='${newRow.issuetype.icon}' title='${newRow.issuetype.value}'> ${newRow.summary}`,
+        newRow.assignee,
         `<img src='${newRow.parent.icon}'>${newRow.parent.value}`,
         newRow.status.value,
         newRow.issuelinks,

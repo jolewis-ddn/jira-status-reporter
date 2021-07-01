@@ -3645,7 +3645,7 @@ server.get('/query', async (req, res, next) => {
   try {
     let fields = req.query.fields ? req.query.fields.split(';') : ['fixVersions']
     let showChanges = req.query.changes && (req.query.changes == "yes" || req.query.changes == "true") ? true : false
-    debug(`showChanges: ${showChanges}`)
+    debug(`showChanges: ${showChanges}; JQL: ${req.query.jsql}`)
 
     res.send(await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges ))
   } catch(err) {
