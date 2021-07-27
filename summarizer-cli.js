@@ -1,6 +1,6 @@
 /**
  * Input format:
- *     http://localhost:9292/query?jql=parentEpic=RED-1234&fields=summary&fields=issuelinks&fields=progress&fields=aggregateprogress&fields=status&changes=yes
+ *     http://server:9999/query?jql=parentEpic=XXX-1234&fields=summary&fields=issuelinks&fields=progress&fields=aggregateprogress&fields=status&changes=yes
  *
  * @format
  */
@@ -44,7 +44,7 @@ async function fetchAndProcessData() {
     data = JSON.parse(fs.readFileSync(options.inputFile))
     debug(`parsing ${options.inputFile}`)
   } else {
-    const url = `http://${options.host}:9292/query?jql=parentEpic=${options.parent}&fields=summary;issuelinks;progress;aggregateprogress;status;components;fixVersions;priority;parent;issuetype;assignee&changes=yes`
+    const url = `http://${options.host}:${options.port}/query?jql=parentEpic=${options.parent}&fields=summary;issuelinks;progress;aggregateprogress;status;components;fixVersions;priority;parent;issuetype;assignee&changes=yes`
     debug(`parsing data fetched from url (${url})`)
 
     const { rawBody } = await got(url)

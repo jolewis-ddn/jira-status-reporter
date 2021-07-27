@@ -5,6 +5,7 @@
   "main": "JiraStatusServer.js",
   "dependencies": {
     "@nastyox/rando.js": "^2.0.5",
+    "better-sqlite3": "^7.4.3",
     "commander": "^7.2.0",
     "config": "^3.3.6",
     "date-fns": "^2.22.1",
