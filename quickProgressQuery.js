@@ -31,7 +31,7 @@ const db = require('better-sqlite3')(dbFilename, { readonly: true })
 const startDate = options.startDate || '2021-07-18'
 const endDate = options.endDate || '2021-07-25'
 const sql = `select * from 'story-stats' where ( date='${endDate}' and key in (select key from 'story-stats' where date='${startDate}' ${releaseFilter})) or (date='${startDate}' ${releaseFilter}) order by key,date ASC`
-debug(`SQL: ${sql}`)
+console.log(`SQL: ${sql}`)
 
 const stmt = db.prepare(sql)
 const rows = stmt.all()
@@ -151,4 +151,5 @@ function convertToHours(progress) {
 
 const StoryStats = require('./StoryStats')
 const storyStats = new StoryStats()
-console.log(storyStats.getComponentList(true))
+// console.log(storyStats.getComponentList(true))
+console.table(storyStats.getSummaryReport(options.startDate, options.endDate, options.component, options.release))
