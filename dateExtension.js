@@ -134,3 +134,10 @@ Date.prototype.workingDaysFromNow = function (toDate) {
     throw new Error(`Invalid toDate ${toDate}`)
   }
 }
+
+// Source: http://stackoverflow.com/questions/563406/ddg#563442
+Date.prototype.addDays = function(days) {
+  var date = new Date(this.valueOf())
+  date.setDate(date.getDate() + days)
+  return date
+}

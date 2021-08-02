@@ -2932,38 +2932,194 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
   const burndown = await jdr.getBurndownStats(release, component)
 
-  // Total of counts by day
-  let sumOfCounts = []
-  if (burndown.stats && Object.keys(burndown.stats)[0]) {
-    for (let i = 0; i < burndown.stats[Object.keys(burndown.stats)[0]].length; i++) {
-      sumOfCounts[i] = 0.0
-    }
-  } else {
-    console.error(`Failed fetching burndown stats: data record is empty.`)
-  }
-  // debug(`sumOfCounts: length = ${sumOfCounts.length}`)
-
-  // debug(`burndown statuses: `, Object.keys(burndown.stats).join(','))
   // Build the data object based on the burndown data
-  const data = {}
-  Object.keys(burndown.stats).forEach((status) => {
-    status.replace(/\s/g, '')
-    data[status] = burndown.stats[status]
-    for (let i = 0; i < data[status].length; i++) {
-      sumOfCounts[i] += data[status][i]
-    }
-  })
-
-  // Now clean up the sumOfCounts values to 2 decimal places
-  // TODO: Fix the original value assignment, above
-  sumOfCounts = sumOfCounts.map((x) => { return +Number.parseFloat(x).toFixed(2)})
+  let data = {}
   
-  // TODO: Add moving averages to chart as new line
-  // data[`mvgAvg7`] = calcMovingAverage(sumOfCounts, 7, null)
-  // data[`mvgAvg30`] = calcMovingAverage(sumOfCounts, 30, null)
+  let sumOfCounts = [], mvgAvg30, mvgAvg60, mvgAvg90, mvgAvg120, mvgAvg150, mvgAvgReleaseDates, mvgAvgDates1d, mvgAvgDates30d
+  let lastTotalEstimate = 0
 
-  // debug(`sumOfCountsMvgAvg = `, sumOfCountsMvgAvg)
+  if (cache.has(`sumOfCounts-${release ? release : 'none'}-${component ? component : 'none'}`)) {
+    debug(`*** sumOfCounts cache hit! ***`)
 
+    sumOfCounts = cache.get(`sumOfCounts-${release ? release : 'none'}-${component ? component : 'none'}`)
+    mvgAvg30 = cache.get(`mvgAvg30-${release ? release : 'none'}-${component ? component : 'none'}`)
+    mvgAvg60 = cache.get(`mvgAvg60-${release ? release : 'none'}-${component ? component : 'none'}`)
+    mvgAvg90 = cache.get(`mvgAvg90-${release ? release : 'none'}-${component ? component : 'none'}`)
+    mvgAvg120 = cache.get(`mvgAvg120-${release ? release : 'none'}-${component ? component : 'none'}`)
+    mvgAvg150 = cache.get(`mvgAvg150-${release ? release : 'none'}-${component ? component : 'none'}`)
+    lastTotalEstimate = cache.get(`lastTotalEstimate-${release ? release : 'none'}-${component ? component : 'none'}`)
+    mvgAvgReleaseDates = cache.get(`mvgAvgReleaseDates-${release ? release : 'none'}-${component ? component : 'none'}`)
+    data = cache.get(`data-${release ? release : 'none'}-${component ? component : 'none'}`)
+    cache.set(`mvgAvgDates-30d-${release ? release : 'none'}-${component ? component : 'none'}`, burndown.dates[burndown.dates.length-30])
+    mvgAvgDates1d = cache.get(`mvgAvgDates-1d-${release ? release : 'none'}-${component ? component : 'none'}`)
+    mvgAvgDates30d = cache.get(`mvgAvgDates-30d-${release ? release : 'none'}-${component ? component : 'none'}`)
+
+  } else {
+    debug(`--- sumOfCounts cache MISS ---\n\ncalcuating sumOfCounts & moving averages`)
+
+    if (burndown.stats && Object.keys(burndown.stats)[0]) {
+      for (let i = 0; i < burndown.stats[Object.keys(burndown.stats)[0]].length; i++) {
+        sumOfCounts[i] = 0.0
+      }
+    } else {
+      console.error(`Failed fetching burndown stats: data record is empty.`)
+    }
+    // debug(`sumOfCounts: length = ${sumOfCounts.length}`)
+  
+    // debug(`burndown statuses: `, Object.keys(burndown.stats).join(','))
+    Object.keys(burndown.stats).forEach((status) => {
+      status.replace(/\s/g, '')
+      data[status] = burndown.stats[status]
+      for (let i = 0; i < data[status].length; i++) {
+        sumOfCounts[i] += data[status][i]
+      }
+    })
+    cache.set(`data-${release ? release : 'none'}-${component ? component : 'none'}`, data)
+
+    // Now clean up the sumOfCounts values to 2 decimal places
+    // TODO: Fix the original value assignment, above
+    sumOfCounts = sumOfCounts.map((x) => { return +Number.parseFloat(x).toFixed(2)})
+    cache.set(`sumOfCounts-${release ? release : 'none'}-${component ? component : 'none'}`, sumOfCounts)
+    
+    // TODO: Calc moving averages
+    console.log(`-30d == ${burndown.dates[burndown.dates.length-30]}`)
+    mvgAvg30 = calcMovingAverage(sumOfCounts, 30, null)
+    debug(`mvgAvg30: last: ${mvgAvg30[mvgAvg30.length-1]}; -30d: ${mvgAvg30[mvgAvg30.length-30]}; delta: ${mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]}`)
+    cache.set(`mvgAvg30-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg30)
+    
+    mvgAvg60 = calcMovingAverage(sumOfCounts, 60, null)
+    debug(`mvgAvg60: last: ${mvgAvg60[mvgAvg60.length-1]}; -30d: ${mvgAvg60[mvgAvg60.length-30]}; delta: ${mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]}`)
+    cache.set(`mvgAvg60-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg90)
+    
+    mvgAvg90 = calcMovingAverage(sumOfCounts, 90, null)
+    debug(`mvgAvg90: last: ${mvgAvg90[mvgAvg90.length-1]}; -30d: ${mvgAvg90[mvgAvg90.length-30]}; delta: ${mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]}`)
+    cache.set(`mvgAvg90-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg120)
+    
+    mvgAvg120 = calcMovingAverage(sumOfCounts, 120, null)
+    debug(`mvgAvg120: last: ${mvgAvg120[mvgAvg120.length-1]}; -30d: ${mvgAvg120[mvgAvg120.length-30]}; delta: ${mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]}`)
+    cache.set(`mvgAvg120-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg120)
+
+    mvgAvg150 = calcMovingAverage(sumOfCounts, 150, null)
+    debug(`mvgAvg150: last: ${mvgAvg150[mvgAvg150.length-1]}; -30d: ${mvgAvg150[mvgAvg150.length-30]}; delta: ${mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]}`)
+    cache.set(`mvgAvg150-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg150)
+    
+    Object.keys(data).forEach((status) => {
+      lastTotalEstimate += 1 * (data[status][data[status].length - 1])
+    })
+    debug(`lastTotalEstimate: ${lastTotalEstimate}`)
+    cache.set(`lastTotalEstimate-${release ? release : 'none'}-${component ? component : 'none'}`, lastTotalEstimate)
+
+    let mvgAvgDate30
+    let mvgAvgAdd30d = Math.round(30*(lastTotalEstimate/(mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]))) || 'n/a'
+    if (mvgAvgAdd30d < 0) {
+      mvgAvgAdd30d = 'n/a' 
+      mvgAvgDate30 = 'n/a'
+    } else {
+      if (mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]) {
+        mvgAvgDate30 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1])))).toLocaleDateString()
+      } else {
+          mvgAvgDate30 = 'n/a'
+      }
+    }
+
+    let mvgAvgDate60
+    let mvgAvgAdd60d = Math.round(30*(lastTotalEstimate/(mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]))) || 'n/a'
+    if (mvgAvgAdd60d < 0) {
+      mvgAvgAdd60d = 'n/a' 
+      mvgAvgDate60 = 'n/a'
+    } else {
+      if (mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]) {
+        mvgAvgDate60 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1])))).toLocaleDateString()
+      } else {
+        mvgAvgDate60 = 'n/a'
+      }
+    }
+
+    let mvgAvgDate90
+    let mvgAvgAdd90d = Math.round(30*(lastTotalEstimate/(mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]))) || 'n/a'
+    if (mvgAvgAdd90d < 0) {
+      mvgAvgAdd90d = 'n/a' 
+      mvgAvgDate90 = 'n/a'
+    } else {
+      if (mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]) {
+        mvgAvgDate90 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1])))).toLocaleDateString()
+      } else {
+        mvgAvgDate90 = 'n/a'
+      }
+    }
+
+    let mvgAvgDate120
+    let mvgAvgAdd120d = Math.round(30*(lastTotalEstimate/(mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]))) || 'n/a'
+    if (mvgAvgAdd120d < 0) {
+      mvgAvgAdd120d = 'n/a' 
+      mvgAvgDate120 = 'n/a'
+    } else {
+      if (mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]) {
+        mvgAvgDate120 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1])))).toLocaleDateString()
+      } else {
+        mvgAvgDate120 = 'n/a'
+      }
+    }
+
+    let mvgAvgDate150
+    let mvgAvgAdd150d = Math.round(30*(lastTotalEstimate/(mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]))) || 'n/a'
+    if (mvgAvgAdd150d < 0) {
+      mvgAvgAdd150d = 'n/a' 
+      mvgAvgDate150 = 'n/a'
+    } else {
+      if (mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]) {
+        mvgAvgDate150 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1])))).toLocaleDateString()
+      } else {
+        mvgAvgDate150 = 'n/a'
+      }
+    }
+
+    mvgAvgReleaseDates = {
+      '30d': {
+        minus30d: mvgAvg30[mvgAvg30.length-30],
+        minus1d: mvgAvg30[mvgAvg30.length-1],
+        monthlyVelocity: Math.round(mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]),
+        addDays: mvgAvgAdd30d,
+        date: mvgAvgDate30
+      },
+      '60d': {
+        minus30d: mvgAvg60[mvgAvg60.length-30],
+        minus1d: mvgAvg60[mvgAvg60.length-1],
+        monthlyVelocity: Math.round(mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]),
+        addDays: mvgAvgAdd60d,
+        date: mvgAvgDate60
+      },
+      '90d': {
+        minus30d: mvgAvg90[mvgAvg90.length-30],
+        minus1d: mvgAvg90[mvgAvg90.length-1],
+        monthlyVelocity: Math.round(mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]),
+        addDays: mvgAvgAdd90d,
+        date: mvgAvgDate90
+      },
+      '120d': {
+        minus30d: mvgAvg120[mvgAvg120.length-30],
+        minus1d: mvgAvg120[mvgAvg120.length-1],
+        monthlyVelocity: Math.round(mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]),
+        addDays: mvgAvgAdd120d,
+        date: mvgAvgDate120
+      },
+      '150d': {
+        minus30d: mvgAvg150[mvgAvg150.length-30],
+        minus1d: mvgAvg150[mvgAvg150.length-1],
+        monthlyVelocity: Math.round(mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]),
+        addDays: mvgAvgAdd150d,
+        date: mvgAvgDate150
+      }
+    }
+    debug(`mvgAvgReleaseDates: `, mvgAvgReleaseDates)
+    cache.set(`mvgAvgReleaseDates-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvgReleaseDates)
+
+    mvgAvgDates1d = burndown.dates[burndown.dates.length-1]
+    mvgAvgDates30d = burndown.dates[burndown.dates.length-30]
+    cache.set(`mvgAvgDates-30d-${release ? release : 'none'}-${component ? component : 'none'}`, burndown.dates[burndown.dates.length-30])
+    cache.set(`mvgAvgDates-1d-${release ? release : 'none'}-${component ? component : 'none'}`, burndown.dates[burndown.dates.length-1])
+  }
+  
   // debug(`B: versionData: ${versionData}`)
   if (forecast) { // Have a release date!
     // debug(`...Adding dates to burndown.dates to reach ${versionReleaseDate}`)
@@ -2975,13 +3131,6 @@ server.get('/burndown/:rel', async (req, res, next) => {
     // debug(`burndown.dates: added ${datesAdded} new entries`)
     jsrCLM.setCategories(burndown.dates)
 
-    let lastTotalEstimate = 0
-    Object.keys(data).forEach((status) => {
-      if (status !== `mvgAvg7` && status !== `mvgAvg30`) {
-        lastTotalEstimate += 1 * (data[status][data[status].length - 1])
-      }
-    })
-    // debug(`lastTotalEstimate: ${lastTotalEstimate}`)
 
     data['Forecast'] = Array(burndown.dates.length)
     // let hasForecast2 = component ? false : config.has('forecast') && config.forecast.has('teamSize') && typeof config.forecast.teamSize == 'number'
@@ -3139,6 +3288,36 @@ server.get('/burndown/:rel', async (req, res, next) => {
       res.write(`<EM>Error</EM>: ${err}`)
     })
     .finally(async () => {
+      let mvgAvgCalcHtml = []
+      res.write(bsAccordionStart('accordion2'))
+      mvgAvgCalcHtml.push(`<p><em>Total Work Remaining</em>: ${Math.round(lastTotalEstimate)} days</p>`)
+      mvgAvgCalcHtml.push(`<p><em>Formula</em>: Today + (Days Work Remaining); `)
+      mvgAvgCalcHtml.push(`<ul>`)
+      mvgAvgCalcHtml.push(`<li><em>Days Work Remaining</em> = 30 * Monthly Work Remaining</li>`)
+      mvgAvgCalcHtml.push(`<li><em>Monthly Work Remaining</em> = Total Work Remaining / Monthly Velocity</li>`)
+      mvgAvgCalcHtml.push(`<li><em>Total Work Remaining</em> = Sum of remaining work (days)</li>`)
+      mvgAvgCalcHtml.push(`<li><em>Monthly Velocity</em> = mvgAvg[30d ago] - mvgAvg[yesterday] = mvgAvg[${mvgAvgDates30d}]-mvgAvg[${mvgAvgDates1d}]</li>`)
+      mvgAvgCalcHtml.push(`</ul></p>`)
+      mvgAvgCalcHtml.push(`<table class='table table-sm'>
+        <thead>
+        <tr>
+          <th>Mvg Avg (Days)</th>
+          <th>Monthly Velocity</th>
+          <th>Days to Add</th>
+          <th>Final Date</th>
+        </tr></thead>`)
+      mvgAvgCalcHtml.push(`<tbody>`)
+      Object.keys(mvgAvgReleaseDates).forEach((mvgAvgData) => {
+        mvgAvgCalcHtml.push(`<tr>
+          <td>${mvgAvgData}</td>
+          <td>${mvgAvgReleaseDates[mvgAvgData]['monthlyVelocity']} (${Math.round(mvgAvgReleaseDates[mvgAvgData]['minus30d'])}-${Math.round(mvgAvgReleaseDates[mvgAvgData]['minus1d'])})</td>
+          <td>${mvgAvgReleaseDates[mvgAvgData]['addDays']}</td>
+          <td>${mvgAvgReleaseDates[mvgAvgData]['date']}</td></tr>`)
+      })
+      mvgAvgCalcHtml.push(`</tbody>`)
+      mvgAvgCalcHtml.push(`</table>`)
+      res.write(bsAccordionEnd())
+
       let burndownStatsHtml = []
       res.write(bsAccordionStart('accordion1'))
       if (chartResponse.status == 'ok') {
@@ -3180,7 +3359,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
           <td class='text-center'>${burndownStatsTotals[4]}</td>
           </tr>`)
 
-        burndownStatsHtml.push(`</tbody></thead></table>`)
+        burndownStatsHtml.push(`</tbody></table>`)
 
         // Show forecast toggle
         // res.write(`<p>`)
@@ -3196,6 +3375,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
           }
         }
       }
+      // res.write(bsAccordionEnd())
 
       // Show component list
       const componentList = await jdr.getComponentList()
@@ -3231,6 +3411,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
       //   res.write(`<li><a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;">${c}</a></li>`)
       // })
       // res.write(`</ul>`)
+      res.write(bsAccordionEnd())
 
       // showReleased toggle button
       let releasedLinkHtml = `<div>`
@@ -3245,7 +3426,9 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
       res.write(bsAccordionAdd(1, 'Burndown Stats', 'accordion1', burndownStatsHtml.join('')))
       // res.write(bsAccordionAdd(2, 'Image', 'accordion1', `<img id="exported"></img>`))
+      res.write(bsAccordionEnd())
 
+      res.write(bsAccordionAdd(2, 'MvgAvg Data', 'accordion2', mvgAvgCalcHtml.join('')))
       res.write(bsAccordionEnd())
 
       res.write(buildHtmlFooter())
