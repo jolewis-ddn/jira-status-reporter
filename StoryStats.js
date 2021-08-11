@@ -18,54 +18,68 @@ class StoryStats {
     }
   }
 
-  /**
-   *Return a top-level list of the components, story count, story mod count, and expended and total time
-   *
-   * @param {Date} startDate
-   * @param {Date} endDate
-   * @param {String} [component=false]
-   * @param {String} [fixVersion=false]
-   * @memberof StoryStats
-   */
-  getSummaryReport(
+  getChangeStats(
     startDate,
     endDate,
     inComponent = false,
     inFixVersion = false
-    ) {
-    // startDate = new Date(startDate.setHours(0,0,0,0))
-    // let startYMD = `${startDate.getFullYear()}-0${startDate.getMonth()+1}-${startDate.getDate()+1}`
-
-    // endDate = new Date(endDate.setHours(0,0,0,0))
-    // let endYMD = `${endDate.getFullYear()}-0${endDate.getMonth()+1}-${endDate.getDate()+1}`
-
-    let startYMD = startDate
-    let endYMD = endDate
-    
+  ) {
     let prevRow, prevKey
     let processRow = false
     const componentsFound = []
-    const results = {}
-    
+    let results = {}
+
     let releaseFilter = ''
     let componentFilter = ''
-    
+
     if (inComponent) {
       componentFilter = ` AND Component like '%${inComponent}%'`
     }
-    
+
     if (inFixVersion) {
       releaseFilter = ` AND fixVersion='${inFixVersion}' `
     }
-    
-    const sql = `select * from 'story-stats' where ( date='${endYMD}' and key in (select key from 'story-stats' where date='${startYMD}' ${releaseFilter})) or (date='${startYMD}' ${releaseFilter}) order by key,date ASC`
-    console.log(sql)
 
-    console.log(`startDate: ${startDate}; startYMD: ${startYMD}`)
-    console.log(`endDate: ${endDate}; endYMD: ${endYMD}`)
+    // Additions
+    const addSql = `select * from 'story-stats' where date='${endDate}' ${componentFilter} ${releaseFilter} and key not in (select key from 'story-stats' where date='${startDate}' ${componentFilter} ${releaseFilter}) group by key order by key,date ASC`
+    debug(addSql)
 
-    const rows = this.db
-      .prepare( sql ).all()
+    const addRows = this.db.prepare(addSql).all()
+    addRows.forEach((row) => {
+      let components = ['none']
+        if (row.component) {
+          components = row.component.split(',')
+        }
+
+        components.forEach((component) => {
+          if (!inComponent || component == inComponent) {
+            if (!Object.keys(results).includes(component)) {
+              results[component] = {
+                count: 0,
+                changed: 0,
+                completed: 0,
+                total: 0,
+                changes: [],
+                additions: [],
+              }
+            }
+
+            results[component].count++
+            results[component].additions.push(row)
+          }
+      })
+    })
+
+    // Changes
+    const changeSql = `select * from 'story-stats' where ( date='${endDate}' and key in (select key from 'story-stats' where date='${startDate}' ${componentFilter} ${releaseFilter})) or (date='${startDate}' ${componentFilter} ${releaseFilter}) order by key,date ASC`
+    debug(changeSql)
+
+    debug(`startDate: ${startDate}; startYMD: ${startDate}`)
+    debug(`endDate: ${endDate}; endYMD: ${endDate}`)
+
+    const rows = this.db.prepare(changeSql).all()
+
+    debug(`Results count: `, rows.length)
 
     rows.forEach((row) => {
       processRow = row.key == prevKey
@@ -77,25 +91,31 @@ class StoryStats {
         }
 
         components.forEach((component) => {
+          // debug(`Processing Component: ${component}`)
           if (!componentsFound.includes(component)) {
             componentsFound.push(component)
           }
 
-          if (!inComponent && component == inComponent) {
+          if (!inComponent || component == inComponent) {
+            // debug(`Continuing with inComponent ${inComponent}`)
+
             if (!Object.keys(results).includes(component)) {
               results[component] = {
                 count: 0,
                 changed: 0,
                 completed: 0,
                 total: 0,
-                data: [],
+                changes: [],
+                additions: [],
               }
             }
 
             results[component].count++
             if (
               row.total !== prevRow.total ||
-              row.progress !== prevRow.progress
+              row.progress !== prevRow.progress ||
+              row.fixVersion !== prevRow.fixVersion ||
+              row.status !== prevRow.status
             ) {
               results[component].changed++
             }
@@ -109,7 +129,7 @@ class StoryStats {
               prevRow.status !== row.status ||
               prevRow.fixVersion !== row.fixVersion
             ) {
-              results[component].data.push({
+              results[component].changes.push({
                 key: row.key,
                 dates: [prevRow.date, row.date],
                 progress:
@@ -137,33 +157,34 @@ class StoryStats {
       prevKey = row.key
     })
 
-    let cleanResults = {}
-    let data = {}
-    // if (inComponent) {
-    //   if (results[inComponent]) {
-    //     if (results[inComponent].data.length > 0) {
-    //       data = results[inComponent]['data']
-    //     }
-    //   } else {
-    //     console.error(`Couldn't find component: ${inComponent}`)
-    //     console.error(
-    //       `Available components: \n\t${componentsFound
-    //         .sort()
-    //         .filter((x) => x !== 'none')
-    //         .join(`\n\t`)}`
-    //     )
-    //     process.exit(1)
-    //   }
-    // }
+    return results
+  }
 
-  //   Object.keys(results)
-  // .sort()
-  // .forEach((component) => {
-  //   cleanResults[component] = results[component]
-  //   delete cleanResults[component][`data`]
-  // })
+  /**
+   *Return a top-level list of the components, story count, story mod count, and expended and total time
+   *
+   * @param {Date} startDate
+   * @param {Date} endDate
+   * @param {String} [component=false]
+   * @param {String} [fixVersion=false]
+   * @memberof StoryStats
+   */
+  getSummaryReport(
+    startDate,
+    endDate,
+    inComponent = false,
+    inFixVersion = false
+  ) {
+    debug(`inComponent: ${inComponent}`)
 
-    console.table( results)
+    const changes = this.getChangeStats(
+      startDate,
+      endDate,
+      inComponent,
+      inFixVersion
+    )
+
+    return changes
   }
 
   /**
