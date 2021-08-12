@@ -26,6 +26,7 @@ program
   .option('-e, --end-date <date>', 'Ending date (YYYY-MM-DD)')
   .option('-o, --output <filename>', 'Output file')
   .option('-f, --format <format>', 'Output format')
+  .option('-w, --week-report', 'Run report for previous week (overrides -s and -e)')
   .option('-v, --verbose', 'Show more details (including unchanged issue data)')
 
 program.parse(process.argv)
@@ -40,18 +41,34 @@ if (options.component && !componentList.includes(options.component)) {
   process.exit(1)
 }
 
+let startDate
+let endDate
+
+if (options.weekReport) {
+  // Formatting source: https://stackoverflow.com/a/37649046
+  startDate = new Date(new Date()-(1000*60*60*24*8)).toLocaleString('en-us', {year: 'numeric', month: '2-digit', day: '2-digit'}).
+  replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2') // yesterday
+  endDate = new Date(new Date()-(1000*60*60*24*1)).toLocaleString('en-us', {year: 'numeric', month: '2-digit', day: '2-digit'}).
+  replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2') // 8 days ago
+} else {
+  startDate = options.startDate
+  endDate = options.endDate
+}
+
+debug(`startDate: ${startDate}; endDate: ${endDate}`)
+
 if (options.output && options.format == "html") { 
-  fs.writeFileSync(options.output, buildHtmlHeader(options.startDate, options.endDate), { encoding: 'utf8', flags: 'w' })
+  fs.writeFileSync(options.output, buildHtmlHeader(startDate, endDate), { encoding: 'utf8', flags: 'w' })
 }
 
 const summaryReport = storyStats.getSummaryReport(
-  options.startDate,
-  options.endDate,
+  startDate,
+  endDate,
   options.component,
   options.release
 )
 
-console.table(summaryReport)
+// console.table(summaryReport)
 
 if (options.output && options.format == "html") { 
   fs.writeFileSync(options.output, buildHtml("Summary", "Summary", summaryReport), { encoding: 'utf8', flag: 'a' })
@@ -59,15 +76,15 @@ if (options.output && options.format == "html") {
 
 Object.keys(summaryReport).sort().forEach((component) => {
   const componentData = summaryReport[component].changes
-  console.log(
-    `Issue${
-      componentData.length == 1 ? '' : 's'
-    } updated for Component ${component}: ${
-      componentData.length == 0 ? 'None' : ''
-    }`
-  )
+  // console.log(
+  //   `Issue${
+  //     componentData.length == 1 ? '' : 's'
+  //   } updated for Component ${component}: ${
+  //     componentData.length == 0 ? 'None' : ''
+  //   }`
+  // )
   if (componentData.length) {
-    console.table(componentData)
+    // console.table(componentData)
     const outputFile = path.resolve(options.output)
     if (options.format == 'json') {
       fs.writeFileSync(
@@ -83,13 +100,13 @@ Object.keys(summaryReport).sort().forEach((component) => {
     }
   }
   const addData = summaryReport[component].additions
-  console.log(
-    `Issue${addData.length == 1 ? '' : 's'} added for Component ${component}: ${
-      addData.length == 0 ? 'None' : ''
-    }`
-  )
+  // console.log(
+  //   `Issue${addData.length == 1 ? '' : 's'} added for Component ${component}: ${
+  //     addData.length == 0 ? 'None' : ''
+  //   }`
+  // )
   if (addData.length) {
-    console.table(addData)
+    // console.table(addData)
     if (options.output) {
       const outputFile = path.resolve(options.output)
       if (options.format == 'json') {
