@@ -8,6 +8,7 @@ const fs = require('fs')
 const debug = require('debug')('quickProgressQuery')
 
 const ACCEPTED_FORMATS = ['json', 'html']
+const DEFAULT_OUTPUT = "output.html"
 
 const htmlFooter = `<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 
@@ -24,7 +25,7 @@ program
   .option('-c, --component <name>', 'Limit results to specified Component name')
   .option('-s, --start-date <date>', 'Starting date (YYYY-MM-DD)')
   .option('-e, --end-date <date>', 'Ending date (YYYY-MM-DD)')
-  .option('-o, --output <filename>', 'Output file')
+  .option('-o, --output <filename>', 'Output file (default: output.html)')
   .option('-f, --format <format>', 'Output format')
   .option('-w, --week-report', 'Run report for previous week (overrides -s and -e)')
   .option('-v, --verbose', 'Show more details (including unchanged issue data)')
@@ -43,6 +44,7 @@ if (options.component && !componentList.includes(options.component)) {
 
 let startDate
 let endDate
+let outputFormat = options.format || options.output.endsWith('html') ? 'html' : 'json'
 
 if (options.weekReport) {
   // Formatting source: https://stackoverflow.com/a/37649046
@@ -55,9 +57,11 @@ if (options.weekReport) {
   endDate = options.endDate
 }
 
-debug(`startDate: ${startDate}; endDate: ${endDate}`)
+debug(`- startDate: ${startDate}; 
+- endDate: ${endDate}
+- options.output: ${options.output || 'unset'}`)
 
-if (options.output && options.format == "html") { 
+if (options.output && outputFormat == "html") { 
   fs.writeFileSync(options.output, buildHtmlHeader(startDate, endDate), { encoding: 'utf8', flags: 'w' })
 }
 
@@ -70,7 +74,7 @@ const summaryReport = storyStats.getSummaryReport(
 
 // console.table(summaryReport)
 
-if (options.output && options.format == "html") { 
+if (options.output && outputFormat == "html") { 
   fs.writeFileSync(options.output, buildHtml("Summary", "Summary", summaryReport), { encoding: 'utf8', flag: 'a' })
 }
 
@@ -86,13 +90,13 @@ Object.keys(summaryReport).sort().forEach((component) => {
   if (componentData.length) {
     // console.table(componentData)
     const outputFile = path.resolve(options.output)
-    if (options.format == 'json') {
+    if (options.output && outputFormat == 'json') {
       fs.writeFileSync(
         outputFile,
         JSON.stringify({ component: component, changeData: componentData }, null, 2),
         { encoding: 'utf8', flag: 'a' }
       )
-    } else if (options.format == 'html') {
+    } else if (options.output && outputFormat == 'html') {
       fs.writeFileSync(outputFile, buildHtml(component, 'Updates', componentData), {
         encoding: 'utf8',
         flag: 'a',
@@ -109,13 +113,13 @@ Object.keys(summaryReport).sort().forEach((component) => {
     // console.table(addData)
     if (options.output) {
       const outputFile = path.resolve(options.output)
-      if (options.format == 'json') {
+      if (outputFormat == 'json') {
         fs.writeFileSync(
           outputFile,
           JSON.stringify({ component: component, addData: addData }, null, 2),
           { encoding: 'utf8', flag: 'a' }
         )
-      } else if (options.format == 'html') {
+      } else if (outputFormat == 'html') {
         fs.writeFileSync(
           outputFile,
           buildHtml(component, 'Additions', addData),
@@ -126,7 +130,7 @@ Object.keys(summaryReport).sort().forEach((component) => {
   }
 })
 
-if (options.output && options.format == "html") { 
+if (options.output && outputFormat == "html") { 
   fs.writeFileSync(options.output, htmlFooter, { encoding: 'utf8', flag: 'a' })
 }
 
@@ -159,7 +163,7 @@ function buildHtml(component, type, data) {
     ].join('</th><th>')}</th></tr>`
     output += `<tbody>`
     Object.keys(data).sort().forEach((item) => {
-      output += `<tr><td>${data[item].changed > 0 ? `<a href="#${item}-Updates">` : data[item].additions.length > 0 ? `<a href="#${item}-Additions">` :''}${item}</a></td><td>${data[item].count}</td><td>${data[item].changed}</td><td>${data[item].completed}</td><td>${data[item].total}</td><td>${data[item].additions.length}</td></tr>`
+      output += `<tr><td>${data[item].changed > 0 ? `<a href="#${item}-Updates">` : data[item].additions.length > 0 ? `<a href="#${item}-Additions">` :''}${item}</a></td><td>${data[item].count}</td><td>${data[item].changed}</td><td>${convertToDays(data[item].completed)}</td><td>${convertToDays(data[item].total)}</td><td>${data[item].additions.length}</td></tr>`
     })
   } else if (type == 'Additions') {
     output += `<table class="table table-sm table-striped"><thead><tr><th>${[
@@ -179,8 +183,8 @@ function buildHtml(component, type, data) {
         addition.status,
         addition.fixVersion,
         addition.component,
-        addition.progress,
-        addition.total,
+        convertToDays(addition.progress),
+          convertToDays(addition.total),
       ].join('</td><td>')}</td></tr>`
     })
   } else if (type == 'Updates') {
@@ -194,17 +198,67 @@ function buildHtml(component, type, data) {
     ].join('</th><th>')}</th></tr>`
     output += `<tbody>`
     data.forEach((update) => {
+      debug(`typeof(update.total): ${typeof update.total}`, update.total, update.total.length)
       output += `<tr><th>${[
         `<a href="${config.jira.protocol}:${config.jira.host}/browse/${update.key}" target="_blank" rel="noreferrer noopener">${update.key}</a>`,
-        update.dates,
-        update.progress,
-        update.status,
-        update.total,
-        update.fixVersion,
+        tidyChangeCell(update.dates),
+        tidyChangeCell(update.progress),
+        tidyChangeCell(update.status),
+        tidyChangeCell(update.total),
+        tidyChangeCell(update.fixVersion),
       ].join('</td><td>')}</td></tr>`
     })
   }
   output += `</tbody>`
   output += `</table>`
   return(output)
+}
+
+function tidyChangeCell(content) {
+  if (typeof content == typeof []) {
+    return(content.map((x) => {
+      return convertToDays(x, true)
+    }).join(' &#10132; '))
+  } else {
+    return(`<span style='color: #aaa'>${convertToDays(content)}</span>`)
+  }
+}
+
+function convertToDays(val, tiered = false) {
+  if (typeof val == typeof 0) {
+    if (val === 0) {
+      return(val)
+    }
+
+    let dayVal = 1*(val/28800).toFixed(2)
+
+    if (dayVal == dayVal.toFixed(0)) {
+      dayVal = +dayVal.toFixed(0)
+    }
+    if (tiered) {
+      if (val >= 144000) {
+        let weekVal = dayVal/5
+        if (weekVal == weekVal.toFixed(0)) {
+          weekVal = +weekVal.toFixed(0)
+        } else {
+          weekVal = +weekVal.toFixed(2)
+        }
+       return(weekVal + ' w')
+      } else if (val >= 28800) {
+        return(dayVal + ' d')
+      } else if (val >= 3600) {
+        let hourVal = 1*(dayVal * 8).toFixed(2)
+        if (hourVal == hourVal.toFixed(0)) {
+          hourVal = +hourVal.toFixed(0)
+        }
+        return(hourVal + ' h')
+      } else {
+        return((val).toFixed(2) + ' min')
+      }
+    } else {
+      return(dayVal + ' d')
+    }
+  } else {
+    return(val)
+  }
 }
