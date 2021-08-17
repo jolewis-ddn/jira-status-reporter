@@ -2056,19 +2056,21 @@ server.get('/epics', (req, res, next) => {
           let epicItemIndex = -1
           let epicItemIndexToRemove = -1
 
-          debug(`\n>>> Orig Results: ${e.issues.map((i) => i.key).join(',')}\n`)
+          // debug(`\n>>> Orig Results: ${e.issues.map((i) => i.key).join(',')}\n`)
 
           // Make sure the epic is highlighted properly
           for (let i = 0; i < e.issues.length; i++) {
             const issue = e.issues[i]
 
             // debug(`e.fixVersions: `, issue.fields.fixVersions)
-            debug(
-              `includesRelease(fixVersions, ${onlyRelease}) = `,
-              includesRelease(issue.fields.fixVersions)
-            )
+            // debug(
+            //   `includesRelease(fixVersions, ${onlyRelease}) = `,
+            //   includesRelease(issue.fields.fixVersions)
+            // )
 
-            if (issue.key == epicIdRequested) {
+            // if (issue.key == epicIdRequested) {
+            // debug(`epicIdRequested.indexOf(${issue.key}): ${epicIdRequested.indexOf(issue.key)} // `, epicIdRequested)
+            if (epicIdRequested.indexOf(issue.key) > -1) {
               epicData = issue
               // epicItemIndexToRemove = epicItemIndex
               epicItemIndex = i
@@ -2087,9 +2089,9 @@ server.get('/epics', (req, res, next) => {
             epicData = e.issues.pop()
           }
 
-          debug(
-            `\n>>> Updated Results: ${e.issues.map((i) => i.key).join(',')}\n`
-          )
+          // debug(
+          //   `\n>>> Updated Results: ${e.issues.map((i) => i.key).join(',')}\n`
+          // )
 
           debug(`processing ${epicData.key}...`)
 
