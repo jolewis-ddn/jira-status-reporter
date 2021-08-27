@@ -482,7 +482,7 @@ function buildStylesheet() {
     .bundledicon { margin: -2px 4px -2px 4px; }
     .lineicon { margin: -2px 4px 0px 0px; }
 
-    .liHeader { display: inline-block; width: 180px; text-align: right; }
+    .liHeader { display: inline-block; width: 280px; text-align: right; }
 
     .summaryCol { width: 30%; }
     .linksCol { width: 150px; }
@@ -2366,7 +2366,7 @@ server.get('/epics', (req, res, next) => {
           htmlOutput.push(`<h3>Remaining Work</h3>`)
           htmlOutput.push(`<ul>`)
           Object.keys(ownerData)
-            .sort()
+            .sort((a, b) => { return a.split(` `)[a.split(` `).length-1].substring(0,3) > b.split(` `)[b.split(` `).length-1].substring(0,3) ? 1 : -1 })
             .forEach((owner) => {
               let totalEstRem = 0
               let ownerHtml = []
@@ -2420,7 +2420,7 @@ server.get('/epics', (req, res, next) => {
               // if (ownerHtml[owner] && ownerHtml[owner].length) {
               // if (totalEstRem > 0) {
               htmlOutput.push(
-                `<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d]</span>: `
+                `<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d; ETA: ${new Date().addBusinessDays(totalEstRem).toLocaleDateString()}]</span>: `
               )
               // }
               htmlOutput.push(ownerHtml.join(''))
