@@ -20,8 +20,6 @@ const NodeCache = require("node-cache");
 const JiraDataCache = require("./JiraDataCache");
 const { CANCELLED } = require("dns");
 
-const sqlite3 = require("sqlite3").verbose();
-
 const ALL_RELEASES = "ALL_RELEASES";
 const NO_RELEASE = "NONE";
 
@@ -46,7 +44,7 @@ class JiraDataReader {
     this.REBUILD = 999
     this.UPDATE  = 500
     this.REFRESH = 10
-    this.db = new sqlite3.Database(databaseFullname)
+    this.betterDb = require('better-sqlite3')(databaseFullname, { readonly: true })
     // this.jsr = new JSR()
 
     return this
@@ -95,10 +93,7 @@ class JiraDataReader {
         const sql = `select key, total, min(date) as earliestDate from 'story-stats' where key in (select key from 'story-stats' where date='${createdDateStr}') and key not in (select key from 'story-stats' where date='${prevDayStr}') group by key order by key`
         debug(`sql: ${sql}`)
 
-        this.db.all(sql, (dberr, rows) => {
-          if (dberr) { reject(dberr) }
-          resolve({ sql: sql, createdDate: createdDate, data: rows })
-        })
+        resolve({ sql: sql, createdDate: createdDate, data: this.betterDb.prepare(sql).all() })
       } catch (err) {
         reject(err)
       }
@@ -125,7 +120,7 @@ class JiraDataReader {
     let updates = 0
     debug(`Beginning db transaction...`)
 
-    this.db.run('BEGIN')
+    // this.db.run('BEGIN')
 
     flist.forEach((fname) => {
       debug(`processing ${fname}...`)
@@ -149,7 +144,7 @@ class JiraDataReader {
     })
 
     debug(`Committing inserts to database...`)
-    this.db.run('COMMIT')
+    // this.db.run('COMMIT')
     debug('...done committing')
 
     debug(`Saving cache (${updates} updates)`)
@@ -259,7 +254,7 @@ class JiraDataReader {
    * @memberof JiraDataReader
    */
   async clearCache() {
-    await this.db.run("DELETE FROM 'story-stats';")
+    await this.betterDb.run("DELETE FROM 'story-stats';")
 
     this.cache.makeCache()
     this.loaded = this.cache.isActive()
@@ -285,14 +280,8 @@ class JiraDataReader {
     debug(`getReleaseList() called...`)
     return new Promise((resolve, reject) => {
       let sql = `SELECT distinct(fixVersion) FROM 'story-stats' ORDER BY fixVersion`
-      this.db.all(sql, (err, rows) => {
-        if (err) {
-          reject(err)
-        } else {
-          // debug(rows);
-          resolve(rows.map((x) => x.fixVersion))
-        }
-      })
+      const rows = this.betterDb.prepare(sql).all()
+      resolve(rows.map((x) => x.fixVersion))
     })
   }
 
@@ -306,19 +295,14 @@ class JiraDataReader {
     debug(`getComponentList() called...`)
     return new Promise((resolve, reject) => {
       let sql = `SELECT distinct(component) FROM 'story-stats' where component is not null ORDER BY component`
-      this.db.all(sql, (err, rows) => {
-        if (err) {
-          reject(err)
-        } else {
-          let cleanList = []
-          const uglyList = rows.map((x) => x.component)
-          uglyList.forEach((entry) => {
-            // debug(`entry: `, entry)
-            cleanList = cleanList.concat(entry.split(','))
-          })
-          resolve([...new Set(cleanList)].sort())
-        }
+      const rows = this.betterDb.prepare(sql).all()
+      let cleanList = []
+      const uglyList = rows.map((x) => x.component)
+      uglyList.forEach((entry) => {
+        // debug(`entry: `, entry)
+        cleanList = cleanList.concat(entry.split(','))
       })
+      resolve([...new Set(cleanList)].sort())
     })
   }
 
@@ -327,16 +311,11 @@ class JiraDataReader {
    *
    * @memberof JiraDataReader
    */
-  async getDateList(whereFilter = '') {
+  getDateList(whereFilter = '') {
     return new Promise((resolve, reject) => {
       let sql = `select date from 'story-stats' ${whereFilter} group by date order by date`
-      this.db.all(sql, (err, rows) => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve(rows.map((x) => x.date))
-        }
-      })
+      const rows = this.betterDb.prepare(sql).all()
+      resolve(rows.map((x) => x.date))
     })
   }
 
@@ -381,46 +360,44 @@ class JiraDataReader {
       debug(sql)
 
       if (!ncache.has(sql)) {
-        this.db.all(sql, async (err, rows) => {
-          if (err != null) {
-            reject(err)
-          } else {
-            debug(`# of rows returned: `, rows.length)
-            // Now that we have the data, it has to be reformatted per status
-            // TODO: Fix implicit assumption that the first status has an entry for every day
+        const rows = this.betterDb.prepare(sql).all()
+        debug(`# of rows returned: `, rows.length)
+        // Now that we have the data, it has to be reformatted per status
+        // TODO: Fix implicit assumption that the first status has an entry for every day
 
-            let burndownStatDaily = {}
-            let burndownStatDates = await this.getDateList()
+        let burndownStatDaily = {}
+        this.getDateList().then((burndownStatDates) => {
 
-            /* Example results...
-              { status: 'In Progress', date: '2020-11-01', remaining: 3513600 },
-              { status: 'In Progress', date: '2020-11-02', remaining: 2513600 },
-              { status: 'In Progress', date: '2020-11-03', remaining: 1513600 },
-              { status: 'In Progress', date: '2020-11-04', remaining:  369600 },
-              ...
-              */
-            rows.forEach((row) => {
-              // debug(`in rows.forEach(`, row, `)`);
-              // if (!burndownStatDates.includes(row.date)) {
-              //   burndownStatDates.push(row.date);
-              // }
-              if (!Object.keys(burndownStatDaily).includes(row.status)) {
-                // Build an array the same length as the dates array, filled with 0s
-                burndownStatDaily[row.status] = Array(
-                  burndownStatDates.length
-                ).fill(0)
-              }
-              // burndownStatDaily[row.status].push(
-              //   convertSecondsToDays(row.remaining)
-              // );
-              burndownStatDaily[row.status][
-                burndownStatDates.indexOf(row.date)
-              ] = convertSecondsToDays(row.remaining)
-            })
-            debug(`...setting cache for burndownStats: nodeCache(${sql})`)
-            this.nodeCache.set(sql, { stats: burndownStatDaily, dates: burndownStatDates, meta: { cacheDate: new Date() } })
-            resolve(this.nodeCache.get(sql))
-          }
+
+          /* Example results...
+            { status: 'In Progress', date: '2020-11-01', remaining: 3513600 },
+            { status: 'In Progress', date: '2020-11-02', remaining: 2513600 },
+            { status: 'In Progress', date: '2020-11-03', remaining: 1513600 },
+            { status: 'In Progress', date: '2020-11-04', remaining:  369600 },
+            ...
+            */
+          rows.forEach((row) => {
+            // debug(`in rows.forEach(`, row, `)`);
+            // if (!burndownStatDates.includes(row.date)) {
+            //   burndownStatDates.push(row.date);
+            // }
+            if (!Object.keys(burndownStatDaily).includes(row.status)) {
+              // Build an array the same length as the dates array, filled with 0s
+              burndownStatDaily[row.status] = Array(
+                burndownStatDates.length
+              ).fill(0)
+            }
+            // burndownStatDaily[row.status].push(
+            //   convertSecondsToDays(row.remaining)
+            // );
+
+            burndownStatDaily[row.status][
+              burndownStatDates.indexOf(row.date)
+            ] = convertSecondsToDays(row.remaining)
+          })
+          debug(`...setting cache for burndownStats: nodeCache(${sql})`)
+          this.nodeCache.set(sql, { stats: burndownStatDaily, dates: burndownStatDates, meta: { cacheDate: new Date() } })
+          resolve(this.nodeCache.get(sql))
         })
       } else {
         debug(`...returning burndownStats from cache...`)
@@ -537,7 +514,7 @@ class JiraDataReader {
             //   0
             // ) {
             // debug(`INSERT INTO 'story-stats' (key, date, status, fixVersion, progress, total) VALUES (${i.key}, ${this.lastFiledate}, ${i.fields.status.name}, ${release}, ${i.fields.aggregateprogress.progress}, ${i.fields.aggregateprogress.total})`)
-            this.db.run(
+            this.betterDb.prepare(
               'INSERT INTO `story-stats` (key, date, status, fixVersion, component, progress, total) VALUES (?, ?, ?, ?, ?, ?, ?)',
               i.key,
               this.lastFiledate,
@@ -546,7 +523,7 @@ class JiraDataReader {
               component,
               i.fields.aggregateprogress.progress,
               i.fields.aggregateprogress.total
-            )
+            ).run()
             // }
           }
         })

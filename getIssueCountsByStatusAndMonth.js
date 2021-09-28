@@ -4,13 +4,11 @@ const { Command } = require('commander')
 const program = new Command()
 program.version('0.0.2')
 
-const sqlite3 = require('sqlite3').verbose()
-
 const config = require('config')
 const dataPath = config.has('dataPath') ? config.get('dataPath') : 'data'
 const dataPathPrefix = '.' + path.sep + dataPath + path.sep
 
-const db = new sqlite3.Database(dataPathPrefix + 'jira-stats.db')
+this db = require('better-sqlite3')(dataPathPrefix + 'jira-stats.db')
 
 const datefns = require('date-fns')
 
@@ -65,7 +63,7 @@ STATUS.forEach((status) => {
             let m2 = datefns.getMonth(nextDay)+1
             let day2 = datefns.getDate(nextDay)
 
-            db.run(`delete from 'jira-stats' WHERE status='${status}' AND year=${y} AND month=${m}`)
+            db.exec(`delete from 'jira-stats' WHERE status='${status}' AND year=${y} AND month=${m}`)
 
             const jql = `project=${PROJECT_NAME} and status was "${status}" DURING ("${y}/${m}/${day}", "${y2}/${m2}/${day2}")`
             debug(`Starting... jql: ${jql}`)
@@ -74,7 +72,7 @@ STATUS.forEach((status) => {
                 jsr.search(jql, QUERY_PARAMS)
                     .then((results) => {
                         debug(`${status} on ${y}/${m}/${day}`, results.total)
-                        db.run("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)", status, y, m, day, results.total)
+                        db.prepare("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)").all(status, y, m, day, results.total)
                     })
                     .catch((err) => {
                         // TODO: Fix this recursive HACK!
@@ -82,14 +80,14 @@ STATUS.forEach((status) => {
                             jsr.search(jql, QUERY_PARAMS)
                                 .then((results) => {
                                     debug(`Try #2: ${status} on ${y}/${m}/${day}`, results.total)
-                                    db.run("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)", status, y, m, day, results.total)
+                                    db.prepare("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)").all(status, y, m, day, results.total)
                                 })
                                 .catch((err) => {
                                     sleep(3000).then(() => {
                                         jsr.search(jql, QUERY_PARAMS)
                                             .then((results) => {
                                                 debug(`Try #3: ${status} on ${y}/${m}/${day}`, results.total)
-                                                db.run("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)", status, y, m, day, results.total)
+                                                db.prepare("INSERT INTO `jira-stats` (status, year, month, day, count) VALUES (?, ?, ?, ?, ?)").all(status, y, m, day, results.total)
                                             })
                                             .catch((err) => {
                                                 console.error(`Error after try #3: ${err.statusCode} for status ${status} on ${y}/${m}/${day} (JQL: ${jql}`)
