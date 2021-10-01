@@ -3833,7 +3833,10 @@ server.get('/query', async (req, res, next) => {
     debug(`showChanges: ${showChanges}; JQL: ${req.query.jsql}`)
 
     if (!cache.has(req.query.jql)) {
+      debug(`no cache entry found for ${req.query.jql}, so adding one`)
       cache.set(req.query.jql, await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges ))
+    } else {
+      debug(`cache entry found for ${req.query.jql}, so returning it`)
     }
     res.send(cache.get(req.query.jql))
   } catch(err) {
