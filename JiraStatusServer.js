@@ -19,6 +19,8 @@ const mermaidConfig = require('./config/mermaid-config')
 const MermaidNodes = require('./MermaidNodes')
 const mermaid = new MermaidNodes()
 
+const redis = require('redis')
+
 const JiraStatus = require('./JiraStatus')
 
 const JSR = require('./JiraStatusReporter')
@@ -81,6 +83,21 @@ const cors = corsMiddleware({
 
 server.use(cors.preflight)
 server.use(cors.actual)
+
+// Set up caching -- START
+
+cache.on('set', async (key, value) => {
+  if (config.has('cache') && config.cache.has('redis') && config.cache.redis.has('url')) {
+    debug(`Setting cache value for ${key} to ${value} in redis`)
+    const client = redis.createClient({ url: config.cache.redis.url })
+    client.on('error', (err) => { console.log('Redis Client Error', err) })
+    await client.connect()
+    await client.set(key, JSON.stringify(value), { EX: 600, NX: true })
+    debug(`... done`)
+  }
+})
+
+// Set up caching -- END
 
 function buildAlert(content, title = false, alertClass="success") {
   return(`<div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
