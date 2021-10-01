@@ -3832,7 +3832,10 @@ server.get('/query', async (req, res, next) => {
     let showChanges = req.query.changes && (req.query.changes == "yes" || req.query.changes == "true") ? true : false
     debug(`showChanges: ${showChanges}; JQL: ${req.query.jsql}`)
 
-    res.send(await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges ))
+    if (!cache.has(req.query.jql)) {
+      cache.set(req.query.jql, await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges ))
+    }
+    res.send(cache.get(req.query.jql))
   } catch(err) {
     res.send(`query err: `, err)
   }
