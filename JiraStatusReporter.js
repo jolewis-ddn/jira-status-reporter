@@ -2,8 +2,10 @@
 const debug = require('debug')('JSR')
 const JiraApi = require('jira-client')
 
+const { CACHE_TTL } = require('./utilities')
+
 const NodeCache = require('node-cache')
-const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 })
+const cache = new NodeCache({ stdTTL: CACHE_TTL, checkperiod: 120 })
 
 const crypto = require('crypto')
 
@@ -777,6 +779,8 @@ class JiraStatusReporter {
                     compiledResults.startAt = 0
                     compiledResults.maxResults = compiledResults.total
                     compiledResults.comment = 'Compiled by JiraStatusReporter'
+                    compiledResults.query = jql
+                    
                     compiledResults.issues = []
                     for (let rrctr = 0; rrctr < rawResults.length; rrctr++) {
                       const element = rawResults[rrctr]

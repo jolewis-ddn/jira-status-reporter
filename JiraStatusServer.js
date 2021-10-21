@@ -6,11 +6,13 @@ const restifyErrors = require('restify-errors')
 const corsMiddleware = require('restify-cors-middleware')
 const XXH = require('xxhashjs')
 
+const { calcMovingAverage, tagCache, CACHE_TTL } = require('./utilities')
+
 const fs = require('fs')
 const path = require('path')
 
 const NodeCache = require('node-cache')
-const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 })
+const cache = new NodeCache({ stdTTL: CACHE_TTL, checkperiod: 120 })
 
 const config = require('config')
 const NONE = 'none'
@@ -36,7 +38,6 @@ const dashboard = new Dashboard()
 const LocalStorage = require('node-localstorage').LocalStorage
 const { cachedDataVersionTag } = require('v8')
 const { stringify } = require('querystring')
-const { calcMovingAverage } = require('./utilities')
 let ls = new LocalStorage('./.cache')
 
 const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
@@ -3846,18 +3847,29 @@ server.get('/unestimated', async (req, res, next) => {
 server.get('/query', async (req, res, next) => {
   try {
     let fields = req.query.fields ? req.query.fields.split(';') : ['fixVersions']
+    let cacheTTL = req.query.ttl && (!isNaN(parseInt(req.query.ttl)) && isFinite(req.query.ttl)) ? parseInt(req.query.ttl) : CACHE_TTL
+
+    debug(`/query: cacheTTL = ${cacheTTL}`)
     let showChanges = req.query.changes && (req.query.changes == "yes" || req.query.changes == "true") ? true : false
-    debug(`showChanges: ${showChanges}; JQL: ${req.query.jsql}`)
+    debug(`/query: showChanges: ${showChanges}; JQL: ${req.query.jsql}`)
 
     if (!cache.has(req.query.jql)) {
       debug(`no cache entry found for ${req.query.jql}, so adding one`)
-      cache.set(req.query.jql, await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges ))
+
+      let createdDate = Math.floor(+new Date() / 1000)
+      let expDate = createdDate + cacheTTL
+      
+      let cacheData = await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges)
+      cacheData.cache = { status: "new", created: createdDate, expires: expDate }
+      cache.set(req.query.jql, cacheData, cacheTTL)
+
+      res.send(cache.get(req.query.jql))
     } else {
       debug(`cache entry found for ${req.query.jql}, so returning it`)
+      res.send(tagCache(cache.get(req.query.jql)))
     }
-    res.send(cache.get(req.query.jql))
   } catch(err) {
-    res.send(`query err: `, err)
+    res.send({ error: err })
   }
   return next()
 })

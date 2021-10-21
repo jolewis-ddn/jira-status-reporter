@@ -34,5 +34,16 @@ function calcMovingAverage(arr, per, emptyVal = 0) {
 	return(resp)
 }
 
+function tagCache(c, ttl = 0) {
+	if (c.cache && c.cache.status) { // Not stamped yet
+		c.cache.status = "used"
+	}
+	return(c)
+}
+
+const CACHE_TTL = 600
+
+exports.CACHE_TTL = CACHE_TTL;
+exports.tagCache = tagCache;
 exports.padToTwoCharacters = padToTwoCharacters;
 exports.calcMovingAverage = calcMovingAverage;
