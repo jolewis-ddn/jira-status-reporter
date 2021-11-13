@@ -17,6 +17,8 @@
     "lodash": "^4.17.21",
     "node-cache": "^5.1.2",
     "node-localstorage": "^2.2.1",
+    "pino": "^7.2.0",
+    "pino-debug": "^2.0.0",
     "redis": "^4.0.0-rc.2",
     "restify": "^8.5.1",
     "restify-cors-middleware": "^1.1.1",
