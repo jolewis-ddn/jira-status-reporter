@@ -1,3 +1,5 @@
+/** @format */
+
 'use strict'
 const debug = require('debug')('JiraStatusServer')
 const d = require('./dateExtension')
@@ -31,8 +33,11 @@ let jsr = new JSR()
 const JiraDataReader = require('./JiraDataReader')
 let jdr = new JiraDataReader()
 
+const JiraDataParser = require('./JiraDataParser')
+let jdp = new JiraDataParser()
+
 const Dashboard = require('./Dashboard')
-const { convertSecondsToDays } = require("./jiraUtils")
+const { convertSecondsToDays } = require('./jiraUtils')
 const dashboard = new Dashboard()
 
 const LocalStorage = require('node-localstorage').LocalStorage
@@ -40,7 +45,9 @@ const { cachedDataVersionTag } = require('v8')
 const { stringify } = require('querystring')
 let ls = new LocalStorage('./.cache')
 
-const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
+const UNASSIGNED_USER = config.has('unassignedUser')
+  ? config.unassignedUser
+  : 'UNASSIGNED'
 
 const labels = ['Epic', 'Story', 'Task', 'Sub-task', 'Bug', 'Requirement']
 const states = ['Open', 'Active', 'Closed', 'Stopped', 'New']
@@ -49,22 +56,16 @@ const backgroundColors = [
   'MediumSeaGreen',
   'CornflowerBlue',
   'Pink',
-  'Purple'
+  'Purple',
 ]
 
-const foregroundColors = [
-  'black',
-  'white',
-  'white',
-  'black',
-  'white'
-]
+const foregroundColors = ['black', 'white', 'white', 'black', 'white']
 
 const BAR_COLORS = {
-  'Blocked': backgroundColors[3],
-  'Emergency': backgroundColors[3],
-  'Icebox': backgroundColors[0],
-  'Defined': backgroundColors[0],
+  Blocked: backgroundColors[3],
+  Emergency: backgroundColors[3],
+  Icebox: backgroundColors[0],
+  Defined: backgroundColors[0],
   'In Progress': backgroundColors[1],
   'In Review': backgroundColors[1],
 }
@@ -79,7 +80,7 @@ server.use(restify.plugins.queryParser())
 const cors = corsMiddleware({
   origins: ['*'],
   allowHeaders: [],
-  exposeHeaders: []
+  exposeHeaders: [],
 })
 
 server.use(cors.preflight)
@@ -88,10 +89,16 @@ server.use(cors.actual)
 // Set up caching -- START
 
 cache.on('set', async (key, value) => {
-  if (config.has('cache') && config.cache.has('redis') && config.cache.redis.has('url')) {
+  if (
+    config.has('cache') &&
+    config.cache.has('redis') &&
+    config.cache.redis.has('url')
+  ) {
     debug(`Setting cache value for ${key} to ${value} in redis`)
     const client = redis.createClient({ url: config.cache.redis.url })
-    client.on('error', (err) => { console.log('Redis Client Error', err) })
+    client.on('error', (err) => {
+      console.log('Redis Client Error', err)
+    })
     await client.connect()
     await client.set(key, JSON.stringify(value), { EX: 600, NX: true })
     debug(`... done`)
@@ -100,13 +107,13 @@ cache.on('set', async (key, value) => {
 
 // Set up caching -- END
 
-function buildAlert(content, title = false, alertClass="success") {
-  return(`<div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
-  ${title ? `<strong>${title}</strong> `:''}${content}
+function buildAlert(content, title = false, alertClass = 'success') {
+  return `<div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
+  ${title ? `<strong>${title}</strong> ` : ''}${content}
   <button type="button" class="close" data-dismiss="alert" aria-label="Close">
   <span aria-hidden="true">&times;</span>
 </button>
-</div>`)
+</div>`
 }
 
 server.get(
@@ -149,13 +156,22 @@ server.get('/', async (req, res, next) => {
   <li><a href='/estimates'>Estimates</a> (HTML)</li>
   <li>Fields (<a href='/fields'>JSON</a> or <a href='/fields?format=html'>HTML</a>)</li>
   <li>Groups (<a href='/groups'>JSON</a> or <a href='/groups?format=html'>HTML</a>)</li>
-  <li>Issue Types (<a href='/issueTypes'>For ${config.get('project')} only</a> or <a href='/issueTypes?all=yes'>Complete list</a>)</li>
+  <li>Issue Types (<a href='/issueTypes'>For ${config.get(
+    'project'
+  )} only</a> or <a href='/issueTypes?all=yes'>Complete list</a>)</li>
   <li>Links (<a href='/links'>JSON</a> or <a href='/links?format=html'>HTML/Mermaid</a>): Requires Jira key parameter ('?id=ABC-1234')</li>
   <li>Progress: Requires Jira release ID ('release/111111') (HTML)</li>`)
 
   if (config.has(releases)) {
     res.write(`<ul><li><em>${config.project} releases:</em> `)
-    res.write(releases.filter((rel) => !rel.released).map((rel) => `<a href='/progress/${rel.id}'>${rel.name} (${rel.id})</a>`).join(', '))
+    res.write(
+      releases
+        .filter((rel) => !rel.released)
+        .map(
+          (rel) => `<a href='/progress/${rel.id}'>${rel.name} (${rel.id})</a>`
+        )
+        .join(', ')
+    )
     res.write(`</li></ul>`)
   }
 
@@ -166,7 +182,14 @@ server.get('/', async (req, res, next) => {
 
   if (releases.length) {
     res.write(`<ul><li><em>${config.project} releases:</em> `)
-    res.write(releases.filter((rel) => !rel.released).map((rel) => `<a href='/remainingWorkReport/${rel.name}'>${rel.name}</a>`).join(', '))
+    res.write(
+      releases
+        .filter((rel) => !rel.released)
+        .map(
+          (rel) => `<a href='/remainingWorkReport/${rel.name}'>${rel.name}</a>`
+        )
+        .join(', ')
+    )
     res.write(`</li></ul>`)
   }
 
@@ -176,7 +199,11 @@ server.get('/', async (req, res, next) => {
   <li>Unestimated (<a href='/unestimated'>JSON</a> or <a href='/unestimated?format=html'>HTML</a>)</li>`)
 
   // Print the cache management links if the Admin param is set
-  if (req.query && req.query.admin && req.query.admin == (config.has('adminKey') ? config.get('adminKey') : 'yes')) {
+  if (
+    req.query &&
+    req.query.admin &&
+    req.query.admin == (config.has('adminKey') ? config.get('adminKey') : 'yes')
+  ) {
     res.write(`<h2>Cache Management</h2>
     <li><a href='/cache/flush'>Flush</a></li>
     <li><a href='/cache/stats'>Stats</a></li>
@@ -205,7 +232,7 @@ server.get('/count/', async (req, res, next) => {
 
 function getBarColor(estDate, relDate) {
   // debug(`getBarColor(${estDate}, ${relDate}) called...`)
-  return (estDate < relDate) ? 'green' : 'red'
+  return estDate < relDate ? 'green' : 'red'
 }
 
 server.get('/remainingWorkReport/:release', async (req, res, next) => {
@@ -213,15 +240,15 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
 
   const releases = await getVersions(false)
   debug(`... releases: `, releases)
-  const releaseObj = releases.filter(rel => rel.name == req.params.release)[0]
+  const releaseObj = releases.filter((rel) => rel.name == req.params.release)[0]
   const release = releaseObj && releaseObj.name ? releaseObj.name : false
   debug(`... processing release: `, releaseObj)
 
-  if (release) { // Valid release provided?
+  if (release) {
+    // Valid release provided?
     // let reportParams = {}
 
-    jsr.getRemainingWorkReport([release])
-    .then(async (results) => {
+    jsr.getRemainingWorkReport([release]).then(async (results) => {
       const detailTable = []
       const userSummary = {}
       const title = 'Remaining Work Report'
@@ -231,92 +258,145 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       results.data.results.forEach(async (row) => {
         detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
         if (!Object.keys(userSummary).includes(row[0])) {
-          userSummary[row[0]] = { progress: 0, total: 0, remaining: 0, unestimatedCount: 0, issueCount: 0 }
+          userSummary[row[0]] = {
+            progress: 0,
+            total: 0,
+            remaining: 0,
+            unestimatedCount: 0,
+            issueCount: 0,
+          }
         }
         userSummary[row[0]].progress += row[4]
         userSummary[row[0]].total += row[5]
         userSummary[row[0]].remaining += row[7]
 
-        if (row[5] == 0) { userSummary[row[0]].unestimatedCount += 1 }
+        if (row[5] == 0) {
+          userSummary[row[0]].unestimatedCount += 1
+        }
         userSummary[row[0]].issueCount += 1
       })
 
       res.writeHead(200, { 'Content-Type': 'text/html' })
       res.write(buildHtmlHeader(title, false))
       res.write(buildPageHeader(title, release))
-      res.write(`<div><em>Code Freeze Date</em> ${config.reports.codeFreeze}</div>`)
-      res.write(`<div><em>Stories with Sub-Tasks</em> are ${config.has('workInSubtasksOnly') && config.workInSubtasksOnly ? '<strong>not</strong>': ''} shown/included</div>`)
-      res.write(`<div><small class="text-muted">Cache date: ${results.meta.cacheDate} (Expires in ${((results.meta.cacheTTL - new Date().getTime())/1000/60).toFixed(2)} minutes)</small></div>`)
+      res.write(
+        `<div><em>Code Freeze Date</em> ${config.reports.codeFreeze}</div>`
+      )
+      res.write(
+        `<div><em>Stories with Sub-Tasks</em> are ${
+          config.has('workInSubtasksOnly') && config.workInSubtasksOnly
+            ? '<strong>not</strong>'
+            : ''
+        } shown/included</div>`
+      )
+      res.write(
+        `<div><small class="text-muted">Cache date: ${
+          results.meta.cacheDate
+        } (Expires in ${(
+          (results.meta.cacheTTL - new Date().getTime()) /
+          1000 /
+          60
+        ).toFixed(2)} minutes)</small></div>`
+      )
       res.write(`<h3>Summary</h3>`)
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'>
         <thead>
         <tr>
-          <th>${
-            [
-              'User', 
-              'Progress', 
-              'Total', 
-              'Remaining', 
-              '% Unestimated', 
-              'Finish Date', 
-              'Timespan'
-            ].join('</th><th>')
-          }</th>
+          <th>${[
+            'User',
+            'Progress',
+            'Total',
+            'Remaining',
+            '% Unestimated',
+            'Finish Date',
+            'Timespan',
+          ].join('</th><th>')}</th>
         </tr>
         </thead>
         <tbody>`)
       let sortedUserData = []
-      if (req.query.sort && req.query.sort == "name") {
+      if (req.query.sort && req.query.sort == 'name') {
         debug(`... sorted by name (ascending)`)
-        sortedUserData = Object.keys(userSummary).sort((a,b) => {
-          return a.toUpperCase() < b.toUpperCase() 
-            ?
-            -1
-            :
-            a.toUpperCase() > b.toUpperCase()
-            ?
-            1
-            :
-            0 // Equal
+        sortedUserData = Object.keys(userSummary).sort((a, b) => {
+          return a.toUpperCase() < b.toUpperCase()
+            ? -1
+            : a.toUpperCase() > b.toUpperCase()
+            ? 1
+            : 0 // Equal
         })
       } else {
         debug(`... sorted by remaining work (descending)`)
-        sortedUserData = Object.keys(userSummary).sort((a,b) => {
-          return userSummary[b].remaining - userSummary[a].remaining 
+        sortedUserData = Object.keys(userSummary).sort((a, b) => {
+          return userSummary[b].remaining - userSummary[a].remaining
         })
       }
 
       const codeFreezeDate = new Date(config.reports.codeFreeze)
 
-      sortedUserData
-      .forEach(async (user) => {
+      sortedUserData.forEach(async (user) => {
         res.write(`<tr>
-          <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=project="${results.config.project}"%20AND%20assignee${user == UNASSIGNED_USER ? ` is empty` : `="${user}"`}%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(',')})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(',')})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(',')}")' target='_blank'>${user}</a></td>
+          <td><a href='${config.jira.protocol}://${
+          config.jira.host
+        }/issues/?jql=project="${results.config.project}"%20AND%20assignee${
+          user == UNASSIGNED_USER ? ` is empty` : `="${user}"`
+        }%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(
+          ','
+        )})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(
+          ','
+        )})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(
+          ','
+        )}")' target='_blank'>${user}</a></td>
           <td class="text-center">${userSummary[user].progress.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].total.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].remaining.toFixed(2)}</td>
-          <td class="text-center" data-toggle="tooltip" data-html="true" title="${userSummary[user].unestimatedCount} of ${userSummary[user].issueCount} total">${userSummary[user].issueCount > 0 ? (100*(userSummary[user].unestimatedCount/userSummary[user].issueCount)).toFixed(0) : 0 }%
+          <td class="text-center" data-toggle="tooltip" data-html="true" title="${
+            userSummary[user].unestimatedCount
+          } of ${userSummary[user].issueCount} total">${
+          userSummary[user].issueCount > 0
+            ? (
+                100 *
+                (userSummary[user].unestimatedCount /
+                  userSummary[user].issueCount)
+              ).toFixed(0)
+            : 0
+        }%
           <!-- unestimated blocks -->`)
-          if (userSummary[user].unestimatedCount > 0) {
-            for (let i = 0; i < userSummary[user].unestimatedCount; i++) {
-              res.write(`<span style="vertical-align: middle; height: 10px; width: 10px; background-color: red; padding: 0px 4px 0px 0px; margin: 2px;"></span>`)
-            }
+        if (userSummary[user].unestimatedCount > 0) {
+          for (let i = 0; i < userSummary[user].unestimatedCount; i++) {
+            res.write(
+              `<span style="vertical-align: middle; height: 10px; width: 10px; background-color: red; padding: 0px 4px 0px 0px; margin: 2px;"></span>`
+            )
           }
-          res.write(`</td>
-          <td class="text-center">${calcFutureDate(userSummary[user].remaining.toFixed(2))}</td>
-          <td style="vertical-align: middle;"><div style="height: 20px; width: ${userSummary[user].remaining.toFixed(2)*2}px; background-color: ${ getBarColor(new Date().addBusinessDays(userSummary[user].remaining), codeFreezeDate) };"></div></td>
+        }
+        res.write(`</td>
+          <td class="text-center">${calcFutureDate(
+            userSummary[user].remaining.toFixed(2)
+          )}</td>
+          <td style="vertical-align: middle;"><div style="height: 20px; width: ${
+            userSummary[user].remaining.toFixed(2) * 2
+          }px; background-color: ${getBarColor(
+          new Date().addBusinessDays(userSummary[user].remaining),
+          codeFreezeDate
+        )};"></div></td>
           </tr>`)
       })
       res.write(`</tbody></table>`)
 
       res.write(`<h3>Item Detail</h3>`)
-      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${results.data && results.data.headers ? results.data.headers.join('</th><th>') : ''}</th></tr></thead><tbody>`)
+      res.write(
+        `<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${
+          results.data && results.data.headers
+            ? results.data.headers.join('</th><th>')
+            : ''
+        }</th></tr></thead><tbody>`
+      )
       res.write(detailTable.join(''))
       res.write(`</tbody></table>`)
       res.write(buildHtmlFooter())
       res.end()
     })
-  } else { // Invalid release
+  } else {
+    // Invalid release
     debug(`Invalid release provided: ${req.params.release}`)
     res.write('Invalid release provided')
     res.end()
@@ -420,17 +500,23 @@ function startHtml(res) {
 }
 
 function buildHtmlHeader(title = '', showButtons = true, excludeHome = false) {
-  let buttons = [`<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>`, `<button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>`, `<button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`]
+  let buttons = [
+    `<button id='toggleCharts' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Charts</button>`,
+    `<button id='toggleButton' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Names</button>`,
+    `<button id='toggleLegend' type='button' class='btn btn-outline-primary btn-sm float-right'>Toggle Legend</button>`,
+  ]
 
   if (typeof showButtons === 'boolean') {
     if (!showButtons) {
       buttons = []
       debug('emptying showButtons')
     }
-  } else if (typeof showButtons === 'number') { // Single button to show
+  } else if (typeof showButtons === 'number') {
+    // Single button to show
     debug(`showButtons[${showButtons}] set`)
     buttons = [buttons[showButtons]]
-  } else if (typeof showButtons === 'object') { // Array of buttons to show
+  } else if (typeof showButtons === 'object') {
+    // Array of buttons to show
     console.error('typeof showButtons === object/array is not yet implemented')
   }
 
@@ -438,9 +524,11 @@ function buildHtmlHeader(title = '', showButtons = true, excludeHome = false) {
   // const bootstrapCss = '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">'
 
   // Bootstrap 4.5.2
-  const bootstrapCss = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css" integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">'
+  const bootstrapCss =
+    '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css" integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">'
 
-  const jqueryJs = '<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>'
+  const jqueryJs =
+    '<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>'
 
   return `<!doctype html><html lang="en"><head><title>${title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -527,7 +615,7 @@ function buildStylesheet() {
  * @returns string
  */
 function buildHomeButton() {
-  return(simpleButton('Home','/',true,'sm',false,'right'))
+  return simpleButton('Home', '/', true, 'sm', false, 'right')
 }
 
 function buildButtonJs() {
@@ -564,7 +652,7 @@ function buildHtmlFooter() {
   // </script>`)
 
   // Bootstrap 4.5
-   return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+  return `<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js" integrity="sha384-+YQ4JLhjyBLPDQt//I+STsc9iw4uQqACwlvpslubQzn4u2UU2UFM80nGisd026JF" crossorigin="anonymous"></script>
    <script>
    $(function () {
@@ -663,16 +751,26 @@ function updateStats(stats, issueType, issueStatusName) {
  * @param {string} [onClickEvent=''] Javascript to run on click
  * @returns HTML string - either <a> or <button> depending on the target value
  */
-function simpleButton(label, link = false, active = true, size = 'sm', extraClasses = '', float = '', onClickEvent = false) {
+function simpleButton(
+  label,
+  link = false,
+  active = true,
+  size = 'sm',
+  extraClasses = '',
+  float = '',
+  onClickEvent = false
+) {
   // <button type="button" class="btn btn-secondary .disabled" disabled aria-disabled="true">${c}</button>
   let onclick = onClickEvent ? ` onClick="${onClickEvent}"` : ''
-  let classes = `btn ${size ? `btn-${size}` : ''} ${float ? `float-${float}` : ''} btn-link ${extraClasses} ${active ? '' : '.disabled'}`
+  let classes = `btn ${size ? `btn-${size}` : ''} ${
+    float ? `float-${float}` : ''
+  } btn-link ${extraClasses} ${active ? '' : '.disabled'}`
   let disabled = active ? '' : 'disabled aria-disabled="true"'
 
   if (link) {
-    return(`<a href='${link}' class='${classes}' ${disabled} ${onclick}>${label}</a>`)
+    return `<a href='${link}' class='${classes}' ${disabled} ${onclick}>${label}</a>`
   } else {
-    return(`<button type='button' class='${classes}' ${disabled} ${onclick}>${label}</button>`)
+    return `<button type='button' class='${classes}' ${disabled} ${onclick}>${label}</button>`
   }
 }
 
@@ -684,9 +782,20 @@ function simpleButton(label, link = false, active = true, size = 'sm', extraClas
  */
 async function getEpicEstimates(epicKey) {
   if (!cache.has(`epicEstimate-${epicKey}`)) {
-    const fields = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking']
+    const fields = [
+      'summary',
+      'assignee',
+      'customfield_10008',
+      'aggregateprogress',
+      'progress',
+      'timetracking',
+    ]
     // Query for stories by parent epic
-    const result = await jsr._genericJiraSearch(`'Epic Link' in (${epicKey}) AND status not in (Done,Dead) and issuetype=story`, 99, fields)
+    const result = await jsr._genericJiraSearch(
+      `'Epic Link' in (${epicKey}) AND status not in (Done,Dead) and issuetype=story`,
+      99,
+      fields
+    )
     const storyData = []
     let progress = 0
     let total = 0
@@ -695,14 +804,20 @@ async function getEpicEstimates(epicKey) {
       total += issue.fields.aggregateprogress.total
       storyData.push({
         key: `${issue.key} ${issue.fields.summary}`,
-        assignee: issue.fields.assignee ? issue.fields.assignee.displayName : '',
+        assignee: issue.fields.assignee
+          ? issue.fields.assignee.displayName
+          : '',
         progress: issue.fields.aggregateprogress.progress,
-        total: issue.fields.aggregateprogress.total
+        total: issue.fields.aggregateprogress.total,
       })
-      cache.set(`epicEstimate-${epicKey}`, { progress: progress, total: total, details: storyData })
+      cache.set(`epicEstimate-${epicKey}`, {
+        progress: progress,
+        total: total,
+        details: storyData,
+      })
     })
   }
-  return (cache.get(`epicEstimate-${epicKey}`))
+  return cache.get(`epicEstimate-${epicKey}`)
 }
 
 /**
@@ -718,7 +833,7 @@ async function getVersions(flushCache = false) {
     cache.set('versions', await jsr.get(`project/${config.project}/versions`))
   }
   debug(`... returning from cache...`)
-  return(cache.get('versions'))
+  return cache.get('versions')
 }
 
 /**
@@ -730,18 +845,29 @@ async function getVersions(flushCache = false) {
  * @returns Object containing summary stats
  */
 function compileVersionDetails(issues, versionId, storyOnly = false) {
-  const versionDetails = { components: [], issues: issues, componentEstimates: {} }
+  const versionDetails = {
+    components: [],
+    issues: issues,
+    componentEstimates: {},
+  }
   const components = [NONE]
-  let componentEstimates = { 
-    'none': {
-      count: { Epic: 0, Story: 0, 'Sub-task': 0, Bug: 0, Task: 0, Requirement: 0 },
+  let componentEstimates = {
+    none: {
+      count: {
+        Epic: 0,
+        Story: 0,
+        'Sub-task': 0,
+        Bug: 0,
+        Task: 0,
+        Requirement: 0,
+      },
       progress: 0,
       total: 0,
       percent: 0,
-      timeoriginalestimate: 0, 
-      assignees: {}, 
-      issues: [] 
-    }
+      timeoriginalestimate: 0,
+      assignees: {},
+      issues: [],
+    },
   }
 
   if (!cache.has(`versionDetails-${versionId}`)) {
@@ -749,16 +875,32 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
       // Store components
       if (issue.fields.components && issue.fields.components.length > 0) {
         // debug(issue.fields.components.length)
-        let issueComponents = issue.fields.components.map(x => x.name)
+        let issueComponents = issue.fields.components.map((x) => x.name)
         issueComponents.forEach((c) => {
-          if (!components.includes(c)) { 
+          if (!components.includes(c)) {
             components.push(c)
-            componentEstimates[c] = { count: { Epic: 0, Story: 0, 'Sub-task': 0, Bug: 0, Task: 0, Requirement: 0 }, progress: 0, total: 0, percent: 0, timeoriginalestimate: 0, assignees: {}, issues: [] }
+            componentEstimates[c] = {
+              count: {
+                Epic: 0,
+                Story: 0,
+                'Sub-task': 0,
+                Bug: 0,
+                Task: 0,
+                Requirement: 0,
+              },
+              progress: 0,
+              total: 0,
+              percent: 0,
+              timeoriginalestimate: 0,
+              assignees: {},
+              issues: [],
+            }
           }
           // Update component estimates
           componentEstimates[c].progress += issue.fields.progress.progress
           componentEstimates[c].total += issue.fields.progress.total
-          componentEstimates[c].timeoriginalestimate += issue.fields.timeoriginalestimate
+          componentEstimates[c].timeoriginalestimate +=
+            issue.fields.timeoriginalestimate
           componentEstimates[c].count[issue.fields.issuetype.name]++
           let assignee
           if (issue.fields.assignee) {
@@ -767,29 +909,39 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
             assignee = NONE
             // debug(`assignee set to ${assignee}`)
           }
-          if (!Object.keys(componentEstimates[c].assignees).includes(assignee)) {
+          if (
+            !Object.keys(componentEstimates[c].assignees).includes(assignee)
+          ) {
             componentEstimates[c].assignees[assignee] = {
               Epic: { progress: 0, total: 0, count: 0 },
               Story: { progress: 0, total: 0, count: 0 },
               'Sub-task': { progress: 0, total: 0, count: 0 },
               Bug: { progress: 0, total: 0, count: 0 },
               Task: { progress: 0, total: 0, count: 0 },
-              Requirement: { progress: 0, total: 0, count: 0 }
+              Requirement: { progress: 0, total: 0, count: 0 },
             }
           }
-          
+
           // debug(c, assignee, issue.fields.issuetype.name, issue.fields.progress.progress)
           // TODO: Check that issue.fields.progress is defined
-          componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
-          componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
-          componentEstimates[c].assignees[assignee][issue.fields.issuetype.name].count += 1
+          componentEstimates[c].assignees[assignee][
+            issue.fields.issuetype.name
+          ].progress += issue.fields.progress.progress
+          componentEstimates[c].assignees[assignee][
+            issue.fields.issuetype.name
+          ].total += issue.fields.progress.total
+          componentEstimates[c].assignees[assignee][
+            issue.fields.issuetype.name
+          ].count += 1
           componentEstimates[c].count[issue.fields.issuetype.name] += 1
         })
-      } else {            // No component set, so record this to 'none'
+      } else {
+        // No component set, so record this to 'none'
         // debug(`${issue.key} NONE: `, issue.fields.progress.progress, issue.fields.progress.total)
         componentEstimates[NONE].progress += issue.fields.progress.progress
         componentEstimates[NONE].total += issue.fields.progress.total
-        componentEstimates[NONE].timeoriginalestimate += issue.fields.timeoriginalestimate
+        componentEstimates[NONE].timeoriginalestimate +=
+          issue.fields.timeoriginalestimate
 
         let assignee
         if (issue.fields.assignee) {
@@ -799,19 +951,27 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
           // debug(`assignee set to ${assignee}`)
         }
         // debug(`componentEstimates[${NONE}]: `, componentEstimates.NONE)
-        if (!Object.keys(componentEstimates[NONE].assignees).includes(assignee)) {
+        if (
+          !Object.keys(componentEstimates[NONE].assignees).includes(assignee)
+        ) {
           componentEstimates[NONE].assignees[assignee] = {
             Epic: { progress: 0, total: 0, count: 0 },
             Story: { progress: 0, total: 0, count: 0 },
             'Sub-task': { progress: 0, total: 0, count: 0 },
             Bug: { progress: 0, total: 0, count: 0 },
             Task: { progress: 0, total: 0, count: 0 },
-            Requirement: { progress: 0, total: 0, count: 0 }
+            Requirement: { progress: 0, total: 0, count: 0 },
           }
         }
-        componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].progress += issue.fields.progress.progress
-        componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].total += issue.fields.progress.total
-        componentEstimates[NONE].assignees[assignee][issue.fields.issuetype.name].count += 1
+        componentEstimates[NONE].assignees[assignee][
+          issue.fields.issuetype.name
+        ].progress += issue.fields.progress.progress
+        componentEstimates[NONE].assignees[assignee][
+          issue.fields.issuetype.name
+        ].total += issue.fields.progress.total
+        componentEstimates[NONE].assignees[assignee][
+          issue.fields.issuetype.name
+        ].count += 1
         componentEstimates[NONE].count[issue.fields.issuetype.name] += 1
       }
     })
@@ -823,7 +983,7 @@ function compileVersionDetails(issues, versionId, storyOnly = false) {
     return versionDetails
   } else {
     debug(`...returning versionDetails-${versionId} cached value`)
-    return(cache.get(`versionDetails-${versionId}`))
+    return cache.get(`versionDetails-${versionId}`)
   }
 }
 
@@ -841,9 +1001,12 @@ function compileUserDetails(issues) {
       /*
        * Include if there is no exclusion list in the config file
        * OR
-       * the issue Status is not in exclusion list 
+       * the issue Status is not in exclusion list
        */
-      if (!config.has('excludeFromEstimateQueries') || (!config.get('excludeFromEstimateQueries').includes(issue.status.name))) {
+      if (
+        !config.has('excludeFromEstimateQueries') ||
+        !config.get('excludeFromEstimateQueries').includes(issue.status.name)
+      ) {
         let assignee = 'none' // Default in case there isn't a valid Assignee
         if (issue.fields.assignee && issue.fields.assignee.displayName) {
           assignee = issue.fields.assignee.displayName
@@ -854,23 +1017,29 @@ function compileUserDetails(issues) {
         }
 
         // TODO: Handle multiple fixVersion values (without double-counting?)
-        let release = issue.fields.fixVersions.length ? issue.fields.fixVersions[0].name : 'none'
+        let release = issue.fields.fixVersions.length
+          ? issue.fields.fixVersions[0].name
+          : 'none'
 
         // Assume that if the release isn't in the remainingEstimateTotal, it isn't in openIssues either
-        if (!Object.keys(userDetails[assignee].remainingEstimateTotal).includes(release)) {
+        if (
+          !Object.keys(userDetails[assignee].remainingEstimateTotal).includes(
+            release
+          )
+        ) {
           userDetails[assignee].remainingEstimateTotal[release] = 0
           userDetails[assignee].openIssues[release] = []
         }
 
-        userDetails[assignee].remainingEstimateTotal[release] += issue.fields.progress.total - issue.fields.progress.progress
+        userDetails[assignee].remainingEstimateTotal[release] +=
+          issue.fields.progress.total - issue.fields.progress.progress
         userDetails[assignee].openIssues[release].push(issue.fields.key)
       }
     })
     cache.set(`userDetails`, userDetails)
-
   } else {
     debug(`...returning userDetails cached value`)
-    return(cache.get(`userDetails`))
+    return cache.get(`userDetails`)
   }
 }
 
@@ -883,7 +1052,9 @@ function compileUserDetails(issues) {
 function calcFutureDate(dplus) {
   const d = new Date()
   const dFuture = d.addBusinessDays(Math.round(dplus), true)
-  return (`${dFuture.getMonth() + 1}/${dFuture.getDate()}/${dFuture.getFullYear()}`)
+  return `${
+    dFuture.getMonth() + 1
+  }/${dFuture.getDate()}/${dFuture.getFullYear()}`
 }
 
 /**
@@ -909,12 +1080,15 @@ function buildLink(
 ) {
   const title = `${issueKey}: ${issueSummary} (${issueOwner}; ${issueStatus})`
   const displayTitle = hideName ? '' : title
-  return `<span class='${hideName ? '' : 'issueComboLink lineicon'}'><a href='${config.get('jira.protocol')}://${config.get('jira.host')
-    }/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
-      statusName
-    )}' src='${issueTypeIconUrl}' title='${cleanText(
-      title
-    )}')/><span class='${hideName ? '' : 'issueName'}'/>${displayTitle}</span></a></span>`
+  return `<span class='${
+    hideName ? '' : 'issueComboLink lineicon'
+  }'><a href='${config.get('jira.protocol')}://${config.get(
+    'jira.host'
+  )}/browse/${issueKey}' target='_blank'><img class='icon ${JiraStatus.formatCssClassName(
+    statusName
+  )}' src='${issueTypeIconUrl}' title='${cleanText(title)}')/><span class='${
+    hideName ? '' : 'issueName'
+  }'/>${displayTitle}</span></a></span>`
 }
 
 /**
@@ -927,7 +1101,14 @@ async function getRequirements() {
   debug('getRequirements() called')
   if (!cache.has('requirements')) {
     debug('...fetching from Jira')
-    cache.set('requirements', await jsr._genericJiraSearch(`issuetype=requirement and project=${config.project} order by key`, 99), 3600)
+    cache.set(
+      'requirements',
+      await jsr._genericJiraSearch(
+        `issuetype=requirement and project=${config.project} order by key`,
+        99
+      ),
+      3600
+    )
   } else {
     debug('...fetching from cache')
   }
@@ -944,7 +1125,7 @@ async function getGroups(flushCache) {
   if (!cache.has('groups') || (flushCache && flushCache == 'yes')) {
     cache.set('groups', await jsr.get('/groups/picker?maxResults=50'))
   }
-  return(cache.get('groups'))
+  return cache.get('groups')
 }
 
 /**
@@ -957,7 +1138,9 @@ async function getSmallGroups(flushCache = false) {
   if (!cache.has('smallGroups') || (flushCache && flushCache == 'yes')) {
     const groups = await getGroups(false)
     debug('getSmallGroups.length == ', groups.groups.length)
-    const smallGroups = groups.groups.filter(g => config.userGroups.includes(g.name))
+    const smallGroups = groups.groups.filter((g) =>
+      config.userGroups.includes(g.name)
+    )
     for (let gi = 0; gi < smallGroups.length; gi++) {
       const gname = smallGroups[gi].name
       smallGroups[gi].members = await getGroupMembers(gname)
@@ -980,13 +1163,19 @@ async function getGroupMembers(groupName) {
     const mbrs = await jsr.get(`/group/member?groupname=${groupName}`)
     if (config.has('userExclude')) {
       // Exclude specific users
-      groupMembers = mbrs.values.map((v) => { return v.displayName }).filter(x => !config.userExclude.includes(x))
+      groupMembers = mbrs.values
+        .map((v) => {
+          return v.displayName
+        })
+        .filter((x) => !config.userExclude.includes(x))
     } else {
-      groupMembers = mbrs.values.map((v) => { return v.displayName })
+      groupMembers = mbrs.values.map((v) => {
+        return v.displayName
+      })
     }
     cache.set(`groupMembers-${groupName}`, groupMembers)
   }
-  return(cache.get(`groupMembers-${groupName}`))
+  return cache.get(`groupMembers-${groupName}`)
 }
 
 /**
@@ -1000,14 +1189,29 @@ async function getChildren(parentId) {
   try {
     if (!cache.has(`children-${parentId}`)) {
       debug('...fetching from Jira')
-      cache.set(`children-${parentId}`, await jsr._genericJiraSearch(`parentEpic=${parentId} and key != ${parentId} ORDER BY key asc`, 99, ['summary', 'status', 'assignee', 'labels', 'fixVersions', 'issuetype', 'issuelinks']))
+      cache.set(
+        `children-${parentId}`,
+        await jsr._genericJiraSearch(
+          `parentEpic=${parentId} and key != ${parentId} ORDER BY key asc`,
+          99,
+          [
+            'summary',
+            'status',
+            'assignee',
+            'labels',
+            'fixVersions',
+            'issuetype',
+            'issuelinks',
+          ]
+        )
+      )
     } else {
       debug('...fetching from cache')
     }
-    return (cache.get(`children-${parentId}`))
+    return cache.get(`children-${parentId}`)
   } catch (err) {
     debug(`getChildren(${parentId}) error: `, err)
-    return (null)
+    return null
   }
 }
 
@@ -1057,8 +1261,11 @@ server.get('/cache/flush', async (req, res, next) => {
 server.get('/progress/:rel', async (req, res, next) => {
   let rel = req.params.rel || false
 
-  debug(`rel: ${rel}
-  query: `, req.query.exclude)
+  debug(
+    `rel: ${rel}
+  query: `,
+    req.query.exclude
+  )
 
   if (rel) {
     let typesExcluded = []
@@ -1072,22 +1279,30 @@ server.get('/progress/:rel', async (req, res, next) => {
 
       const versions = await getVersions(false)
       let version = versions.filter((v) => v.id == rel)[0]
-      if (!version) { // Try to get release by name
+      if (!version) {
+        // Try to get release by name
         version = versions.filter((v) => v.name == rel)[0]
       }
 
-      if (!version) { // Can't figure out the version, so croak
-        throw new Error('Invalid release version provided. Please check the value and try again. (Either the numeric value or the string name are valid values.)')
+      if (!version) {
+        // Can't figure out the version, so croak
+        throw new Error(
+          'Invalid release version provided. Please check the value and try again. (Either the numeric value or the string name are valid values.)'
+        )
       } else {
         // Convert the rel value to the numeric version id
         rel = version.id
       }
-      
+
       res.write(`<h2>${version.name}</h2>`)
       res.write(`<h3>Release Date: ${version.releaseDate}</h2>`)
-      
-      const versionRelatedIssues = await jsr.get(`version/${rel}/relatedIssueCounts`)
-      const versionUnresolvedIssues = await jsr.get(`version/${rel}/unresolvedIssueCount`)
+
+      const versionRelatedIssues = await jsr.get(
+        `version/${rel}/relatedIssueCounts`
+      )
+      const versionUnresolvedIssues = await jsr.get(
+        `version/${rel}/unresolvedIssueCount`
+      )
 
       // debug(`versionRelatedIssues: `, versionRelatedIssues)
       // debug(`versionUnresolvedIssues: `, versionUnresolvedIssues)
@@ -1098,32 +1313,53 @@ server.get('/progress/:rel', async (req, res, next) => {
         const jql = `project=${config.project} AND fixVersion=${rel} `
 
         // Exclude any types?
-        if ((config.releaseExcludeTypes && config.releaseExcludeTypes.length) || req.query.exclude) {
+        if (
+          (config.releaseExcludeTypes && config.releaseExcludeTypes.length) ||
+          req.query.exclude
+        ) {
           debug(`req.query.exclude: ${req.query.exclude}
           config.releaseExcludeTypes: ${config.releaseExcludeTypes}`)
           if (req.query.exclude) {
-            debug(`req.query.exclude: adding ${typeof req.query.exclude} ${req.query.exclude} to typesExcluded[]`)
+            debug(
+              `req.query.exclude: adding ${typeof req.query.exclude} ${
+                req.query.exclude
+              } to typesExcluded[]`
+            )
             if (typeof req.query.exclude == 'string') {
-              typesExcluded.push(req.query.exclude) 
-            } else { // Assume array/object
-              typesExcluded = typesExcluded.concat(req.query.exclude) 
+              typesExcluded.push(req.query.exclude)
+            } else {
+              // Assume array/object
+              typesExcluded = typesExcluded.concat(req.query.exclude)
             }
           }
 
           if (config.releaseExcludeTypes) {
-            debug(`config.releaseExcludedTypes: adding ${config.releaseExcludeTypes.length} ${typeof config.releaseExcludeTypes} ${config.releaseExcludeTypes} to typesExcluded[]`)
+            debug(
+              `config.releaseExcludedTypes: adding ${
+                config.releaseExcludeTypes.length
+              } ${typeof config.releaseExcludeTypes} ${
+                config.releaseExcludeTypes
+              } to typesExcluded[]`
+            )
             typesExcluded = typesExcluded.concat(config.releaseExcludeTypes)
           }
 
           debug(`typesExcluded: `, typesExcluded)
-          
+
           jql_suffix += ` and issuetype not in ("${typesExcluded.join('","')}")`
         }
         debug(`jql: ${jql}${jql_suffix}`)
 
-        versionIssues = await jsr._genericJiraSearch(jql + jql_suffix, 99, ['summary', 'issuetype', 'assignee', 'components', 'aggregateprogress', 'progress', 'timeoriginalestimate'])
+        versionIssues = await jsr._genericJiraSearch(jql + jql_suffix, 99, [
+          'summary',
+          'issuetype',
+          'assignee',
+          'components',
+          'aggregateprogress',
+          'progress',
+          'timeoriginalestimate',
+        ])
         cache.set(`versionIssues-${rel}`, versionIssues)
-
       } else {
         versionIssues = cache.get(`versionIssues-${rel}`)
       }
@@ -1135,7 +1371,14 @@ server.get('/progress/:rel', async (req, res, next) => {
         <li>Unresolved Issues: ${versionUnresolvedIssues.issuesUnresolvedCount}</li>
         </ul>`)
       let versionDetails = compileVersionDetails(versionIssues.issues, rel)
-      const COLUMNS = ['Component', 'Count', 'Completed', 'Remaining', '%/Finish', 'Original Est.']
+      const COLUMNS = [
+        'Component',
+        'Count',
+        'Completed',
+        'Remaining',
+        '%/Finish',
+        'Original Est.',
+      ]
 
       if (typesExcluded.length) {
         res.write(`<em>Excluding: ${typesExcluded.join(', ')}</em>`)
@@ -1158,74 +1401,147 @@ server.get('/progress/:rel', async (req, res, next) => {
       // `)
 
       // Start main table
-      res.write(`<table style='width: auto !important;' class='table table-sm'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+      res.write(
+        `<table style='width: auto !important;' class='table table-sm'><thead><tr><th>${COLUMNS.join(
+          '</th><th>'
+        )}</th></tr></thead><tbody>`
+      )
 
-      Object.keys(versionDetails.componentEstimates).sort().forEach((component) => {
-        // Component row
-        res.write(`<tr class='table-active'>
+      Object.keys(versionDetails.componentEstimates)
+        .sort()
+        .forEach((component) => {
+          // Component row
+          res.write(`<tr class='table-active'>
           <td>${component}</td>
           <td></td>
-          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].progress)}</td>
-          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].total)}</td>
-          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].percent)}</td>
-          <td class='summCell'>${convertSecondsToDays(versionDetails.componentEstimates[component].timeoriginalestimate)}</td>
+          <td class='summCell'>${convertSecondsToDays(
+            versionDetails.componentEstimates[component].progress
+          )}</td>
+          <td class='summCell'>${convertSecondsToDays(
+            versionDetails.componentEstimates[component].total
+          )}</td>
+          <td class='summCell'>${convertSecondsToDays(
+            versionDetails.componentEstimates[component].percent
+          )}</td>
+          <td class='summCell'>${convertSecondsToDays(
+            versionDetails.componentEstimates[component].timeoriginalestimate
+          )}</td>
           </tr>`)
 
-        // Assignee details/progress
-        if (versionDetails.componentEstimates[component].assignees) {
-          // debug(`assignees: `, versionDetails.componentEstimates[component].assignees)
-          Object.keys(versionDetails.componentEstimates[component].assignees).sort().forEach((assignee) => {
-            let resp = ''   // HTML response for rest of user's data
-            let prog   = 0  // Temp holder for progress
-            let tot    = 0  // Temp holder for total
-            let remain = 0  // Temp holder for remaining work
+          // Assignee details/progress
+          if (versionDetails.componentEstimates[component].assignees) {
+            // debug(`assignees: `, versionDetails.componentEstimates[component].assignees)
+            Object.keys(versionDetails.componentEstimates[component].assignees)
+              .sort()
+              .forEach((assignee) => {
+                let resp = '' // HTML response for rest of user's data
+                let prog = 0 // Temp holder for progress
+                let tot = 0 // Temp holder for total
+                let remain = 0 // Temp holder for remaining work
 
-            let progTooltip = `<em><b>Issue Stats for ${assignee}:</b></em><ul>`
-            let progTooltipLen = 0
-            let totalIssueCount = 0
+                let progTooltip = `<em><b>Issue Stats for ${assignee}:</b></em><ul>`
+                let progTooltipLen = 0
+                let totalIssueCount = 0
 
-            Object.keys(versionDetails.componentEstimates[component].assignees[assignee]).forEach((type) => {
-              
-              if (!Object.keys(prevUserRemainSum).includes(assignee)) {
-                prevUserRemainSum[assignee] = { remaining: 0, openItems: [] }
-              }
+                Object.keys(
+                  versionDetails.componentEstimates[component].assignees[
+                    assignee
+                  ]
+                ).forEach((type) => {
+                  if (!Object.keys(prevUserRemainSum).includes(assignee)) {
+                    prevUserRemainSum[assignee] = {
+                      remaining: 0,
+                      openItems: [],
+                    }
+                  }
 
-              prog += versionDetails.componentEstimates[component].assignees[assignee][type].progress
-              tot += versionDetails.componentEstimates[component].assignees[assignee][type].total
-              remain += versionDetails.componentEstimates[component].assignees[assignee][type].total - versionDetails.componentEstimates[component].assignees[assignee][type].progress
+                  prog +=
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].progress
+                  tot +=
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].total
+                  remain +=
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].total -
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].progress
 
-              // Update the remaining estimate for this user
-              prevUserRemainSum[assignee].remaining += versionDetails.componentEstimates[component].assignees[assignee][type].total - versionDetails.componentEstimates[component].assignees[assignee][type].progress
+                  // Update the remaining estimate for this user
+                  prevUserRemainSum[assignee].remaining +=
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].total -
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].progress
 
-              totalIssueCount += versionDetails.componentEstimates[component].assignees[assignee][type].count
+                  totalIssueCount +=
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].count
 
-              // If this component/user/type has any items, update the tooltip content
-              if (versionDetails.componentEstimates[component].assignees[assignee][type].count) {
-                progTooltip += `<li><em>${type}</em>: Count: ${versionDetails.componentEstimates[component].assignees[assignee][type].count}; Completed: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].progress)}d; Total: ${convertSecondsToDays(versionDetails.componentEstimates[component].assignees[assignee][type].total)}d</li>`
-                progTooltipLen++
-              }
-            })
-            
-            if (progTooltipLen > 0) {
-              progTooltip += '' // '</ul>'
-            } else {
-              progTooltip = ''
-            }
+                  // If this component/user/type has any items, update the tooltip content
+                  if (
+                    versionDetails.componentEstimates[component].assignees[
+                      assignee
+                    ][type].count
+                  ) {
+                    progTooltip += `<li><em>${type}</em>: Count: ${
+                      versionDetails.componentEstimates[component].assignees[
+                        assignee
+                      ][type].count
+                    }; Completed: ${convertSecondsToDays(
+                      versionDetails.componentEstimates[component].assignees[
+                        assignee
+                      ][type].progress
+                    )}d; Total: ${convertSecondsToDays(
+                      versionDetails.componentEstimates[component].assignees[
+                        assignee
+                      ][type].total
+                    )}d</li>`
+                    progTooltipLen++
+                  }
+                })
 
-            // User row
-            res.write(`<tr>
-              <td class='smright' data-toggle="tooltip" data-html="true" title="${progTooltip}"><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${assignee == NONE ? ' is empty' : '="' + assignee + '"'}%20AND%20component${component == NONE ? ' is empty' : '="' + component + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
+                if (progTooltipLen > 0) {
+                  progTooltip += '' // '</ul>'
+                } else {
+                  progTooltip = ''
+                }
+
+                // User row
+                res.write(`<tr>
+              <td class='smright' data-toggle="tooltip" data-html="true" title="${progTooltip}"><a href='${
+                  config.jira.protocol
+                }://${config.jira.host}/issues/?jql=assignee${
+                  assignee == NONE ? ' is empty' : '="' + assignee + '"'
+                }%20AND%20component${
+                  component == NONE ? ' is empty' : '="' + component + '"'
+                }%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${assignee}</a></td>
               <td class='smcenter'>${totalIssueCount}</td>
               <td class='smcenter'>${convertSecondsToDays(prog)}</td>
               <td class='smcenter'>${convertSecondsToDays(remain)}</td>
-              <td class='smcenter'>${tot > 0 ? calcFutureDate(convertSecondsToDays(prevUserRemainSum[assignee].remaining)) : ''}</td>
+              <td class='smcenter'>${
+                tot > 0
+                  ? calcFutureDate(
+                      convertSecondsToDays(
+                        prevUserRemainSum[assignee].remaining
+                      )
+                    )
+                  : ''
+              }</td>
               <td class='smcenter'></td>
               </tr>`)
-          })
-        }
-      })
+              })
+          }
+        })
       res.write('</tbody></table>')
-      
+
       // End Accordion block 1: component-table
       // res.write('</div></div></div>')
 
@@ -1243,19 +1559,35 @@ server.get('/progress/:rel', async (req, res, next) => {
 
       if (Object.keys(prevUserRemainSum).length) {
         res.write('<h2>User Remaining Work Forecast</h2>')
-        res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${['User', 'Remaining Work', 'Finish Date'].join('</th><th>')}</th></tr></thead><tbody>`)
+        res.write(
+          `<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${[
+            'User',
+            'Remaining Work',
+            'Finish Date',
+          ].join('</th><th>')}</th></tr></thead><tbody>`
+        )
         let userData = {}
-        Object.keys(prevUserRemainSum).sort().forEach((user) => {
-          // Save the data
-          let remainingDays = convertSecondsToDays(prevUserRemainSum[user].remaining)
-          userData[user] = remainingDays
+        Object.keys(prevUserRemainSum)
+          .sort()
+          .forEach((user) => {
+            // Save the data
+            let remainingDays = convertSecondsToDays(
+              prevUserRemainSum[user].remaining
+            )
+            userData[user] = remainingDays
 
-          res.write(`<tr>
-          <td><a href='${config.jira.protocol}://${config.jira.host}/issues/?jql=assignee${user == NONE ? ' is empty' : '="' + user + '"'}%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${user}</a></td>
+            res.write(`<tr>
+          <td><a href='${config.jira.protocol}://${
+              config.jira.host
+            }/issues/?jql=assignee${
+              user == NONE ? ' is empty' : '="' + user + '"'
+            }%20AND%20fixversion=${rel} ${jql_suffix}' target='_blank'>${user}</a></td>
           <td>${remainingDays}</td>
-          <td>${calcFutureDate(convertSecondsToDays(prevUserRemainSum[user].remaining))}</td>
+          <td>${calcFutureDate(
+            convertSecondsToDays(prevUserRemainSum[user].remaining)
+          )}</td>
           </tr>`)
-        })
+          })
         res.write(`</tbody></table>`)
         let filename =
           (config.dataPath
@@ -1264,12 +1596,10 @@ server.get('/progress/:rel', async (req, res, next) => {
             ? config.dataDir
             : '.') +
           path.sep +
-          (config.has('reports') && config.reports.has('remainingWorkReport') 
+          (config.has('reports') && config.reports.has('remainingWorkReport')
             ? config.reports.remainingWorkReport
             : 'remainingWorkPerUser') +
-          (config.has('dataFileExt')
-            ? config.dataFileExt
-            : '.json')
+          (config.has('dataFileExt') ? config.dataFileExt : '.json')
         debug(`...writing remaining work per user data to ${filename}`)
         fs.writeFileSync('remainingWorkPerUser.json', JSON.stringify(userData))
       } else {
@@ -1280,8 +1610,6 @@ server.get('/progress/:rel', async (req, res, next) => {
       res.write('</div></div></div>')
       // End Accordion
       res.write('</div>')
-
-
     } catch (err) {
       debug(err)
       res.write(`<em>error</em><!-- ${err} -->`)
@@ -1302,8 +1630,19 @@ server.get('/releases', async (req, res, next) => {
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
 
-      const COLUMNS = ['Name', 'Description', 'Archived', 'Released', 'Release Date', 'User Release Date']
-      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+      const COLUMNS = [
+        'Name',
+        'Description',
+        'Archived',
+        'Released',
+        'Release Date',
+        'User Release Date',
+      ]
+      res.write(
+        `<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join(
+          '</th><th>'
+        )}</th></tr></thead><tbody>`
+      )
       releases.forEach((rel) => {
         res.write(`<tr>
           <td>${rel.name}</td>
@@ -1312,10 +1651,11 @@ server.get('/releases', async (req, res, next) => {
           <td>${rel.released}</td>
           <td>${rel.releaseDate}</td>
           <td>${rel.userReleaseDate}</td>
-          <td><a href='progress/${rel.id}' target='_blank'>Progress Report</a></td>
+          <td><a href='progress/${
+            rel.id
+          }' target='_blank'>Progress Report</a></td>
           </tr>
         `)
-
       })
       res.write(`</tbody></table>`)
       res.write(buildHtmlFooter())
@@ -1350,15 +1690,39 @@ server.get('/estimates', async (req, res, next) => {
   let sort = req.query.sort ? `${req.query.sort}, ` : ''
 
   const pageTitle = 'Estimates Report'
-  const COLUMNS = ['Epic', 'Story', 'Release', 'Assignee', 'Spent', 'Total', '% Done']
-  const FIELDS = ['summary', 'assignee', 'customfield_10008', 'aggregateprogress', 'progress', 'timetracking', 'labels', 'fixVersions']
+  const COLUMNS = [
+    'Epic',
+    'Story',
+    'Release',
+    'Assignee',
+    'Spent',
+    'Total',
+    '% Done',
+  ]
+  const FIELDS = [
+    'summary',
+    'assignee',
+    'customfield_10008',
+    'aggregateprogress',
+    'progress',
+    'timetracking',
+    'labels',
+    'fixVersions',
+  ]
 
   try {
     // Get data
     const epics = {}
     if (!cache.has('epicList')) {
       debug('...epicList: loading from Jira')
-      cache.set('epicList', await jsr._genericJiraSearch(`issuetype=epic and project=${config.project} ${relFilter}`, 99, ['summary', 'assignee']))
+      cache.set(
+        'epicList',
+        await jsr._genericJiraSearch(
+          `issuetype=epic and project=${config.project} ${relFilter}`,
+          99,
+          ['summary', 'assignee']
+        )
+      )
     } else {
       debug('...epicList: loading from cache')
     }
@@ -1368,7 +1732,14 @@ server.get('/estimates', async (req, res, next) => {
 
     if (!cache.has('storyList')) {
       debug('...storyList: loading from Jira')
-      cache.set('storyList', await jsr._genericJiraSearch(`issuetype=story and status not in (dead, done) and project=${config.project} and "Epic Link" is not empty ${relFilter} order by ${sort}"EPIC LINK" ASC, key ASC`, 99, FIELDS))
+      cache.set(
+        'storyList',
+        await jsr._genericJiraSearch(
+          `issuetype=story and status not in (dead, done) and project=${config.project} and "Epic Link" is not empty ${relFilter} order by ${sort}"EPIC LINK" ASC, key ASC`,
+          99,
+          FIELDS
+        )
+      )
     } else {
       debug('...storyList: loading from cache')
     }
@@ -1376,15 +1747,18 @@ server.get('/estimates', async (req, res, next) => {
 
     if (format == 'csv') {
       COLUMNS.pop()
-      let response = COLUMNS.join("\t") + "\n"
+      let response = COLUMNS.join('\t') + '\n'
       storyList.issues.forEach((story) => {
-        response += ([story.fields.customfield_10008 + ' ' + epics[story.fields.customfield_10008],
-        story.key + ' ' + story.fields.summary,
-        story.fields.assignee ? story.fields.assignee.displayName : NONE,
-        story.fields.aggregateprogress.progress,
-        story.fields.aggregateprogress.total
-        ].join("\t"))
-        response += "\n"
+        response += [
+          story.fields.customfield_10008 +
+            ' ' +
+            epics[story.fields.customfield_10008],
+          story.key + ' ' + story.fields.summary,
+          story.fields.assignee ? story.fields.assignee.displayName : NONE,
+          story.fields.aggregateprogress.progress,
+          story.fields.aggregateprogress.total,
+        ].join('\t')
+        response += '\n'
       })
       res.header('Content-Type', 'text/csv')
       res.header('Content-Disposition', 'attachment;filename=export.csv')
@@ -1392,31 +1766,53 @@ server.get('/estimates', async (req, res, next) => {
       return next()
     } else {
       // Assignee stats:
-      let assigneeStats = { 'none': { progress: 0, total: 0, count: [], empty: [], rel: {} } }
+      let assigneeStats = {
+        none: { progress: 0, total: 0, count: [], empty: [], rel: {} },
+      }
 
       res.write(buildHtmlHeader(pageTitle, false))
       res.write(buildPageHeader(pageTitle))
 
       res.write(`<div><a href='?format=csv'>Download as csv</a></div>`)
       // Write table
-      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join('</th><th>')}</th></tr></thead><tbody>`)
+      res.write(
+        `<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${COLUMNS.join(
+          '</th><th>'
+        )}</th></tr></thead><tbody>`
+      )
       storyList.issues.forEach((story) => {
         // debug(`story & labels & fixVersions: `, story.key, story.fields.labels.join(', '), story.fields.fixVersions)
         res.write(`<tr>
-                  <td class='epicCol' style='font-size: smaller; color: gray;'>${story.fields.customfield_10008} ${epics[story.fields.customfield_10008]}</td>
+                  <td class='epicCol' style='font-size: smaller; color: gray;'>${
+                    story.fields.customfield_10008
+                  } ${epics[story.fields.customfield_10008]}</td>
                   <td>${story.key} ${story.fields.summary}</td>`)
 
         // Release(s)
-        const fixVersions = story.fields.fixVersions.map((x) => { return (x.name) }).join(', ') || 'unset'
-        if (story.fields.fixVersions.length > 1) { debug(`Multiple fixVersions for ${story.key}: ${fixVersions}`) }
+        const fixVersions =
+          story.fields.fixVersions
+            .map((x) => {
+              return x.name
+            })
+            .join(', ') || 'unset'
+        if (story.fields.fixVersions.length > 1) {
+          debug(`Multiple fixVersions for ${story.key}: ${fixVersions}`)
+        }
         res.write(`<td class='fixVersionCol'>${fixVersions}</td>`)
 
         // Store the release value in the releases list
-        if (!(Object.keys(releases).includes(fixVersions))) {
-          releases[fixVersions] = { total: story.fields.aggregateprogress.total, progress: story.fields.aggregateprogress.progress }
+        if (!Object.keys(releases).includes(fixVersions)) {
+          releases[fixVersions] = {
+            total: story.fields.aggregateprogress.total,
+            progress: story.fields.aggregateprogress.progress,
+          }
         } else {
-          releases[fixVersions]['total'] = releases[fixVersions]['total'] + story.fields.aggregateprogress.total
-          releases[fixVersions]['progress'] = releases[fixVersions]['progress'] + story.fields.aggregateprogress.progress
+          releases[fixVersions]['total'] =
+            releases[fixVersions]['total'] +
+            story.fields.aggregateprogress.total
+          releases[fixVersions]['progress'] =
+            releases[fixVersions]['progress'] +
+            story.fields.aggregateprogress.progress
         }
 
         // There is an assignee
@@ -1426,42 +1822,93 @@ server.get('/estimates', async (req, res, next) => {
 
           // Update assigneeStats
           if (!(assignee in assigneeStats)) {
-            assigneeStats[assignee] = { progress: 0, total: 0, count: [], empty: [], rel: {} } 
+            assigneeStats[assignee] = {
+              progress: 0,
+              total: 0,
+              count: [],
+              empty: [],
+              rel: {},
+            }
           }
 
-          assigneeStats[assignee].count.push(`${story.key} ${story.fields.summary} [${convertSecondsToDays(story.fields.aggregateprogress.progress)} of ${convertSecondsToDays(story.fields.aggregateprogress.total)}d]`)
+          assigneeStats[assignee].count.push(
+            `${story.key} ${story.fields.summary} [${convertSecondsToDays(
+              story.fields.aggregateprogress.progress
+            )} of ${convertSecondsToDays(
+              story.fields.aggregateprogress.total
+            )}d]`
+          )
 
-          assigneeStats[assignee].progress += story.fields.aggregateprogress.progress
+          assigneeStats[assignee].progress +=
+            story.fields.aggregateprogress.progress
           assigneeStats[assignee].total += story.fields.aggregateprogress.total
 
-          if (!Object.keys(assigneeStats[assignee]['rel']).includes(fixVersions)) {
-            assigneeStats[assignee]['rel'][fixVersions] = { total: convertSecondsToDays(story.fields.aggregateprogress.total), progress: convertSecondsToDays(story.fields.aggregateprogress.progress) }
-          } else { // Key already exists, so increment it
-            assigneeStats[assignee]['rel'][fixVersions].total = assigneeStats[assignee]['rel'][fixVersions].total + convertSecondsToDays(story.fields.aggregateprogress.total)
-            assigneeStats[assignee]['rel'][fixVersions].progress = assigneeStats[assignee]['rel'][fixVersions].progress + convertSecondsToDays(story.fields.aggregateprogress.progress)
+          if (
+            !Object.keys(assigneeStats[assignee]['rel']).includes(fixVersions)
+          ) {
+            assigneeStats[assignee]['rel'][fixVersions] = {
+              total: convertSecondsToDays(story.fields.aggregateprogress.total),
+              progress: convertSecondsToDays(
+                story.fields.aggregateprogress.progress
+              ),
+            }
+          } else {
+            // Key already exists, so increment it
+            assigneeStats[assignee]['rel'][fixVersions].total =
+              assigneeStats[assignee]['rel'][fixVersions].total +
+              convertSecondsToDays(story.fields.aggregateprogress.total)
+            assigneeStats[assignee]['rel'][fixVersions].progress =
+              assigneeStats[assignee]['rel'][fixVersions].progress +
+              convertSecondsToDays(story.fields.aggregateprogress.progress)
           }
 
-          if (story.fields.aggregateprogress.total == 0) { assigneeStats[assignee].empty.push(`${story.key} ${story.fields.summary}`) }
-        } else { // No assignee
+          if (story.fields.aggregateprogress.total == 0) {
+            assigneeStats[assignee].empty.push(
+              `${story.key} ${story.fields.summary}`
+            )
+          }
+        } else {
+          // No assignee
           // debug(`No assignee for ${story.key}`)
           res.write(`<td class='storyCol problem'>none</td>`)
           assigneeStats[NONE].count.push(`${story.key} ${story.fields.summary}`)
-          assigneeStats[NONE].progress += story.fields.aggregateprogress.progress
+          assigneeStats[NONE].progress +=
+            story.fields.aggregateprogress.progress
           assigneeStats[NONE].total += story.fields.aggregateprogress.total
-          if (assigneeStats.none.total == 0) { assigneeStats.none.empty.push(`${story.key} ${story.fields.summary}`) }
+          if (assigneeStats.none.total == 0) {
+            assigneeStats.none.empty.push(
+              `${story.key} ${story.fields.summary}`
+            )
+          }
         }
 
         // Spent
-        res.write(`<td class='spentCol'>${convertSecondsToDays(story.fields.aggregateprogress.progress)} d</td>`)
+        res.write(
+          `<td class='spentCol'>${convertSecondsToDays(
+            story.fields.aggregateprogress.progress
+          )} d</td>`
+        )
         // Total
         if (story.fields.aggregateprogress.total > 0) {
-          res.write(`<td class='totalCol'>${convertSecondsToDays(story.fields.aggregateprogress.total)} d</td>`)
+          res.write(
+            `<td class='totalCol'>${convertSecondsToDays(
+              story.fields.aggregateprogress.total
+            )} d</td>`
+          )
         } else {
           res.write(`<td class='totalCol problem'>0d</td>`)
         }
 
         // Percent Done
-        res.write(`<td class='percentDoneCol'>${story.fields.aggregateprogress.total > 0 ? (100 * (story.fields.aggregateprogress.progress / story.fields.aggregateprogress.total).toFixed(2)) : '0'}%</td>
+        res.write(`<td class='percentDoneCol'>${
+          story.fields.aggregateprogress.total > 0
+            ? 100 *
+              (
+                story.fields.aggregateprogress.progress /
+                story.fields.aggregateprogress.total
+              ).toFixed(2)
+            : '0'
+        }%</td>
                   </tr>`)
       })
       res.write(`</tbody></table>`)
@@ -1475,66 +1922,134 @@ server.get('/estimates', async (req, res, next) => {
           <th>Spent (days)</th>
           <th>Planned (days)</th>
         </tr></thead><tbody>`)
-      Object.keys(releases).sort().forEach((rel) => {
-        res.write(`
+      Object.keys(releases)
+        .sort()
+        .forEach((rel) => {
+          res.write(`
           <td>${rel}</td>
           <td>${convertSecondsToDays(releases[rel].progress)}</td>
           <td>${convertSecondsToDays(releases[rel].total)}</td>
           </tr>`)
-      })
+        })
       res.write('</tbody></table>')
 
       res.write(`<hr>`)
 
-      let USER_COLUMNS = ['Name', 'Spent', 'Total', 'Completed', 'Missing Est. (%)']
+      let USER_COLUMNS = [
+        'Name',
+        'Spent',
+        'Total',
+        'Completed',
+        'Missing Est. (%)',
+      ]
       // Write User Data table
       res.write(`<h2>User Report</h2>`)
       res.write(`<table style='width: auto !important;' class='table table-sm table-striped'><thead>
         <tr><th>${USER_COLUMNS.join('</th><th>')}</th>`)
-      Object.keys(releases).sort().forEach((rel) => { res.write(`<th>${rel}</th>`) })
+      Object.keys(releases)
+        .sort()
+        .forEach((rel) => {
+          res.write(`<th>${rel}</th>`)
+        })
       res.write(`</tr></thead><tbody>`)
       // debug(assigneeStats)
       Object.keys(assigneeStats).forEach((a) => {
-        const titleContentCount = assigneeStats[a].count.length > 0 ? '<b>Total Story List</b><ol><li>' + assigneeStats[a].count.join('</li><li>') + '</ol>' : NONE
-        const titleContentEmpty = assigneeStats[a].empty.length > 0 ? `<b>Unestimated Story list</b><ol><li>${assigneeStats[a].empty.join('</li><li>')}</ol>` : NONE
+        const titleContentCount =
+          assigneeStats[a].count.length > 0
+            ? '<b>Total Story List</b><ol><li>' +
+              assigneeStats[a].count.join('</li><li>') +
+              '</ol>'
+            : NONE
+        const titleContentEmpty =
+          assigneeStats[a].empty.length > 0
+            ? `<b>Unestimated Story list</b><ol><li>${assigneeStats[
+                a
+              ].empty.join('</li><li>')}</ol>`
+            : NONE
 
         res.write(`<tr>
           <td class='nameCol'>${a}</td>
-          <td class='spentCol'>${assigneeStats[a].progress > 0 ? convertSecondsToDays(assigneeStats[a].progress) : 0} d</td>
+          <td class='spentCol'>${
+            assigneeStats[a].progress > 0
+              ? convertSecondsToDays(assigneeStats[a].progress)
+              : 0
+          } d</td>
           <td class='totalCol`)
         if (assigneeStats[a].total == 0) {
           res.write(` problem'>0d</td>`)
         } else {
           const days = convertSecondsToDays(assigneeStats[a].total)
-          const endDate = calcFutureDate(convertSecondsToDays(assigneeStats[a].total - assigneeStats[a].progress))
-          res.write(`'><span data-toggle="tooltip" data-html="true" title='${endDate}'>${days}d</span></td>`)
+          const endDate = calcFutureDate(
+            convertSecondsToDays(
+              assigneeStats[a].total - assigneeStats[a].progress
+            )
+          )
+          res.write(
+            `'><span data-toggle="tooltip" data-html="true" title='${endDate}'>${days}d</span></td>`
+          )
         }
         // Completed
-        res.write(`<td class='completedCol'>${assigneeStats[a].total > 0 ? Math.round(100 * (assigneeStats[a].progress / assigneeStats[a].total)) : 0}%</td>`)
+        res.write(
+          `<td class='completedCol'>${
+            assigneeStats[a].total > 0
+              ? Math.round(
+                  100 * (assigneeStats[a].progress / assigneeStats[a].total)
+                )
+              : 0
+          }%</td>`
+        )
         // Missing Estimate
-        res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${assigneeStats[a].empty.length}</span> of <span data-toggle="tooltip" data-html="true" title="Finish by ${titleContentCount}">${assigneeStats[a].count.length}</span> 
-          (${assigneeStats[a].empty.length > 0 ? (100 * (assigneeStats[a].empty.length / assigneeStats[a].count.length)).toFixed(0) : 0}%)</td>`)
+        res.write(`<td class='missingEstCol'><span data-toggle="tooltip" data-html="true" title="${titleContentEmpty}">${
+          assigneeStats[a].empty.length
+        }</span> of <span data-toggle="tooltip" data-html="true" title="Finish by ${titleContentCount}">${
+          assigneeStats[a].count.length
+        }</span> 
+          (${
+            assigneeStats[a].empty.length > 0
+              ? (
+                  100 *
+                  (assigneeStats[a].empty.length /
+                    assigneeStats[a].count.length)
+                ).toFixed(0)
+              : 0
+          }%)</td>`)
 
         // Releases details
-        Object.keys(releases).sort().forEach((rel) => {
-          // debug(`processing release data for user = ${a} rel = ${rel}`)
-          // Print the user's numbers for this release
-          if (Object.keys(assigneeStats[a]['rel']).includes(rel)) {
-            // debug(`assigneeStats[a]['rel'][${rel}] = `, assigneeStats[a]['rel'][rel])
-            const userProgress = assigneeStats[a]['rel'][rel].progress
-            const userTotal = assigneeStats[a]['rel'][rel].total
-            res.write(`<!-- ${rel} --><td>${userProgress} of <span data-toggle="tooltip" data-html="true" title="${calcFutureDate(userTotal)}">${userTotal}d</span></td>`)
-          } else {
-            res.write('<!-- no data --><td></td>')
-          }
-        })
+        Object.keys(releases)
+          .sort()
+          .forEach((rel) => {
+            // debug(`processing release data for user = ${a} rel = ${rel}`)
+            // Print the user's numbers for this release
+            if (Object.keys(assigneeStats[a]['rel']).includes(rel)) {
+              // debug(`assigneeStats[a]['rel'][${rel}] = `, assigneeStats[a]['rel'][rel])
+              const userProgress = assigneeStats[a]['rel'][rel].progress
+              const userTotal = assigneeStats[a]['rel'][rel].total
+              res.write(
+                `<!-- ${rel} --><td>${userProgress} of <span data-toggle="tooltip" data-html="true" title="${calcFutureDate(
+                  userTotal
+                )}">${userTotal}d</span></td>`
+              )
+            } else {
+              res.write('<!-- no data --><td></td>')
+            }
+          })
         res.write(`</tr>`)
         // Sum of estimates by release
       })
-      res.write(`<tr><td><em>Release Totals</em></td><td colspan=${USER_COLUMNS.length - 1}></td>`)
-      Object.keys(releases).sort().forEach((rel) => {
-        res.write(`<td><b>${convertSecondsToDays(releases[rel].progress)} of ${convertSecondsToDays(releases[rel].total)}d</b></td>`)
-      })
+      res.write(
+        `<tr><td><em>Release Totals</em></td><td colspan=${
+          USER_COLUMNS.length - 1
+        }></td>`
+      )
+      Object.keys(releases)
+        .sort()
+        .forEach((rel) => {
+          res.write(
+            `<td><b>${convertSecondsToDays(
+              releases[rel].progress
+            )} of ${convertSecondsToDays(releases[rel].total)}d</b></td>`
+          )
+        })
       res.write('</tr>')
 
       res.write(buildHtmlFooter())
@@ -1583,7 +2098,7 @@ server.get('/groups', async (req, res, next) => {
         debug('returning filtered list')
         const smallGroups = await getSmallGroups()
         // debug(`smallGroups: `, smallGroups)
-        
+
         res.write(`Showing ${smallGroups.length} groups`)
         res.write('<ol>')
 
@@ -1597,7 +2112,17 @@ server.get('/groups', async (req, res, next) => {
       } else {
         res.write(groups.header)
         debug('returning un-filtered list')
-        res.write(['<ol><li>', groups.groups.map((g) => { return g.name }).join('</li><li>'), '</li></ul>'].join(''))
+        res.write(
+          [
+            '<ol><li>',
+            groups.groups
+              .map((g) => {
+                return g.name
+              })
+              .join('</li><li>'),
+            '</li></ul>',
+          ].join('')
+        )
       }
       res.write(buildHtmlFooter())
       res.end()
@@ -1624,17 +2149,19 @@ server.get('/requirements', async (req, res, next) => {
     const childrenCache = []
 
     const COLUMNS = {
-      'Name': '',
-      'Summary': '',
-      'fixVersion': '',
-      'Teams': '',
-      'Status': '',
-      'Links': '',
-      'Children': ''
+      Name: '',
+      Summary: '',
+      fixVersion: '',
+      Teams: '',
+      Status: '',
+      Links: '',
+      Children: '',
     }
 
     const reqts = await getRequirements()
-    debug(`startAt: ${reqts.startAt}; maxResults: ${reqts.maxResults}; total: ${reqts.total}`)
+    debug(
+      `startAt: ${reqts.startAt}; maxResults: ${reqts.maxResults}; total: ${reqts.total}`
+    )
     res.write(`<em>${reqts.issues.length} requirements</em>`)
 
     // Build the table
@@ -1648,26 +2175,46 @@ server.get('/requirements', async (req, res, next) => {
       const reqt = reqts.issues[r]
       teamCount = 0
       res.write(`<tr>`)
-      res.write(`<td class='nameCol'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/browse/${reqt.key}' target='_blank'>${reqt.key}</td>`)
+      res.write(
+        `<td class='nameCol'><a href='${config.get(
+          'jira.protocol'
+        )}://${config.get('jira.host')}/browse/${reqt.key}' target='_blank'>${
+          reqt.key
+        }</td>`
+      )
       res.write(`<td class='summaryCol'>${reqt.fields.summary}`)
       if (reqt.fields.labels.length) {
-        res.write(` <span class='labelsCol'>[${reqt.fields.labels.join(', ')}]</span>`)
+        res.write(
+          ` <span class='labelsCol'>[${reqt.fields.labels.join(', ')}]</span>`
+        )
         // debug(reqt.fields.labels)
       }
       res.write(`</td>`)
 
-      res.write(`<td class='fixVersionsCol'>${reqt.fields.fixVersions.map(x => x.name).join(', ')}</td>`)
+      res.write(
+        `<td class='fixVersionsCol'>${reqt.fields.fixVersions
+          .map((x) => x.name)
+          .join(', ')}</td>`
+      )
 
       // Teams
       if (reqt.fields.customfield_10070) {
-        res.write(`<td class='teamsCol'>${reqt.fields.customfield_10070.map(x => x.value).join(', ')}</td>`)
+        res.write(
+          `<td class='teamsCol'>${reqt.fields.customfield_10070
+            .map((x) => x.value)
+            .join(', ')}</td>`
+        )
         teamCount = reqt.fields.customfield_10070.length
       } else {
         res.write(`<td class='teamsCol'>None</td>`)
         teamCount = 0
       }
 
-      res.write(`<td class='statusCol ${JiraStatus.formatCssClassName(reqt.fields.status.name)}'>${reqt.fields.status.name}</td>`)
+      res.write(
+        `<td class='statusCol ${JiraStatus.formatCssClassName(
+          reqt.fields.status.name
+        )}'>${reqt.fields.status.name}</td>`
+      )
 
       const implementedByKeys = []
 
@@ -1683,16 +2230,29 @@ server.get('/requirements', async (req, res, next) => {
               implementedByCounter += 1
               implementedByKeys.push(link.inwardIssue.key)
             }
-            res.write(`${link.type.inward} <a href='${config.get('jira.protocol')}://${config.get('jira.host')
-              }/browse/${link.inwardIssue.key}' target='_blank' title='${link.inwardIssue.fields.summary}'>${link.inwardIssue.key}</a><br>`)
+            res.write(
+              `${link.type.inward} <a href='${config.get(
+                'jira.protocol'
+              )}://${config.get('jira.host')}/browse/${
+                link.inwardIssue.key
+              }' target='_blank' title='${link.inwardIssue.fields.summary}'>${
+                link.inwardIssue.key
+              }</a><br>`
+            )
             inwardLinks[link.type.inward]
-              ?
-              inwardLinks[link.type.inward] += 1
-              :
-              inwardLinks[link.type.inward] = 1
-          } else { // outwardIssue
-            res.write(`${link.type.outward} <a href='${config.get('jira.protocol')}://${config.get('jira.host')
-              }/browse/${link.outwardIssue.key}' target='_blank' title='${link.outwardIssue.fields.summary}'>${link.outwardIssue.key}</a><br>`)
+              ? (inwardLinks[link.type.inward] += 1)
+              : (inwardLinks[link.type.inward] = 1)
+          } else {
+            // outwardIssue
+            res.write(
+              `${link.type.outward} <a href='${config.get(
+                'jira.protocol'
+              )}://${config.get('jira.host')}/browse/${
+                link.outwardIssue.key
+              }' target='_blank' title='${link.outwardIssue.fields.summary}'>${
+                link.outwardIssue.key
+              }</a><br>`
+            )
           }
         }
         // })
@@ -1709,7 +2269,9 @@ server.get('/requirements', async (req, res, next) => {
               res.write(`<b style='color: darkred;'>Insufficient</b>`)
             }
           } else {
-            res.write(`<span style='color: red; font-style: italic;'>No Team Set</span>`)
+            res.write(
+              `<span style='color: red; font-style: italic;'>No Team Set</span>`
+            )
           }
         }
       } else {
@@ -1719,10 +2281,13 @@ server.get('/requirements', async (req, res, next) => {
       // res.write(`<td>${reqt.fields.labels.join(',')}</td>`)
       res.write('<td class="childrenCol">')
       for (let i = 0; i < implementedByKeys.length; i++) {
-        const key = implementedByKeys[i];
+        const key = implementedByKeys[i]
         res.write(`<p>${key}: `)
         try {
-          const kids = key in Object.keys(childrenCache) ? childrenCache[key] : await getChildren(key)
+          const kids =
+            key in Object.keys(childrenCache)
+              ? childrenCache[key]
+              : await getChildren(key)
           if (kids.issues && kids.issues.length > 0) {
             // debug(`kids/fields for ${key}: `, kids.issues[0].fields)
             const issueList = []
@@ -1765,7 +2330,9 @@ server.get('/requirements', async (req, res, next) => {
 })
 
 server.get('/created/:createdDate', async (req, res, next) => {
-  res.write(JSON.stringify(await jdr.getItemsCreatedOnDate(req.params.createdDate)))
+  res.write(
+    JSON.stringify(await jdr.getItemsCreatedOnDate(req.params.createdDate))
+  )
   res.end()
   return next()
 })
@@ -1776,7 +2343,7 @@ server.get('/dashboard', async (req, res, next) => {
     res.writeHead(200, { 'Content-Type': 'text/html' })
     res.write(buildHtmlHeader('Dashboard', false))
     res.write(buildPageHeader('Dashboard'))
-    res.write(dashboard.fetch("html"))
+    res.write(dashboard.fetch('html'))
     res.write(buildHtmlFooter())
     res.end()
   } else {
@@ -1872,14 +2439,15 @@ server.get('/filter', async (req, res, next) => {
   res.write(buildHtmlHeader(newHeader))
   res.write(buildPageHeader(data.name, `Filter: ${req.query.id}`))
   debug(`about to run genericJiraSearch(${data.jql}, 99)`)
-  jsr._genericJiraSearch(data.jql, 99)
+  jsr
+    ._genericJiraSearch(data.jql, 99)
     .then((e) => {
       let stats = {
         Epic: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         Story: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         Task: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
         'Sub-task': { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
-        Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 }
+        Bug: { Open: 0, Active: 0, Closed: 0, Stopped: 0 },
       }
 
       let results = {
@@ -1887,7 +2455,7 @@ server.get('/filter', async (req, res, next) => {
         Stories: [],
         Tasks: [],
         Bugs: [],
-        'Sub-tasks': []
+        'Sub-tasks': [],
       }
       let contents = []
 
@@ -1998,12 +2566,12 @@ server.get('/filter', async (req, res, next) => {
         // icons
         res.write(
           '<hr><div class="children">' +
-          results.Epics.join('') +
-          results.Stories.join('') +
-          results.Tasks.join('') +
-          results['Sub-tasks'].join('') +
-          results.Bugs.join('') +
-          '</div>'
+            results.Epics.join('') +
+            results.Stories.join('') +
+            results.Tasks.join('') +
+            results['Sub-tasks'].join('') +
+            results.Bugs.join('') +
+            '</div>'
         )
         res.write('</div>')
         res.write('<hr>')
@@ -2029,10 +2597,13 @@ server.get('/filter', async (req, res, next) => {
   // })
 })
 
-function includesRelease(fixVersions = [], rel = "") {
-  debug(`includesRelease(fixVersions, ${rel}) called... returning: `, fixVersions.filter(ver => ver.name == rel).length)
+function includesRelease(fixVersions = [], rel = '') {
+  debug(
+    `includesRelease(fixVersions, ${rel}) called... returning: `,
+    fixVersions.filter((ver) => ver.name == rel).length
+  )
 
-  return fixVersions.filter(ver => ver.name == rel).length
+  return fixVersions.filter((ver) => ver.name == rel).length
 }
 
 server.get('/epics', (req, res, next) => {
@@ -2046,7 +2617,12 @@ server.get('/epics', (req, res, next) => {
 
   if (cache.has(cacheName)) {
     res.write(cache.get(cacheName))
-    res.write(`<small>Cached response; cache expires in ${Math.round((new Date(cache.getTtl(cacheName)) - new Date())/1000,2)} seconds`)
+    res.write(
+      `<small>Cached response; cache expires in ${Math.round(
+        (new Date(cache.getTtl(cacheName)) - new Date()) / 1000,
+        2
+      )} seconds`
+    )
     res.end()
     return
   } else {
@@ -2249,12 +2825,11 @@ server.get('/epics', (req, res, next) => {
                     issue.fields.timeestimate > 0 &&
                     issue.fields.subtasks.length
                   ) {
-                    storyEstimateData[
-                      `${issue.key}: ${issue.fields.summary}`
-                    ] = {
-                      time: issue.fields.timeestimate,
-                      aggregatetime: issue.fields.aggregatetimeestimate,
-                    }
+                    storyEstimateData[`${issue.key}: ${issue.fields.summary}`] =
+                      {
+                        time: issue.fields.timeestimate,
+                        aggregatetime: issue.fields.aggregatetimeestimate,
+                      }
                   }
                   resultCtr['Stories'].push(
                     `<a href='${config.get('jira.protocol')}://${config.get(
@@ -2384,7 +2959,12 @@ server.get('/epics', (req, res, next) => {
           htmlOutput.push(`<h3>Remaining Work</h3>`)
           htmlOutput.push(`<ul>`)
           Object.keys(ownerData)
-            .sort((a, b) => { return a.split(` `)[a.split(` `).length-1].substring(0,3) > b.split(` `)[b.split(` `).length-1].substring(0,3) ? 1 : -1 })
+            .sort((a, b) => {
+              return a.split(` `)[a.split(` `).length - 1].substring(0, 3) >
+                b.split(` `)[b.split(` `).length - 1].substring(0, 3)
+                ? 1
+                : -1
+            })
             .forEach((owner) => {
               let totalEstRem = 0
               let ownerHtml = []
@@ -2412,7 +2992,9 @@ server.get('/epics', (req, res, next) => {
                       : 0
                   totalEstRem += estRem
 
-                  let barColor = estRem ? BAR_COLORS[j.fields.status.name] : 'red'
+                  let barColor = estRem
+                    ? BAR_COLORS[j.fields.status.name]
+                    : 'red'
 
                   ownerHtml.push(
                     `<a href="${config.get('jira.protocol')}://${config.get(
@@ -2421,9 +3003,7 @@ server.get('/epics', (req, res, next) => {
                       j.key
                     }"><span style="border: 1px; border-color: #a99494; border-style: solid; vertical-align: middle; display: inline-block; padding: 2px; margin: 2px; height: 20px; width: ${
                       estRem ? estRem * DAY_WIDTH : 1
-                    }px; background-color: ${
-                      barColor
-                    };" data-toggle="tooltip" data-html="true" title='${
+                    }px; background-color: ${barColor};" data-toggle="tooltip" data-html="true" title='${
                       j.key
                     }: ${cleanText(j.fields.summary)}<ul><li>Type: ${
                       j.fields.issuetype.name
@@ -2438,7 +3018,9 @@ server.get('/epics', (req, res, next) => {
               // if (ownerHtml[owner] && ownerHtml[owner].length) {
               // if (totalEstRem > 0) {
               htmlOutput.push(
-                `<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d; ETA: ${new Date().addBusinessDays(totalEstRem).toLocaleDateString()}]</span>: `
+                `<li style="list-style-type: none;"><span class="liHeader">${owner} [${totalEstRem}d; ETA: ${new Date()
+                  .addBusinessDays(totalEstRem)
+                  .toLocaleDateString()}]</span>: `
               )
               // }
               htmlOutput.push(ownerHtml.join(''))
@@ -2529,7 +3111,8 @@ server.get('/epics', (req, res, next) => {
 
 server.get('/epicStatus/:id', async (req, res, next) => {
   let id = req.params.id
-  let includeRaw = req.query.raw && req.query.raw == 'yes' ? req.query.raw : false
+  let includeRaw =
+    req.query.raw && req.query.raw == 'yes' ? req.query.raw : false
 
   let response = {
     id: id,
@@ -2537,7 +3120,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
     summary: 'undefined',
     progress: { progress: 0, total: 0 },
     stories: [],
-    users: {}
+    users: {},
   }
 
   let data = await jsr._genericJiraSearch(
@@ -2551,7 +3134,7 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       `issuetype`,
       `assignee`,
       `status`,
-      `summary`
+      `summary`,
     ]
   )
 
@@ -2566,7 +3149,8 @@ server.get('/epicStatus/:id', async (req, res, next) => {
 
   data.issues.forEach((story) => {
     debug(`>>> Processing story: ${story.key}...`)
-    if (story.key == id) { // No progress info @ Epic level
+    if (story.key == id) {
+      // No progress info @ Epic level
       response.status = story.fields.status.name
 
       response.progress.progress += story.fields.progress.progress
@@ -2575,7 +3159,9 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       response.stories.push(story.key)
       if (story.fields.assignee) {
         if (
-          !Object.keys(response.users).includes(story.fields.assignee.displayName)
+          !Object.keys(response.users).includes(
+            story.fields.assignee.displayName
+          )
         ) {
           response.users[story.fields.assignee.displayName] = {
             progress: 0,
@@ -2588,7 +3174,8 @@ server.get('/epicStatus/:id', async (req, res, next) => {
         response.users[story.fields.assignee.displayName].total +=
           story.fields.progress.total
         response.users[story.fields.assignee.displayName].issues.push(story.key)
-      } else { // No assignee
+      } else {
+        // No assignee
         if (!Object.keys(response.users).includes('Unassigned')) {
           response.users['Unassigned'] = { progress: 0, total: 0, issues: [] }
         }
@@ -2604,13 +3191,16 @@ server.get('/epicStatus/:id', async (req, res, next) => {
     // Check on the blockers
     story.fields.issuelinks.forEach((link) => {
       debug(`found link: ${link.type.name}`)
-      if (link.type.inward == "is blocked by" && Object.keys(link).includes("inwardIssue")) {
+      if (
+        link.type.inward == 'is blocked by' &&
+        Object.keys(link).includes('inwardIssue')
+      ) {
         response.blockedBy[link.inwardIssue.key] = {
           summary: link.inwardIssue.fields.summary,
           assignee: link.inwardIssue.fields.assignee,
           progress: 0,
           total: 0,
-          blocks: { id: story.key, summary: story.fields.summary }
+          blocks: { id: story.key, summary: story.fields.summary },
         }
         response.blockedByCount++
       }
@@ -2620,41 +3210,49 @@ server.get('/epicStatus/:id', async (req, res, next) => {
   // Process blockers
   let blockerKeys = Object.keys(response.blockedBy)
   if (blockerKeys.length) {
-    response.blockedBy["Combined"] = { progress: 0, total: 0 }
+    response.blockedBy['Combined'] = { progress: 0, total: 0 }
     debug(`Processing blockers: ${blockerKeys.join(',')}`)
-    const blockerJql = `project=${config.project} AND key in (${blockerKeys.join(',')})`
+    const blockerJql = `project=${
+      config.project
+    } AND key in (${blockerKeys.join(',')})`
     debug(`...blockerJql: ${blockerJql}`)
 
-    let blockerData = await jsr._genericJiraSearch(
-      blockerJql,
-      99,
-      [
-        `key`,
-        `aggregateprogress`,
-        `customfield_10008`,
-        `issuetype`,
-        `assignee`,
-        `status`,
-      ]
-    )
+    let blockerData = await jsr._genericJiraSearch(blockerJql, 99, [
+      `key`,
+      `aggregateprogress`,
+      `customfield_10008`,
+      `issuetype`,
+      `assignee`,
+      `status`,
+    ])
     blockerData.issues.forEach((blockerIssue) => {
-      debug(`blockerIssue: `, blockerIssue.key, blockerIssue.fields.aggregateprogress)
-      response.blockedBy[blockerIssue.key].progress = blockerIssue.fields.aggregateprogress.progress
-      response.blockedBy[blockerIssue.key].total = blockerIssue.fields.aggregateprogress.total
+      debug(
+        `blockerIssue: `,
+        blockerIssue.key,
+        blockerIssue.fields.aggregateprogress
+      )
+      response.blockedBy[blockerIssue.key].progress =
+        blockerIssue.fields.aggregateprogress.progress
+      response.blockedBy[blockerIssue.key].total =
+        blockerIssue.fields.aggregateprogress.total
 
       if (blockerIssue.fields.assignee) {
-        response.blockedBy[blockerIssue.key].assignee = blockerIssue.fields.assignee.displayName
+        response.blockedBy[blockerIssue.key].assignee =
+          blockerIssue.fields.assignee.displayName
       } else {
         response.blockedBy[blockerIssue.key].assignee = UNASSIGNED_USER
       }
 
-      response.blockedBy[blockerIssue.key].status = blockerIssue.fields.status.name
-      response.blockedBy[blockerIssue.key].type = blockerIssue.fields.issuetype.name
+      response.blockedBy[blockerIssue.key].status =
+        blockerIssue.fields.status.name
+      response.blockedBy[blockerIssue.key].type =
+        blockerIssue.fields.issuetype.name
 
-      response.blockedBy["Combined"].progress += blockerIssue.fields.aggregateprogress.progress
-      response.blockedBy["Combined"].total += blockerIssue.fields.aggregateprogress.total
+      response.blockedBy['Combined'].progress +=
+        blockerIssue.fields.aggregateprogress.progress
+      response.blockedBy['Combined'].total +=
+        blockerIssue.fields.aggregateprogress.total
     })
-
   } else {
     debug(`...no blockers found`)
   }
@@ -2662,8 +3260,12 @@ server.get('/epicStatus/:id', async (req, res, next) => {
   // Calculate the longest remaining workload
   let maxRemaining = { user: 'unset', remaining: 0 }
   Object.keys(response.users).forEach((user) => {
-    if (response.users[user].total - response.users[user].progress > maxRemaining.remaining) {
-      maxRemaining.remaining = response.users[user].total - response.users[user].progress
+    if (
+      response.users[user].total - response.users[user].progress >
+      maxRemaining.remaining
+    ) {
+      maxRemaining.remaining =
+        response.users[user].total - response.users[user].progress
       maxRemaining.user = user
     }
   })
@@ -2690,16 +3292,16 @@ server.get('/epicsInRelease/:id', async (req, res, next) => {
 
 function formatField(val, isTime = false, trimString = 30) {
   if (isTime) {
-    return(`${convertSecondsToDays(val)}d`)
+    return `${convertSecondsToDays(val)}d`
   } else {
     if (val) {
       if (val.length > trimString) {
-        return(`${val.substr(0,trimString-3)}...`)
+        return `${val.substr(0, trimString - 3)}...`
       } else {
-        return(val)
+        return val
       }
     } else {
-      return('')
+      return ''
     }
   }
 }
@@ -2723,13 +3325,15 @@ function getFirstNonEmptyField(val, val2) {
   }
 }
 
-server.get('/timeline/:id',async (req, res, next) => {
+server.get('/timeline/:id', async (req, res, next) => {
   let results = await getHistory(req.params.id)
   let timelineResults = formatJiraHistoryToTimeline(results, req.query.field)
   let epicName = await jsr.getIssueSummary(req.params.id)
 
   debug(`timelineResults fetched for ${epicName}`)
-  res.write(buildHtmlHeader(`Timeline for ${req.params.id}: ${epicName}`, false, false))
+  res.write(
+    buildHtmlHeader(`Timeline for ${req.params.id}: ${epicName}`, false, false)
+  )
   res.write(`<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script><script type="text/javascript" src="//unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
     <link href="//unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
     <style type="text/css">
@@ -2789,11 +3393,15 @@ function formatJiraHistoryToTimeline(results, fieldFilter = false) {
   if (results.values.length) {
     response.push({
       id: 0,
-      content: `Lifespan: ${new Date(results.values[0].created).toDateString()}-${new Date(results.values[results.values.length-1].created).toDateString()}`,
+      content: `Lifespan: ${new Date(
+        results.values[0].created
+      ).toDateString()}-${new Date(
+        results.values[results.values.length - 1].created
+      ).toDateString()}`,
       start: results.values[0].created,
-      end: results.values[results.values.length-1].created,
+      end: results.values[results.values.length - 1].created,
       x_type: 'background',
-      className: 'lifespan'
+      className: 'lifespan',
     })
 
     results.values.forEach((val) => {
@@ -2801,44 +3409,85 @@ function formatJiraHistoryToTimeline(results, fieldFilter = false) {
       let fieldName = ''
       val.items.forEach((i) => {
         let timeField = false
-        if (i.field == "timeoriginalestimate" 
-          || i.field == "originalestimate" 
-          || i.field == "timeestimate"
-          )
-        {
+        if (
+          i.field == 'timeoriginalestimate' ||
+          i.field == 'originalestimate' ||
+          i.field == 'timeestimate'
+        ) {
           timeField = true
         }
-      
+
         if (!fieldFilter || fieldFilter.includes(i.field)) {
           if (i.field !== 'Epic Child') {
-            if ((nonEmptyFields(i.from, i.fromString)) && (nonEmptyFields(i.to, i.toString))) {
-              changes.push(`<b>${i.field}</b> changed from ${
-                formatField(getFirstNonEmptyField(i.fromString, i.from), timeField)
-              } to ${
-                formatField(getFirstNonEmptyField(i.toString, i.to), timeField)
-              }`)
+            if (
+              nonEmptyFields(i.from, i.fromString) &&
+              nonEmptyFields(i.to, i.toString)
+            ) {
+              changes.push(
+                `<b>${i.field}</b> changed from ${formatField(
+                  getFirstNonEmptyField(i.fromString, i.from),
+                  timeField
+                )} to ${formatField(
+                  getFirstNonEmptyField(i.toString, i.to),
+                  timeField
+                )}`
+              )
             } else if (nonEmptyFields(i.from, i.fromString)) {
-              changes.push(`<b>${i.field}</b> (${formatField(getFirstNonEmptyField(i.fromString, i.from), timeField)}) removed`)
-            } else if (nonEmptyFields(i.to,i.toString)) {
-              changes.push(`<b>${i.field}</b> set to ${formatField(getFirstNonEmptyField(i.toString, i.to), timeField)}`)
+              changes.push(
+                `<b>${i.field}</b> (${formatField(
+                  getFirstNonEmptyField(i.fromString, i.from),
+                  timeField
+                )}) removed`
+              )
+            } else if (nonEmptyFields(i.to, i.toString)) {
+              changes.push(
+                `<b>${i.field}</b> set to ${formatField(
+                  getFirstNonEmptyField(i.toString, i.to),
+                  timeField
+                )}`
+              )
             } else {
-              debug(`***\n*** Unknown change: `, i, `\n***\tnonEmptyFields(from): ${nonEmptyFields(i.from,i.fromString)}\n\tnonEmptyFields(to): ${nonEmptyFields(i.to,i.toString)}\n\tFirst nonempty (from): ${getFirstNonEmptyField(i.from, i.fromString)}\n\tFirst nonempty (to): ${getFirstNonEmptyField(i.to, i.toString)}\n`)
+              debug(
+                `***\n*** Unknown change: `,
+                i,
+                `\n***\tnonEmptyFields(from): ${nonEmptyFields(
+                  i.from,
+                  i.fromString
+                )}\n\tnonEmptyFields(to): ${nonEmptyFields(
+                  i.to,
+                  i.toString
+                )}\n\tFirst nonempty (from): ${getFirstNonEmptyField(
+                  i.from,
+                  i.fromString
+                )}\n\tFirst nonempty (to): ${getFirstNonEmptyField(
+                  i.to,
+                  i.toString
+                )}\n`
+              )
             }
             fieldName = i.field
           }
         } else {
-          debug(`Skipping field ${i.field}: Doesn't match fieldFilter ${fieldFilter}`)
+          debug(
+            `Skipping field ${i.field}: Doesn't match fieldFilter ${fieldFilter}`
+          )
         }
       }) // val.forEach
 
       if (changes.length) {
-        response.push({id: val.id, content: `${changes.join(';<br>')}`, start: val.created, className: `field${fieldName}` })
+        response.push({
+          id: val.id,
+          content: `${changes.join(';<br>')}`,
+          start: val.created,
+          className: `field${fieldName}`,
+        })
       }
     }) // results.forEach
-    return(response)
-  } else { // No revisions
+    return response
+  } else {
+    // No revisions
     console.error(`No edits/updates recorded`)
-    return({err: 'No changes recorded'})
+    return { err: 'No changes recorded' }
   }
 }
 
@@ -2846,17 +3495,17 @@ async function getHistory(id) {
   try {
     debug(`Getting history for ${id}...`)
     return jsr.getHistory(id, 0, 100)
-  } catch(err) {
-    return(`query err: `, err)
+  } catch (err) {
+    return `query err: `, err
   }
 }
 
 server.get('/burndownStats/:rel', async (req, res, next) => {
-  let release = req.params.rel ? req.params.rel : ""
+  let release = req.params.rel ? req.params.rel : ''
   debug(`/burndownStats/${release} called...`)
   res.send(await jdr.getBurndownStats(release))
   res.end()
-  return next()  
+  return next()
 })
 
 server.get('/burndown', async (req, res, next) => {
@@ -2868,10 +3517,20 @@ server.get('/burndown/:rel', async (req, res, next) => {
   debug(`/burndown/${req.params.rel} called...`)
   let release = req.params.rel ? req.params.rel : false
   let component = req.query.component ? req.query.component : false
-  let forecast = (req.query.forecast && req.query.forecast === "yes") ? req.query.forecast : false
-  let efficiency = (req.query.efficiency ? req.query.efficiency : config.forecast && config.forecast.efficiency && !isNaN(config.forecast.efficiency) ? config.forecast.efficiency : 1)
+  let forecast =
+    req.query.forecast && req.query.forecast === 'yes'
+      ? req.query.forecast
+      : false
+  let efficiency = req.query.efficiency
+    ? req.query.efficiency
+    : config.forecast &&
+      config.forecast.efficiency &&
+      !isNaN(config.forecast.efficiency)
+    ? config.forecast.efficiency
+    : 1
 
-  let showReleased = (req.query.showReleased && req.query.showReleased === "yes") ? true : false
+  let showReleased =
+    req.query.showReleased && req.query.showReleased === 'yes' ? true : false
 
   let teamSize =
     config.has('forecast') && config.forecast.has('teamSize')
@@ -2890,7 +3549,7 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
   res.write(buildHtmlHeader('Burndown Chart', false))
   res.write(buildPageHeader('Burndown Chart'))
-  
+
   let releaseList = await jdr.getReleaseListFromCache() // Cached versions
   let versionData = false
   let versionReleaseDate = false
@@ -2910,11 +3569,14 @@ server.get('/burndown/:rel', async (req, res, next) => {
   if (showReleased) {
     releaseList = versionData.map((v) => v.name)
   } else {
-    releaseList = versionData.filter((v) => v.released == false).map((v) => v.name)
+    releaseList = versionData
+      .filter((v) => v.released == false)
+      .map((v) => v.name)
   }
   debug(`new releaseList: `, releaseList)
 
-  if (release) { // A specific release was selected
+  if (release) {
+    // A specific release was selected
     res.write(simpleButton('All/Combined', '/burndown/'))
 
     // Reduce versionData to selected version/release
@@ -2928,14 +3590,17 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // debug(`... versionData is NOT empty. versionReleaseDate: ${versionReleaseDate}`)
       let now = new Date()
       workingDaysToRelease = now.workingDaysFromNow(versionReleaseDate)
-      workingDaysToRelease > 0 ? enableForecastButton = true : enableForecastButton = false
+      workingDaysToRelease > 0
+        ? (enableForecastButton = true)
+        : (enableForecastButton = false)
       // debug(`versionData: `, versionData, workingDaysToRelease, ' days to the release; enableForecastButton? ', enableForecastButton)
-
-    } else { // No versionData
+    } else {
+      // No versionData
       debug(`ERROR: No versionData!`)
       versionData = false
-    }  
-  } else { // No specific release was selected, so show "All"
+    }
+  } else {
+    // No specific release was selected, so show "All"
     res.write(simpleButton('All/Combined', false, false))
   }
 
@@ -2945,7 +3610,15 @@ server.get('/burndown/:rel', async (req, res, next) => {
     if (release === rel) {
       res.write(simpleButton(relName, false, false))
     } else {
-      res.write(simpleButton(relName, `/burndown/${encodeURIComponent(rel)}?showReleased=${showReleased ? 'yes' : 'no'}`, false))
+      res.write(
+        simpleButton(
+          relName,
+          `/burndown/${encodeURIComponent(rel)}?showReleased=${
+            showReleased ? 'yes' : 'no'
+          }`,
+          false
+        )
+      )
     }
   })
   res.write(`</div>`)
@@ -2954,38 +3627,98 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
   // Build the data object based on the burndown data
   let data = {}
-  
-  let sumOfCounts = [], mvgAvg30, mvgAvg60, mvgAvg90, mvgAvg120, mvgAvg150, mvgAvgReleaseDates, mvgAvgDates1d, mvgAvgDates30d
+
+  let sumOfCounts = [],
+    mvgAvg30,
+    mvgAvg60,
+    mvgAvg90,
+    mvgAvg120,
+    mvgAvg150,
+    mvgAvgReleaseDates,
+    mvgAvgDates1d,
+    mvgAvgDates30d
   let lastTotalEstimate = 0
 
-  if (cache.has(`sumOfCounts-${release ? release : 'none'}-${component ? component : 'none'}`)) {
+  if (
+    cache.has(
+      `sumOfCounts-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
+  ) {
     debug(`*** sumOfCounts cache hit! ***`)
 
-    sumOfCounts = cache.get(`sumOfCounts-${release ? release : 'none'}-${component ? component : 'none'}`)
-    mvgAvg30 = cache.get(`mvgAvg30-${release ? release : 'none'}-${component ? component : 'none'}`)
-    mvgAvg60 = cache.get(`mvgAvg60-${release ? release : 'none'}-${component ? component : 'none'}`)
-    mvgAvg90 = cache.get(`mvgAvg90-${release ? release : 'none'}-${component ? component : 'none'}`)
-    mvgAvg120 = cache.get(`mvgAvg120-${release ? release : 'none'}-${component ? component : 'none'}`)
-    mvgAvg150 = cache.get(`mvgAvg150-${release ? release : 'none'}-${component ? component : 'none'}`)
-    lastTotalEstimate = cache.get(`lastTotalEstimate-${release ? release : 'none'}-${component ? component : 'none'}`)
-    mvgAvgReleaseDates = cache.get(`mvgAvgReleaseDates-${release ? release : 'none'}-${component ? component : 'none'}`)
-    data = cache.get(`data-${release ? release : 'none'}-${component ? component : 'none'}`)
-    cache.set(`mvgAvgDates-30d-${release ? release : 'none'}-${component ? component : 'none'}`, burndown.dates[burndown.dates.length-30])
-    mvgAvgDates1d = cache.get(`mvgAvgDates-1d-${release ? release : 'none'}-${component ? component : 'none'}`)
-    mvgAvgDates30d = cache.get(`mvgAvgDates-30d-${release ? release : 'none'}-${component ? component : 'none'}`)
-
+    sumOfCounts = cache.get(
+      `sumOfCounts-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
+    mvgAvg30 = cache.get(
+      `mvgAvg30-${release ? release : 'none'}-${component ? component : 'none'}`
+    )
+    mvgAvg60 = cache.get(
+      `mvgAvg60-${release ? release : 'none'}-${component ? component : 'none'}`
+    )
+    mvgAvg90 = cache.get(
+      `mvgAvg90-${release ? release : 'none'}-${component ? component : 'none'}`
+    )
+    mvgAvg120 = cache.get(
+      `mvgAvg120-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
+    mvgAvg150 = cache.get(
+      `mvgAvg150-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
+    lastTotalEstimate = cache.get(
+      `lastTotalEstimate-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
+    mvgAvgReleaseDates = cache.get(
+      `mvgAvgReleaseDates-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
+    data = cache.get(
+      `data-${release ? release : 'none'}-${component ? component : 'none'}`
+    )
+    cache.set(
+      `mvgAvgDates-30d-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      burndown.dates[burndown.dates.length - 30]
+    )
+    mvgAvgDates1d = cache.get(
+      `mvgAvgDates-1d-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
+    mvgAvgDates30d = cache.get(
+      `mvgAvgDates-30d-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`
+    )
   } else {
-    debug(`--- sumOfCounts cache MISS ---\n\ncalcuating sumOfCounts & moving averages`)
+    debug(
+      `--- sumOfCounts cache MISS ---\n\ncalcuating sumOfCounts & moving averages`
+    )
 
     if (burndown.stats && Object.keys(burndown.stats)[0]) {
-      for (let i = 0; i < burndown.stats[Object.keys(burndown.stats)[0]].length; i++) {
+      for (
+        let i = 0;
+        i < burndown.stats[Object.keys(burndown.stats)[0]].length;
+        i++
+      ) {
         sumOfCounts[i] = 0.0
       }
     } else {
       console.error(`Failed fetching burndown stats: data record is empty.`)
     }
     // debug(`sumOfCounts: length = ${sumOfCounts.length}`)
-  
+
     // debug(`burndown statuses: `, Object.keys(burndown.stats).join(','))
     Object.keys(burndown.stats).forEach((status) => {
       status.replace(/\s/g, '')
@@ -2994,101 +3727,243 @@ server.get('/burndown/:rel', async (req, res, next) => {
         sumOfCounts[i] += data[status][i]
       }
     })
-    cache.set(`data-${release ? release : 'none'}-${component ? component : 'none'}`, data)
+    cache.set(
+      `data-${release ? release : 'none'}-${component ? component : 'none'}`,
+      data
+    )
 
     // Now clean up the sumOfCounts values to 2 decimal places
     // TODO: Fix the original value assignment, above
-    sumOfCounts = sumOfCounts.map((x) => { return +Number.parseFloat(x).toFixed(2)})
-    cache.set(`sumOfCounts-${release ? release : 'none'}-${component ? component : 'none'}`, sumOfCounts)
-    
+    sumOfCounts = sumOfCounts.map((x) => {
+      return +Number.parseFloat(x).toFixed(2)
+    })
+    cache.set(
+      `sumOfCounts-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      sumOfCounts
+    )
+
     // TODO: Calc moving averages
-    console.log(`-30d == ${burndown.dates[burndown.dates.length-30]}`)
+    console.log(`-30d == ${burndown.dates[burndown.dates.length - 30]}`)
     mvgAvg30 = calcMovingAverage(sumOfCounts, 30, null)
-    debug(`mvgAvg30: last: ${mvgAvg30[mvgAvg30.length-1]}; -30d: ${mvgAvg30[mvgAvg30.length-30]}; delta: ${mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]}`)
-    cache.set(`mvgAvg30-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg30)
-    
+    debug(
+      `mvgAvg30: last: ${mvgAvg30[mvgAvg30.length - 1]}; -30d: ${
+        mvgAvg30[mvgAvg30.length - 30]
+      }; delta: ${
+        mvgAvg30[mvgAvg30.length - 30] - mvgAvg30[mvgAvg30.length - 1]
+      }`
+    )
+    cache.set(
+      `mvgAvg30-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      mvgAvg30
+    )
+
     mvgAvg60 = calcMovingAverage(sumOfCounts, 60, null)
-    debug(`mvgAvg60: last: ${mvgAvg60[mvgAvg60.length-1]}; -30d: ${mvgAvg60[mvgAvg60.length-30]}; delta: ${mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]}`)
-    cache.set(`mvgAvg60-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg90)
-    
+    debug(
+      `mvgAvg60: last: ${mvgAvg60[mvgAvg60.length - 1]}; -30d: ${
+        mvgAvg60[mvgAvg60.length - 30]
+      }; delta: ${
+        mvgAvg60[mvgAvg60.length - 30] - mvgAvg60[mvgAvg60.length - 1]
+      }`
+    )
+    cache.set(
+      `mvgAvg60-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      mvgAvg90
+    )
+
     mvgAvg90 = calcMovingAverage(sumOfCounts, 90, null)
-    debug(`mvgAvg90: last: ${mvgAvg90[mvgAvg90.length-1]}; -30d: ${mvgAvg90[mvgAvg90.length-30]}; delta: ${mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]}`)
-    cache.set(`mvgAvg90-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg120)
-    
+    debug(
+      `mvgAvg90: last: ${mvgAvg90[mvgAvg90.length - 1]}; -30d: ${
+        mvgAvg90[mvgAvg90.length - 30]
+      }; delta: ${
+        mvgAvg90[mvgAvg90.length - 30] - mvgAvg90[mvgAvg90.length - 1]
+      }`
+    )
+    cache.set(
+      `mvgAvg90-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      mvgAvg120
+    )
+
     mvgAvg120 = calcMovingAverage(sumOfCounts, 120, null)
-    debug(`mvgAvg120: last: ${mvgAvg120[mvgAvg120.length-1]}; -30d: ${mvgAvg120[mvgAvg120.length-30]}; delta: ${mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]}`)
-    cache.set(`mvgAvg120-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg120)
+    debug(
+      `mvgAvg120: last: ${mvgAvg120[mvgAvg120.length - 1]}; -30d: ${
+        mvgAvg120[mvgAvg120.length - 30]
+      }; delta: ${
+        mvgAvg120[mvgAvg120.length - 30] - mvgAvg120[mvgAvg120.length - 1]
+      }`
+    )
+    cache.set(
+      `mvgAvg120-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      mvgAvg120
+    )
 
     mvgAvg150 = calcMovingAverage(sumOfCounts, 150, null)
-    debug(`mvgAvg150: last: ${mvgAvg150[mvgAvg150.length-1]}; -30d: ${mvgAvg150[mvgAvg150.length-30]}; delta: ${mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]}`)
-    cache.set(`mvgAvg150-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvg150)
-    
+    debug(
+      `mvgAvg150: last: ${mvgAvg150[mvgAvg150.length - 1]}; -30d: ${
+        mvgAvg150[mvgAvg150.length - 30]
+      }; delta: ${
+        mvgAvg150[mvgAvg150.length - 30] - mvgAvg150[mvgAvg150.length - 1]
+      }`
+    )
+    cache.set(
+      `mvgAvg150-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      mvgAvg150
+    )
+
     Object.keys(data).forEach((status) => {
-      lastTotalEstimate += 1 * (data[status][data[status].length - 1])
+      lastTotalEstimate += 1 * data[status][data[status].length - 1]
     })
     debug(`lastTotalEstimate: ${lastTotalEstimate}`)
-    cache.set(`lastTotalEstimate-${release ? release : 'none'}-${component ? component : 'none'}`, lastTotalEstimate)
+    cache.set(
+      `lastTotalEstimate-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      lastTotalEstimate
+    )
 
     let mvgAvgDate30
-    let mvgAvgAdd30d = Math.round(30*(lastTotalEstimate/(mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]))) || 'n/a'
+    let mvgAvgAdd30d =
+      Math.round(
+        30 *
+          (lastTotalEstimate /
+            (mvgAvg30[mvgAvg30.length - 30] - mvgAvg30[mvgAvg30.length - 1]))
+      ) || 'n/a'
     if (mvgAvgAdd30d < 0) {
-      mvgAvgAdd30d = 'n/a' 
+      mvgAvgAdd30d = 'n/a'
       mvgAvgDate30 = 'n/a'
     } else {
-      if (mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]) {
-        mvgAvgDate30 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1])))).toLocaleDateString()
+      if (mvgAvg30[mvgAvg30.length - 30] - mvgAvg30[mvgAvg30.length - 1]) {
+        mvgAvgDate30 = new Date()
+          .addDays(
+            Math.round(
+              30 *
+                (lastTotalEstimate /
+                  (mvgAvg30[mvgAvg30.length - 30] -
+                    mvgAvg30[mvgAvg30.length - 1]))
+            )
+          )
+          .toLocaleDateString()
       } else {
-          mvgAvgDate30 = 'n/a'
+        mvgAvgDate30 = 'n/a'
       }
     }
 
     let mvgAvgDate60
-    let mvgAvgAdd60d = Math.round(30*(lastTotalEstimate/(mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]))) || 'n/a'
+    let mvgAvgAdd60d =
+      Math.round(
+        30 *
+          (lastTotalEstimate /
+            (mvgAvg60[mvgAvg60.length - 30] - mvgAvg60[mvgAvg60.length - 1]))
+      ) || 'n/a'
     if (mvgAvgAdd60d < 0) {
-      mvgAvgAdd60d = 'n/a' 
+      mvgAvgAdd60d = 'n/a'
       mvgAvgDate60 = 'n/a'
     } else {
-      if (mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]) {
-        mvgAvgDate60 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1])))).toLocaleDateString()
+      if (mvgAvg60[mvgAvg60.length - 30] - mvgAvg60[mvgAvg60.length - 1]) {
+        mvgAvgDate60 = new Date()
+          .addDays(
+            Math.round(
+              30 *
+                (lastTotalEstimate /
+                  (mvgAvg60[mvgAvg60.length - 30] -
+                    mvgAvg60[mvgAvg60.length - 1]))
+            )
+          )
+          .toLocaleDateString()
       } else {
         mvgAvgDate60 = 'n/a'
       }
     }
 
     let mvgAvgDate90
-    let mvgAvgAdd90d = Math.round(30*(lastTotalEstimate/(mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]))) || 'n/a'
+    let mvgAvgAdd90d =
+      Math.round(
+        30 *
+          (lastTotalEstimate /
+            (mvgAvg90[mvgAvg90.length - 30] - mvgAvg90[mvgAvg90.length - 1]))
+      ) || 'n/a'
     if (mvgAvgAdd90d < 0) {
-      mvgAvgAdd90d = 'n/a' 
+      mvgAvgAdd90d = 'n/a'
       mvgAvgDate90 = 'n/a'
     } else {
-      if (mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]) {
-        mvgAvgDate90 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1])))).toLocaleDateString()
+      if (mvgAvg90[mvgAvg90.length - 30] - mvgAvg90[mvgAvg90.length - 1]) {
+        mvgAvgDate90 = new Date()
+          .addDays(
+            Math.round(
+              30 *
+                (lastTotalEstimate /
+                  (mvgAvg90[mvgAvg90.length - 30] -
+                    mvgAvg90[mvgAvg90.length - 1]))
+            )
+          )
+          .toLocaleDateString()
       } else {
         mvgAvgDate90 = 'n/a'
       }
     }
 
     let mvgAvgDate120
-    let mvgAvgAdd120d = Math.round(30*(lastTotalEstimate/(mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]))) || 'n/a'
+    let mvgAvgAdd120d =
+      Math.round(
+        30 *
+          (lastTotalEstimate /
+            (mvgAvg120[mvgAvg120.length - 30] -
+              mvgAvg120[mvgAvg120.length - 1]))
+      ) || 'n/a'
     if (mvgAvgAdd120d < 0) {
-      mvgAvgAdd120d = 'n/a' 
+      mvgAvgAdd120d = 'n/a'
       mvgAvgDate120 = 'n/a'
     } else {
-      if (mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]) {
-        mvgAvgDate120 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1])))).toLocaleDateString()
+      if (mvgAvg120[mvgAvg120.length - 30] - mvgAvg120[mvgAvg120.length - 1]) {
+        mvgAvgDate120 = new Date()
+          .addDays(
+            Math.round(
+              30 *
+                (lastTotalEstimate /
+                  (mvgAvg120[mvgAvg120.length - 30] -
+                    mvgAvg120[mvgAvg120.length - 1]))
+            )
+          )
+          .toLocaleDateString()
       } else {
         mvgAvgDate120 = 'n/a'
       }
     }
 
     let mvgAvgDate150
-    let mvgAvgAdd150d = Math.round(30*(lastTotalEstimate/(mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]))) || 'n/a'
+    let mvgAvgAdd150d =
+      Math.round(
+        30 *
+          (lastTotalEstimate /
+            (mvgAvg150[mvgAvg150.length - 30] -
+              mvgAvg150[mvgAvg150.length - 1]))
+      ) || 'n/a'
     if (mvgAvgAdd150d < 0) {
-      mvgAvgAdd150d = 'n/a' 
+      mvgAvgAdd150d = 'n/a'
       mvgAvgDate150 = 'n/a'
     } else {
-      if (mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]) {
-        mvgAvgDate150 = new Date().addDays(Math.round(30*(lastTotalEstimate/(mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1])))).toLocaleDateString()
+      if (mvgAvg150[mvgAvg150.length - 30] - mvgAvg150[mvgAvg150.length - 1]) {
+        mvgAvgDate150 = new Date()
+          .addDays(
+            Math.round(
+              30 *
+                (lastTotalEstimate /
+                  (mvgAvg150[mvgAvg150.length - 30] -
+                    mvgAvg150[mvgAvg150.length - 1]))
+            )
+          )
+          .toLocaleDateString()
       } else {
         mvgAvgDate150 = 'n/a'
       }
@@ -3096,71 +3971,112 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
     mvgAvgReleaseDates = {
       '30d': {
-        minus30d: mvgAvg30[mvgAvg30.length-30],
-        minus1d: mvgAvg30[mvgAvg30.length-1],
-        monthlyVelocity: Math.round(mvgAvg30[mvgAvg30.length-30]-mvgAvg30[mvgAvg30.length-1]),
+        minus30d: mvgAvg30[mvgAvg30.length - 30],
+        minus1d: mvgAvg30[mvgAvg30.length - 1],
+        monthlyVelocity: Math.round(
+          mvgAvg30[mvgAvg30.length - 30] - mvgAvg30[mvgAvg30.length - 1]
+        ),
         addDays: mvgAvgAdd30d,
-        date: mvgAvgDate30
+        date: mvgAvgDate30,
       },
       '60d': {
-        minus30d: mvgAvg60[mvgAvg60.length-30],
-        minus1d: mvgAvg60[mvgAvg60.length-1],
-        monthlyVelocity: Math.round(mvgAvg60[mvgAvg60.length-30]-mvgAvg60[mvgAvg60.length-1]),
+        minus30d: mvgAvg60[mvgAvg60.length - 30],
+        minus1d: mvgAvg60[mvgAvg60.length - 1],
+        monthlyVelocity: Math.round(
+          mvgAvg60[mvgAvg60.length - 30] - mvgAvg60[mvgAvg60.length - 1]
+        ),
         addDays: mvgAvgAdd60d,
-        date: mvgAvgDate60
+        date: mvgAvgDate60,
       },
       '90d': {
-        minus30d: mvgAvg90[mvgAvg90.length-30],
-        minus1d: mvgAvg90[mvgAvg90.length-1],
-        monthlyVelocity: Math.round(mvgAvg90[mvgAvg90.length-30]-mvgAvg90[mvgAvg90.length-1]),
+        minus30d: mvgAvg90[mvgAvg90.length - 30],
+        minus1d: mvgAvg90[mvgAvg90.length - 1],
+        monthlyVelocity: Math.round(
+          mvgAvg90[mvgAvg90.length - 30] - mvgAvg90[mvgAvg90.length - 1]
+        ),
         addDays: mvgAvgAdd90d,
-        date: mvgAvgDate90
+        date: mvgAvgDate90,
       },
       '120d': {
-        minus30d: mvgAvg120[mvgAvg120.length-30],
-        minus1d: mvgAvg120[mvgAvg120.length-1],
-        monthlyVelocity: Math.round(mvgAvg120[mvgAvg120.length-30]-mvgAvg120[mvgAvg120.length-1]),
+        minus30d: mvgAvg120[mvgAvg120.length - 30],
+        minus1d: mvgAvg120[mvgAvg120.length - 1],
+        monthlyVelocity: Math.round(
+          mvgAvg120[mvgAvg120.length - 30] - mvgAvg120[mvgAvg120.length - 1]
+        ),
         addDays: mvgAvgAdd120d,
-        date: mvgAvgDate120
+        date: mvgAvgDate120,
       },
       '150d': {
-        minus30d: mvgAvg150[mvgAvg150.length-30],
-        minus1d: mvgAvg150[mvgAvg150.length-1],
-        monthlyVelocity: Math.round(mvgAvg150[mvgAvg150.length-30]-mvgAvg150[mvgAvg150.length-1]),
+        minus30d: mvgAvg150[mvgAvg150.length - 30],
+        minus1d: mvgAvg150[mvgAvg150.length - 1],
+        monthlyVelocity: Math.round(
+          mvgAvg150[mvgAvg150.length - 30] - mvgAvg150[mvgAvg150.length - 1]
+        ),
         addDays: mvgAvgAdd150d,
-        date: mvgAvgDate150
-      }
+        date: mvgAvgDate150,
+      },
     }
     debug(`mvgAvgReleaseDates: `, mvgAvgReleaseDates)
-    cache.set(`mvgAvgReleaseDates-${release ? release : 'none'}-${component ? component : 'none'}`, mvgAvgReleaseDates)
+    cache.set(
+      `mvgAvgReleaseDates-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      mvgAvgReleaseDates
+    )
 
-    mvgAvgDates1d = burndown.dates[burndown.dates.length-1]
-    mvgAvgDates30d = burndown.dates[burndown.dates.length-30]
-    cache.set(`mvgAvgDates-30d-${release ? release : 'none'}-${component ? component : 'none'}`, burndown.dates[burndown.dates.length-30])
-    cache.set(`mvgAvgDates-1d-${release ? release : 'none'}-${component ? component : 'none'}`, burndown.dates[burndown.dates.length-1])
+    mvgAvgDates1d = burndown.dates[burndown.dates.length - 1]
+    mvgAvgDates30d = burndown.dates[burndown.dates.length - 30]
+    cache.set(
+      `mvgAvgDates-30d-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      burndown.dates[burndown.dates.length - 30]
+    )
+    cache.set(
+      `mvgAvgDates-1d-${release ? release : 'none'}-${
+        component ? component : 'none'
+      }`,
+      burndown.dates[burndown.dates.length - 1]
+    )
   }
-  
+
   // debug(`B: versionData: ${versionData}`)
-  if (forecast) { // Have a release date!
+  if (forecast) {
+    // Have a release date!
     // debug(`...Adding dates to burndown.dates to reach ${versionReleaseDate}`)
     const origBurndownDates = Array.from(burndown.dates)
     // Extend the dates to the release date
     burndown.dates = extendDates(burndown.dates, versionReleaseDate)
     // const datesAdded = burndown.dates.length - origBurndownDates.length
-    
+
     // debug(`burndown.dates: added ${datesAdded} new entries`)
     jsrCLM.setCategories(burndown.dates)
-
 
     data['Forecast'] = Array(burndown.dates.length)
     // let hasForecast2 = component ? false : config.has('forecast') && config.forecast.has('teamSize') && typeof config.forecast.teamSize == 'number'
     let hasForecast2 = teamSize > 0
     if (component) {
-      debug(`hasForecast2: with component ${component}: ${config.has('forecast')} && ${config.has('reports')} && ${config.reports.has('componentTeams')} && ${config.reports.componentTeams.has(component)} && ${typeof config.reports.componentTeams[component]} == 'number'`)
-      hasForecast2 = config.has('forecast') && config.has('reports') && config.reports.has('componentTeams') && config.reports.componentTeams.has(component) && typeof config.reports.componentTeams[component] == 'number'
-    } else { // Team forecast
+      debug(
+        `hasForecast2: with component ${component}: ${config.has(
+          'forecast'
+        )} && ${config.has('reports')} && ${config.reports.has(
+          'componentTeams'
+        )} && ${config.reports.componentTeams.has(component)} && ${typeof config
+          .reports.componentTeams[component]} == 'number'`
+      )
+      hasForecast2 =
+        config.has('forecast') &&
+        config.has('reports') &&
+        config.reports.has('componentTeams') &&
+        config.reports.componentTeams.has(component) &&
+        typeof config.reports.componentTeams[component] == 'number'
+    } else {
+      // Team forecast
       // debug(`hasForecast2 without component: ${config.has('forecast')} && ${config.forecast.has('teamSize')} && ${typeof config.forecast.teamSize} == 'number'`)
-      hasForecast2 = config.has('forecast') && config.forecast.has('teamSize') && typeof config.forecast.teamSize == 'number'
+      hasForecast2 =
+        config.has('forecast') &&
+        config.forecast.has('teamSize') &&
+        typeof config.forecast.teamSize == 'number'
     }
     debug(`hasForecast2 = ${hasForecast2}`)
 
@@ -3170,27 +4086,30 @@ server.get('/burndown/:rel', async (req, res, next) => {
 
     // Count # of working days between today and release date
     let workdaySpan = 0
-    let lastActualDay = new Date(origBurndownDates[origBurndownDates.length - 1])
-    lastActualDay.setHours(0,0,0,0)
-    
+    let lastActualDay = new Date(
+      origBurndownDates[origBurndownDates.length - 1]
+    )
+    lastActualDay.setHours(0, 0, 0, 0)
+
     let lastForecastDay = new Date(burndown.dates[burndown.dates.length - 1])
-    lastForecastDay.setHours(0,0,0,0)
-    
+    lastForecastDay.setHours(0, 0, 0, 0)
+
     let loc = origBurndownDates.length
     while (lastActualDay < lastForecastDay) {
-      if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
+      if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) {
+        // Weekday
         workdaySpan++
       }
       lastActualDay.setDate(lastActualDay.getDate() + 1)
     }
-    const burndownRate = Math.ceil(lastTotalEstimate/workdaySpan)
+    const burndownRate = Math.ceil(lastTotalEstimate / workdaySpan)
     let currEstimate = lastTotalEstimate
     let currEstimate2 = currEstimate // Forecast_TeamSize
 
     lastActualDay = new Date(burndown.dates[origBurndownDates.length])
-    lastActualDay.setHours(0,0,0,0)
+    lastActualDay.setHours(0, 0, 0, 0)
     lastActualDay.setDate(lastActualDay.getDate() + 1)
-    
+
     // let locCtr = 0
     let finalForecast2Value = 0
     // Set the forecast value
@@ -3202,16 +4121,20 @@ server.get('/burndown/:rel', async (req, res, next) => {
         data['Forecast_TeamSize'][loc] = Math.round(currEstimate2)
       }
 
-      if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
+      if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) {
+        // Weekday
         currEstimate -= burndownRate
         if (currEstimate < 0) {
-          currEstimate = 0 
+          currEstimate = 0
         }
-        
+
         if (hasForecast2) {
           if (component) {
-            currEstimate2 -= Math.round(config.reports.componentTeams[component] * efficiency)
-          } else { // For the whole team
+            currEstimate2 -= Math.round(
+              config.reports.componentTeams[component] * efficiency
+            )
+          } else {
+            // For the whole team
             currEstimate2 -= Math.round(config.forecast.teamSize * efficiency)
           }
           if (currEstimate2 < 0) {
@@ -3229,20 +4152,44 @@ server.get('/burndown/:rel', async (req, res, next) => {
     // so extend the X axis as needed
     if (hasForecast2) {
       debug(`finalForecast2Value: `, finalForecast2Value)
-      debug(`Forecast_TeamSize ending with ${finalForecast2Value}; ${Math.round(finalForecast2Value/teamSize)} days`)
+      debug(
+        `Forecast_TeamSize ending with ${finalForecast2Value}; ${Math.round(
+          finalForecast2Value / teamSize
+        )} days`
+      )
 
       let continueForecastExtension = finalForecast2Value > 0
-      while (continueForecastExtension && (finalForecast2Value > (-1 * teamSize))) { 
-        jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate() > 9 ? `0${lastActualDay.getDate()}` : lastActualDay.getDate()}`}`)
+      while (continueForecastExtension && finalForecast2Value > -1 * teamSize) {
+        jsrCLM.addCategory(
+          `${lastActualDay.getFullYear()}-0${lastActualDay.getMonth() + 1}-${
+            lastActualDay.getDate() > 9
+              ? lastActualDay.getDate()
+              : `0${
+                  lastActualDay.getDate() > 9
+                    ? `0${lastActualDay.getDate()}`
+                    : lastActualDay.getDate()
+                }`
+          }`
+        )
         loc += 1
-        if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) { // Weekday
+        if (lastActualDay.getDay() > 0 && lastActualDay.getDay() < 6) {
+          // Weekday
           finalForecast2Value -= Math.round(teamSize * efficiency)
-          data['Forecast_TeamSize'][loc] = Math.max(Math.round(finalForecast2Value), 0)
-          debug(`setting data['Forecast_TeamSize'][${loc}] to ${data['Forecast_TeamSize'][loc]} on ${lastActualDay}`)
+          data['Forecast_TeamSize'][loc] = Math.max(
+            Math.round(finalForecast2Value),
+            0
+          )
+          debug(
+            `setting data['Forecast_TeamSize'][${loc}] to ${data['Forecast_TeamSize'][loc]} on ${lastActualDay}`
+          )
           // data['x'][loc] = lastActualDay
         } else {
-          debug(`WEEKEND: setting data['Forecast_TeamSize'][${loc}] to ${data['Forecast_TeamSize'][loc-1]} on ${lastActualDay}`)
-          data['Forecast_TeamSize'][loc] = data['Forecast_TeamSize'][loc-1]
+          debug(
+            `WEEKEND: setting data['Forecast_TeamSize'][${loc}] to ${
+              data['Forecast_TeamSize'][loc - 1]
+            } on ${lastActualDay}`
+          )
+          data['Forecast_TeamSize'][loc] = data['Forecast_TeamSize'][loc - 1]
         }
         if (finalForecast2Value < 0) {
           continueForecastExtension = false
@@ -3253,45 +4200,93 @@ server.get('/burndown/:rel', async (req, res, next) => {
       debug(`finalForecast2Value: `, finalForecast2Value)
       if (hasForecast2) {
         // Add final data point
-        debug(`jsrCLM.addCategory(${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+        debug(
+          `jsrCLM.addCategory(${lastActualDay.getFullYear()}-0${
+            lastActualDay.getMonth() + 1
+          }-${
+            lastActualDay.getDate() > 9
+              ? lastActualDay.getDate()
+              : `0${lastActualDay.getDate()}`
+          }`
+        )
 
-        jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+        jsrCLM.addCategory(
+          `${lastActualDay.getFullYear()}-0${lastActualDay.getMonth() + 1}-${
+            lastActualDay.getDate() > 9
+              ? lastActualDay.getDate()
+              : `0${lastActualDay.getDate()}`
+          }`
+        )
 
         lastActualDay.setDate(lastActualDay.getDate() + 1)
 
-        jsrCLM.addCategory(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
+        jsrCLM.addCategory(
+          `${lastActualDay.getFullYear()}-0${lastActualDay.getMonth() + 1}-${
+            lastActualDay.getDate() > 9
+              ? lastActualDay.getDate()
+              : `0${lastActualDay.getDate()}`
+          }`
+        )
 
-        debug(`${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}`)
-        
-        data['Forecast_TeamSize'][loc+1] = 0
-        debug(`FINAL: data['Forecast_TeamSize'][${loc+1}] set to 0`)
+        debug(
+          `${lastActualDay.getFullYear()}-0${lastActualDay.getMonth() + 1}-${
+            lastActualDay.getDate() > 9
+              ? lastActualDay.getDate()
+              : `0${lastActualDay.getDate()}`
+          }`
+        )
+
+        data['Forecast_TeamSize'][loc + 1] = 0
+        debug(`FINAL: data['Forecast_TeamSize'][${loc + 1}] set to 0`)
       }
     }
 
     res.write(`<hr>`)
     res.write(`<ul class="list-unstyled">`)
     res.write(`<li><em>Release Date:</em> ${versionReleaseDate}</li>`)
-    res.write(`<li><em>Total Working Days:</em> ${workdaySpan} working days</li>`)
-    res.write(`<li><em>Last Estimate (Total):</em> ${lastTotalEstimate} days</li>`)
+    res.write(
+      `<li><em>Total Working Days:</em> ${workdaySpan} working days</li>`
+    )
+    res.write(
+      `<li><em>Last Estimate (Total):</em> ${lastTotalEstimate} days</li>`
+    )
     res.write(`<li><em>Burndown Rate:</em> ${burndownRate} estDays/day</li>`)
     if (hasForecast2) {
-      res.write(`<li><em>Forecast_TeamSize:</em> ${Math.round(teamSize*efficiency)} estDays/day (Done: ${lastActualDay.getFullYear()}-0${lastActualDay.getMonth()+1}-${lastActualDay.getDate() > 9 ? lastActualDay.getDate() : `0${lastActualDay.getDate()}`}; Team Size: ${teamSize} people; Efficiency Score: ${efficiency})</li>`)
+      res.write(
+        `<li><em>Forecast_TeamSize:</em> ${Math.round(
+          teamSize * efficiency
+        )} estDays/day (Done: ${lastActualDay.getFullYear()}-0${
+          lastActualDay.getMonth() + 1
+        }-${
+          lastActualDay.getDate() > 9
+            ? lastActualDay.getDate()
+            : `0${lastActualDay.getDate()}`
+        }; Team Size: ${teamSize} people; Efficiency Score: ${efficiency})</li>`
+      )
     }
     res.write(`</ul>`)
-  } else { // No release date, so stop the chart at the end of the actual estimates
+  } else {
+    // No release date, so stop the chart at the end of the actual estimates
     jsrCLM.setCategories(burndown.dates)
   }
 
   // debug(`>>> forecast? `, forecast)
   // debug(`>>> data.length: `, data)
-  
+
   let chartResponse = { status: 'pending' }
 
   jsrCLM
     .setLineChart()
     .setSize({ h: 600, w: 800 })
     .setFill(false)
-    .buildChartImgTag(`Burndown: ${release ? (release === 'NONE' ? 'No release set' : release) : 'All' } ${component ? ' (Component: ' + component + ')' : '' }`, data, "stacked-bar", 'days')
+    .buildChartImgTag(
+      `Burndown: ${
+        release ? (release === 'NONE' ? 'No release set' : release) : 'All'
+      } ${component ? ' (Component: ' + component + ')' : ''}`,
+      data,
+      'stacked-bar',
+      'days'
+    )
     .then((link) => {
       if (typeof link === typeof {}) {
         res.write(link.err)
@@ -3310,13 +4305,27 @@ server.get('/burndown/:rel', async (req, res, next) => {
     .finally(async () => {
       let mvgAvgCalcHtml = []
       res.write(bsAccordionStart('accordion2'))
-      mvgAvgCalcHtml.push(`<p><em>Total Work Remaining</em>: ${Math.round(lastTotalEstimate)} days</p>`)
-      mvgAvgCalcHtml.push(`<p><em>Formula</em>: Today + (Days Work Remaining); `)
+      mvgAvgCalcHtml.push(
+        `<p><em>Total Work Remaining</em>: ${Math.round(
+          lastTotalEstimate
+        )} days</p>`
+      )
+      mvgAvgCalcHtml.push(
+        `<p><em>Formula</em>: Today + (Days Work Remaining); `
+      )
       mvgAvgCalcHtml.push(`<ul>`)
-      mvgAvgCalcHtml.push(`<li><em>Days Work Remaining</em> = 30 * Monthly Work Remaining</li>`)
-      mvgAvgCalcHtml.push(`<li><em>Monthly Work Remaining</em> = Total Work Remaining / Monthly Velocity</li>`)
-      mvgAvgCalcHtml.push(`<li><em>Total Work Remaining</em> = Sum of remaining work (days)</li>`)
-      mvgAvgCalcHtml.push(`<li><em>Monthly Velocity</em> = mvgAvg[30d ago] - mvgAvg[yesterday] = mvgAvg[${mvgAvgDates30d}]-mvgAvg[${mvgAvgDates1d}]</li>`)
+      mvgAvgCalcHtml.push(
+        `<li><em>Days Work Remaining</em> = 30 * Monthly Work Remaining</li>`
+      )
+      mvgAvgCalcHtml.push(
+        `<li><em>Monthly Work Remaining</em> = Total Work Remaining / Monthly Velocity</li>`
+      )
+      mvgAvgCalcHtml.push(
+        `<li><em>Total Work Remaining</em> = Sum of remaining work (days)</li>`
+      )
+      mvgAvgCalcHtml.push(
+        `<li><em>Monthly Velocity</em> = mvgAvg[30d ago] - mvgAvg[yesterday] = mvgAvg[${mvgAvgDates30d}]-mvgAvg[${mvgAvgDates1d}]</li>`
+      )
       mvgAvgCalcHtml.push(`</ul></p>`)
       mvgAvgCalcHtml.push(`<table class='table table-sm'>
         <thead>
@@ -3330,7 +4339,11 @@ server.get('/burndown/:rel', async (req, res, next) => {
       Object.keys(mvgAvgReleaseDates).forEach((mvgAvgData) => {
         mvgAvgCalcHtml.push(`<tr>
           <td>${mvgAvgData}</td>
-          <td>${mvgAvgReleaseDates[mvgAvgData]['monthlyVelocity']} (${Math.round(mvgAvgReleaseDates[mvgAvgData]['minus30d'])}-${Math.round(mvgAvgReleaseDates[mvgAvgData]['minus1d'])})</td>
+          <td>${
+            mvgAvgReleaseDates[mvgAvgData]['monthlyVelocity']
+          } (${Math.round(
+          mvgAvgReleaseDates[mvgAvgData]['minus30d']
+        )}-${Math.round(mvgAvgReleaseDates[mvgAvgData]['minus1d'])})</td>
           <td>${mvgAvgReleaseDates[mvgAvgData]['addDays']}</td>
           <td>${mvgAvgReleaseDates[mvgAvgData]['date']}</td></tr>`)
       })
@@ -3343,32 +4356,64 @@ server.get('/burndown/:rel', async (req, res, next) => {
       if (chartResponse.status == 'ok') {
         // Show summary stats table
         let burndownStats = await jdr.getBurndownStats(release, component)
-        let burndownStatsTotals = [ 0, 0, 0, 0, 0 ]
+        let burndownStatsTotals = [0, 0, 0, 0, 0]
         burndownStatsHtml.push(`<table class='table table-sm'>
           <thead><tr><th>Status</th>
-          <th>${burndownStats.dates[burndownStats.dates.length-1]} (Yesterday)</th>
-          <th>${burndownStats.dates[burndownStats.dates.length-7]} (7d ago)</th>
-          <th>${burndownStats.dates[burndownStats.dates.length-14]} (14d ago)</th>
-          <th>${burndownStats.dates[burndownStats.dates.length-30]} (30d ago)</th>
-          <th>${burndownStats.dates[burndownStats.dates.length-60]} (60d ago)</th>
+          <th>${
+            burndownStats.dates[burndownStats.dates.length - 1]
+          } (Yesterday)</th>
+          <th>${
+            burndownStats.dates[burndownStats.dates.length - 7]
+          } (7d ago)</th>
+          <th>${
+            burndownStats.dates[burndownStats.dates.length - 14]
+          } (14d ago)</th>
+          <th>${
+            burndownStats.dates[burndownStats.dates.length - 30]
+          } (30d ago)</th>
+          <th>${
+            burndownStats.dates[burndownStats.dates.length - 60]
+          } (60d ago)</th>
           </thead>`)
         burndownStatsHtml.push(`<tbody>`)
-        Object.keys(burndownStats.stats).sort().forEach((status) => {
-          burndownStatsHtml.push(`<tr>
+        Object.keys(burndownStats.stats)
+          .sort()
+          .forEach((status) => {
+            burndownStatsHtml.push(`<tr>
             <td class='text-center'>${status}</td>
-            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-1]}</td>
-            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-7]}</td>
-            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-14]}</td>
-            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-30]}</td>
-            <td class='text-center'>${burndownStats.stats[status][burndownStats.dates.length-60]}</td>
+            <td class='text-center'>${
+              burndownStats.stats[status][burndownStats.dates.length - 1]
+            }</td>
+            <td class='text-center'>${
+              burndownStats.stats[status][burndownStats.dates.length - 7]
+            }</td>
+            <td class='text-center'>${
+              burndownStats.stats[status][burndownStats.dates.length - 14]
+            }</td>
+            <td class='text-center'>${
+              burndownStats.stats[status][burndownStats.dates.length - 30]
+            }</td>
+            <td class='text-center'>${
+              burndownStats.stats[status][burndownStats.dates.length - 60]
+            }</td>
             </tr>`)
-        
-          burndownStatsTotals[0] += Math.round(burndownStats.stats[status][burndownStats.dates.length-1])
-          burndownStatsTotals[1] += Math.round(burndownStats.stats[status][burndownStats.dates.length-7])
-          burndownStatsTotals[2] += Math.round(burndownStats.stats[status][burndownStats.dates.length-14])
-          burndownStatsTotals[3] += Math.round(burndownStats.stats[status][burndownStats.dates.length-30])
-          burndownStatsTotals[4] += Math.round(burndownStats.stats[status][burndownStats.dates.length-60])
-        })
+
+            burndownStatsTotals[0] += Math.round(
+              burndownStats.stats[status][burndownStats.dates.length - 1]
+            )
+            burndownStatsTotals[1] += Math.round(
+              burndownStats.stats[status][burndownStats.dates.length - 7]
+            )
+            burndownStatsTotals[2] += Math.round(
+              burndownStats.stats[status][burndownStats.dates.length - 14]
+            )
+            burndownStatsTotals[3] += Math.round(
+              burndownStats.stats[status][burndownStats.dates.length - 30]
+            )
+            burndownStatsTotals[4] += Math.round(
+              burndownStats.stats[status][burndownStats.dates.length - 60]
+            )
+          })
 
         burndownStatsHtml.push(`<tr>
           <td class='text-center'>Total</td>
@@ -3389,9 +4434,29 @@ server.get('/burndown/:rel', async (req, res, next) => {
           // if (release) { // Only print the forecast button if a release was selected
           let componentStr = component ? `&component=${component}` : ''
           if (forecast) {
-            res.write(simpleButton('Disable Forecast', '#', true, false, 'btn-outline-success', false, `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no${componentStr}'; return false;`))
+            res.write(
+              simpleButton(
+                'Disable Forecast',
+                '#',
+                true,
+                false,
+                'btn-outline-success',
+                false,
+                `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=no${componentStr}'; return false;`
+              )
+            )
           } else {
-            res.write(simpleButton('Enable Forecast', '#', true, false, false, '', `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes${componentStr}'; return false;`))
+            res.write(
+              simpleButton(
+                'Enable Forecast',
+                '#',
+                true,
+                false,
+                false,
+                '',
+                `document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=yes${componentStr}'; return false;`
+              )
+            )
           }
         }
       }
@@ -3402,21 +4467,29 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // res.write(`<p>`)
       // res.write(`<div class="btn-group" role="group" aria-label="Component special filter buttons">`) // start button group
       // All components
-      if (component) { // A component filter has been selected; this link is to remove that selection
-        res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=${forecast}'; return false;" type="button" class="btn btn-outline-info">Remove filter</a>`)
+      if (component) {
+        // A component filter has been selected; this link is to remove that selection
+        res.write(
+          `<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?forecast=${forecast}'; return false;" type="button" class="btn btn-outline-info">Remove filter</a>`
+        )
       }
       res.write(`</p>`)
 
       // No component set -- should always be available
-      res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-warning">Empty Component</a></li>`)
+      res.write(
+        `<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=NONE&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-warning">Empty Component</a></li>`
+      )
       // res.write(`</div>`) // End no/empty filter button group
-      
+
       // Individual components
       componentList.forEach((c) => {
         // debug(`component: ${component}; c: ${c}; equal? ${component == c}`)
         if (component != c) {
-          res.write(`<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-primary">${c}</a>`)
-        } else { // Just print a dead button
+          res.write(
+            `<a href="" onClick="document.location.href=window.location.protocol + '//' + window.location.hostname + ':' + window.location.port + window.location.pathname + '?component=${c}&forecast=${forecast}'; return false;" type="button" class="btn btn-outline-primary">${c}</a>`
+          )
+        } else {
+          // Just print a dead button
           res.write(simpleButton(c, false, false))
           // res.write(`<button type="button" class="btn btn-secondary .disabled" disabled aria-disabled="true">${c}</button>`)
         }
@@ -3436,19 +4509,36 @@ server.get('/burndown/:rel', async (req, res, next) => {
       // showReleased toggle button
       let releasedLinkHtml = `<div>`
       if (showReleased) {
-        releasedLinkHtml += simpleButton('Hide Released Versions', './?showReleased=no', true)
+        releasedLinkHtml += simpleButton(
+          'Hide Released Versions',
+          './?showReleased=no',
+          true
+        )
       } else {
-        releasedLinkHtml += simpleButton('Show Released Versions', './?showReleased=yes', true)
+        releasedLinkHtml += simpleButton(
+          'Show Released Versions',
+          './?showReleased=yes',
+          true
+        )
       }
       releasedLinkHtml += '</div>'
       // res.write(bsAccordionAdd(2, 'Show Released Versions', 'accordion1', releasedLinkHtml))
       res.write(releasedLinkHtml)
 
-      res.write(bsAccordionAdd(1, 'Burndown Stats', 'accordion1', burndownStatsHtml.join('')))
+      res.write(
+        bsAccordionAdd(
+          1,
+          'Burndown Stats',
+          'accordion1',
+          burndownStatsHtml.join('')
+        )
+      )
       // res.write(bsAccordionAdd(2, 'Image', 'accordion1', `<img id="exported"></img>`))
       res.write(bsAccordionEnd())
 
-      res.write(bsAccordionAdd(2, 'MvgAvg Data', 'accordion2', mvgAvgCalcHtml.join('')))
+      res.write(
+        bsAccordionAdd(2, 'MvgAvg Data', 'accordion2', mvgAvgCalcHtml.join(''))
+      )
       res.write(bsAccordionEnd())
 
       res.write(buildHtmlFooter())
@@ -3458,11 +4548,16 @@ server.get('/burndown/:rel', async (req, res, next) => {
 })
 
 function bsAccordionStart(id = 'genericAccordion') {
-  return(`<div class='accordion' id='accordion${id}'>`)
+  return `<div class='accordion' id='accordion${id}'>`
 }
 
-function bsAccordionAdd(id = 1, itemTitle = 'Accordion Item', accordionId = 'genericAccordion', content = '') {
-  return(`
+function bsAccordionAdd(
+  id = 1,
+  itemTitle = 'Accordion Item',
+  accordionId = 'genericAccordion',
+  content = ''
+) {
+  return `
   <div class='card'>
     <div class="card-header" id="heading${id}">
       <h2 class="mb-0">
@@ -3476,15 +4571,15 @@ function bsAccordionAdd(id = 1, itemTitle = 'Accordion Item', accordionId = 'gen
         ${content}
       </div>
     </div>
-  </div>`)
+  </div>`
 }
 
 function bsAccordionEnd() {
-  return(`</div>`)
+  return `</div>`
 }
 
 function getSmallTimestamp() {
-  return(`<small style="color: gray; position: inherit; text-align: left; display: block; padding: 0px 30px 0px 15px; font-weight: 100; font-style: inherit; font-size: small; font-family: 'Inconsolata', monospace;">${new Date().toISOString()}</small>`)
+  return `<small style="color: gray; position: inherit; text-align: left; display: block; padding: 0px 30px 0px 15px; font-weight: 100; font-style: inherit; font-size: small; font-family: 'Inconsolata', monospace;">${new Date().toISOString()}</small>`
 }
 
 /**
@@ -3492,27 +4587,34 @@ function getSmallTimestamp() {
  *
  * @param {array} origList Array of dates
  * @param {string} newEndDate New final date
- * 
+ *
  * @returns {array} newList Array of dates to new end date
  */
 function extendDates(origList, newEndDate) {
-  debug(`extendDates called: origList length: `, origList.length, `; origList[origList.length - 1]: `, origList[origList.length - 1], `; newEndDate: `, newEndDate)
+  debug(
+    `extendDates called: origList length: `,
+    origList.length,
+    `; origList[origList.length - 1]: `,
+    origList[origList.length - 1],
+    `; newEndDate: `,
+    newEndDate
+  )
   if (newEndDate <= origList[origList.length - 1]) {
     debug(`... newEndDate <= last origList entry. Returning origList`)
-    return(origList)
+    return origList
   } else {
     const newList = origList
-    let d = new Date(origList[origList.length -1])
+    let d = new Date(origList[origList.length - 1])
     const offset = d.getTimezoneOffset()
 
-    d = new Date(d.getTime() - (offset * 60 * 1000))
+    d = new Date(d.getTime() - offset * 60 * 1000)
     d.setDate(d.getDate() + 2)
 
     let newEndD = new Date(newEndDate)
-    newEndD = new Date(newEndD.getTime() - (offset * 60 * 1000))
-    
-    newEndD.setHours(0,0,0,0)
-    d.setHours(0,0,0,0)
+    newEndD = new Date(newEndD.getTime() - offset * 60 * 1000)
+
+    newEndD.setHours(0, 0, 0, 0)
+    d.setHours(0, 0, 0, 0)
 
     // debug(`... is newEndD (${newEndD}) >= d (${d})?`)
     while (newEndD >= d) {
@@ -3521,7 +4623,7 @@ function extendDates(origList, newEndDate) {
       // debug(`...incrementing d ${d}; newEndD > d ? `, (newEndD > d))
     }
     // newList.push("2020-11-30")
-    return(newList)
+    return newList
   }
 }
 
@@ -3542,7 +4644,7 @@ server.get('/chart', (req, res, next) => {
   debug(`typeFilter: ${typeFilter}`)
 
   // Calc cache key
-  const cacheKey = XXH.h32(JSON.stringify(req.query), 0xABCD ).toString()
+  const cacheKey = XXH.h32(JSON.stringify(req.query), 0xabcd).toString()
   debug(`cacheKey: `, cacheKey, ` from ${JSON.stringify(req.query)}`)
 
   let dates, series, statuses, reZero, reZeroData
@@ -3556,11 +4658,11 @@ server.get('/chart', (req, res, next) => {
     // let series = JSON.parse(JSON.stringify(jdr.getSeriesData()))
     series = { ...jdr.getSeriesData(typeFilter) }
     statuses = Object.keys(series)
-    
+
     const cacheData = {
       dates: dates,
       series: series,
-      statuses: statuses
+      statuses: statuses,
     }
     cache.set(cacheKey, cacheData)
   } else {
@@ -3605,7 +4707,7 @@ server.get('/chart', (req, res, next) => {
       // .setFill(true)
       .setFill(false)
 
-      .buildChartImgTag(chartTitle, null, "line")
+      .buildChartImgTag(chartTitle, null, 'line')
       .then((link) => {
         // debug(`buildChartImgTag returned ${link}`)
         res.write(link)
@@ -3631,10 +4733,12 @@ server.get('/components', async (req, res, next) => {
 })
 
 server.get('/issueTypes', async (req, res, next) => {
-  let activeProjectOnly = (req.query.all && req.query.all == 'yes') ? false : true
+  let activeProjectOnly = req.query.all && req.query.all == 'yes' ? false : true
   debug(`... activeProjectOnly: ${activeProjectOnly}`)
-  
-  const title = `Issue Types: ${activeProjectOnly ? config.get('project') : 'Complete List'}`
+
+  const title = `Issue Types: ${
+    activeProjectOnly ? config.get('project') : 'Complete List'
+  }`
 
   res.writeHead(200, { 'Content-Type': 'text/html' })
   res.write(buildHtmlHeader(title, false))
@@ -3643,7 +4747,9 @@ server.get('/issueTypes', async (req, res, next) => {
   if (activeProjectOnly) {
     res.write(`<a href='?all=yes'>Show all issue types</a>`)
   } else {
-    res.write(`<a href='?all=no'>Show only ${config.get('project')} issue types</a>`)
+    res.write(
+      `<a href='?all=no'>Show only ${config.get('project')} issue types</a>`
+    )
   }
   res.write(`</div>`)
   const issueTypes = await jsr.getIssueTypes(activeProjectOnly)
@@ -3660,14 +4766,14 @@ server.get('/issueTypes', async (req, res, next) => {
   </thead>
   <tbody>`)
   // issueTypes.sort((a, b) => { return a.name - b.name })
-  issueTypes.sort((a, b) => { 
-    if (a.name < b.name) { 
-      return -1 
+  issueTypes.sort((a, b) => {
+    if (a.name < b.name) {
+      return -1
     }
     if (a.name > b.name) {
-      return 1 
-    } 
-    return 0 
+      return 1
+    }
+    return 0
   })
   issueTypes.forEach((t) => {
     res.write(`<tr>
@@ -3688,13 +4794,17 @@ server.get('/links', (req, res, next) => {
     .getLinks(req.query.id)
     .then((issueResult) => {
       if (req.query.format && req.query.format == 'html') {
-
         const title = `Links for ${req.query.id}`
         res.writeHead(200, { 'Content-Type': 'text/html' })
         res.write(buildHtmlHeader(title, false))
         res.write(buildPageHeader(title))
 
-        res.write(MermaidNodes.buildMermaidLinkChart(issueResult, `/links?format=html&id=`))
+        res.write(
+          MermaidNodes.buildMermaidLinkChart(
+            issueResult,
+            `/links?format=html&id=`
+          )
+        )
         res.write(buildHtmlFooter())
       } else {
         debug(`writing to json`)
@@ -3714,9 +4824,9 @@ server.get('/links', (req, res, next) => {
  */
 function getStatusExclusionString() {
   if (hasStatusExclusionList()) {
-    return(` status not in (${getStatusExclusionList().join(',')})`)
+    return ` status not in (${getStatusExclusionList().join(',')})`
   } else {
-    return('')
+    return ''
   }
 }
 
@@ -3727,9 +4837,9 @@ function getStatusExclusionString() {
  */
 function getStatusExclusionList() {
   if (hasStatusExclusionList()) {
-    return(config.get('excludeFromEstimateQueries'))
+    return config.get('excludeFromEstimateQueries')
   } else {
-    return([])
+    return []
   }
 }
 
@@ -3740,7 +4850,7 @@ function getStatusExclusionList() {
  * @returns boolean
  */
 function hasStatusExclusionList() {
-  return(config.has('excludeFromEstimateQueries'))
+  return config.has('excludeFromEstimateQueries')
 }
 
 /**
@@ -3751,25 +4861,48 @@ function hasStatusExclusionList() {
  */
 async function getProjectStoryEstimates(project = config.get('project')) {
   if (!cache.has(`story-estimates-${project}`)) {
-    cache.set(`story-estimates-${project}`, await jsr._genericJiraSearch(`issuetype=story AND project="${project}" ${hasStatusExclusionList() ? ` AND ${getStatusExclusionString()}` : ''}`, 99, ['fixVersions', 'aggregateprogress', 'timeoriginalestimate', 'status', 'assignee']))
+    cache.set(
+      `story-estimates-${project}`,
+      await jsr._genericJiraSearch(
+        `issuetype=story AND project="${project}" ${
+          hasStatusExclusionList() ? ` AND ${getStatusExclusionString()}` : ''
+        }`,
+        99,
+        [
+          'fixVersions',
+          'aggregateprogress',
+          'timeoriginalestimate',
+          'status',
+          'assignee',
+        ]
+      )
+    )
   }
   return cache.get(`story-estimates-${project}`)
 }
 
 server.get('/unestimated', async (req, res, next) => {
-  const projStoryEstimates = await getProjectStoryEstimates(config.get('project'))
+  const projStoryEstimates = await getProjectStoryEstimates(
+    config.get('project')
+  )
   if (req.query && req.query.format == 'html') {
     res.writeHead(200, { 'Content-Type': 'text/html' })
     const header = 'Unestimated Stories'
     res.write(buildHtmlHeader(header, false))
     res.write(buildPageHeader(header))
-    res.write(hasStatusExclusionList() ? `<p><em>Excluding</em>: ${getStatusExclusionList().join(',')}</p>` : '')
+    res.write(
+      hasStatusExclusionList()
+        ? `<p><em>Excluding</em>: ${getStatusExclusionList().join(',')}</p>`
+        : ''
+    )
     /* Compile data for table:
      * results = { <rel_name>: [array_of_Jira_keys...], ... }
      */
     const results = {}
     projStoryEstimates.issues.forEach((issue) => {
-      const relName = issue.fields.fixVersions.length ? issue.fields.fixVersions[0].name : 'No-Release'
+      const relName = issue.fields.fixVersions.length
+        ? issue.fields.fixVersions[0].name
+        : 'No-Release'
 
       // Initialize the object
       if (!Object.keys(results).includes(relName)) {
@@ -3791,9 +4924,11 @@ server.get('/unestimated', async (req, res, next) => {
        *
        * TODO: Include Story if any of the children haven't been estimated
        */
-      if ( ( issue.fields.aggregateprogress && issue.fields.aggregateprogress.total === 0)
-          && ( issue.fields.timeoriginalestimate == null )
-          ) {
+      if (
+        issue.fields.aggregateprogress &&
+        issue.fields.aggregateprogress.total === 0 &&
+        issue.fields.timeoriginalestimate == null
+      ) {
         results[relName].unestimated.push(issue.key)
       }
     })
@@ -3811,7 +4946,7 @@ server.get('/unestimated', async (req, res, next) => {
       </tr>
     </thead>
     <tbody>`)
-    
+
     // Track Story counts
     let runningTotal = 0
     let runningUnEstTotal = 0
@@ -3821,9 +4956,25 @@ server.get('/unestimated', async (req, res, next) => {
       res.write(`
       <tr>
         <td>${rel}</td>
-        <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=key%20in%20(${results[rel].unestimated.join(',')})' target='_blank'>${results[rel].unestimated.length}</a></td>
-        <td class='text-center'><a href='${config.get('jira.protocol')}://${config.get('jira.host')}/issues/?jql=fixVersion${release}%20AND%20project="${config.get('project')}"%20AND%20issuetype="Story"${hasStatusExclusionList() ? ` AND ${getStatusExclusionString()}` : ""}' target='_blank'>${results[rel].totalCount}</a></td>
-        <td class='text-center'>${Math.round((100*results[rel].unestimated.length/results[rel].totalCount))}%</td>
+        <td class='text-center'><a href='${config.get(
+          'jira.protocol'
+        )}://${config.get('jira.host')}/issues/?jql=key%20in%20(${results[
+        rel
+      ].unestimated.join(',')})' target='_blank'>${
+        results[rel].unestimated.length
+      }</a></td>
+        <td class='text-center'><a href='${config.get(
+          'jira.protocol'
+        )}://${config.get(
+        'jira.host'
+      )}/issues/?jql=fixVersion${release}%20AND%20project="${config.get(
+        'project'
+      )}"%20AND%20issuetype="Story"${
+        hasStatusExclusionList() ? ` AND ${getStatusExclusionString()}` : ''
+      }' target='_blank'>${results[rel].totalCount}</a></td>
+        <td class='text-center'>${Math.round(
+          (100 * results[rel].unestimated.length) / results[rel].totalCount
+        )}%</td>
       </tr>`)
 
       runningTotal += results[rel].totalCount
@@ -3834,7 +4985,9 @@ server.get('/unestimated', async (req, res, next) => {
     <td><em>Total</em></td>
     <td class='text-center'>${runningUnEstTotal}</td>
     <td class='text-center'>${runningTotal}</td>
-    <td class='text-center'>${Math.round((100*runningUnEstTotal/runningTotal))}%</td>
+    <td class='text-center'>${Math.round(
+      (100 * runningUnEstTotal) / runningTotal
+    )}%</td>
     </tbody></table>`)
     res.write(buildHtmlFooter())
     res.end()
@@ -3846,11 +4999,22 @@ server.get('/unestimated', async (req, res, next) => {
 
 server.get('/query', async (req, res, next) => {
   try {
-    let fields = req.query.fields ? req.query.fields.split(';') : ['fixVersions']
-    let cacheTTL = req.query.ttl && (!isNaN(parseInt(req.query.ttl)) && isFinite(req.query.ttl)) ? parseInt(req.query.ttl) : CACHE_TTL
+    let fields = req.query.fields
+      ? req.query.fields.split(';')
+      : ['fixVersions']
+    let cacheTTL =
+      req.query.ttl &&
+      !isNaN(parseInt(req.query.ttl)) &&
+      isFinite(req.query.ttl)
+        ? parseInt(req.query.ttl)
+        : CACHE_TTL
 
     debug(`/query: cacheTTL = ${cacheTTL}`)
-    let showChanges = req.query.changes && (req.query.changes == "yes" || req.query.changes == "true") ? true : false
+    let showChanges =
+      req.query.changes &&
+      (req.query.changes == 'yes' || req.query.changes == 'true')
+        ? true
+        : false
     debug(`/query: showChanges: ${showChanges}; JQL: ${req.query.jsql}`)
 
     if (!cache.has(req.query.jql)) {
@@ -3858,9 +5022,18 @@ server.get('/query', async (req, res, next) => {
 
       let createdDate = Math.floor(+new Date() / 1000)
       let expDate = createdDate + cacheTTL
-      
-      let cacheData = await jsr._genericJiraSearch(req.query.jql, 99, fields, showChanges)
-      cacheData.cache = { status: "new", created: createdDate, expires: expDate }
+
+      let cacheData = await jsr._genericJiraSearch(
+        req.query.jql,
+        99,
+        fields,
+        showChanges
+      )
+      cacheData.cache = {
+        status: 'new',
+        created: createdDate,
+        expires: expDate,
+      }
       cache.set(req.query.jql, cacheData, cacheTTL)
 
       res.send(cache.get(req.query.jql))
@@ -3868,7 +5041,7 @@ server.get('/query', async (req, res, next) => {
       debug(`cache entry found for ${req.query.jql}, so returning it`)
       res.send(tagCache(cache.get(req.query.jql)))
     }
-  } catch(err) {
+  } catch (err) {
     res.send({ error: err })
   }
   return next()
@@ -3926,6 +5099,26 @@ server.get('/datafilesJSR', (req, res, next) => {
   } catch (err) {
     res.send(500, err)
   }
+  return next()
+})
+
+server.get('/JDP-report', async (req, res, next) => {
+  let showChanges = true
+  let fields = ''
+
+  let data = await jsr._genericJiraSearch(
+    req.query.jql,
+    99,
+    fields,
+    showChanges
+  )
+  try {
+    jdp.data(data)
+    res.send(jdp.timelines)
+  } catch (err) {
+    res.send(err)
+  }
+
   return next()
 })
 

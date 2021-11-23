@@ -301,6 +301,7 @@ class JiraDataParser {
    * Build timeline for a single issue
    * @param {Object} issueData Jira data object
    * {
+   *    title: <String>      // Jira issue title/name
    *    age: {
    *      days: <#>          // # of days old
    *      source: <String>   // Where the Age comes from
@@ -322,6 +323,7 @@ class JiraDataParser {
    */
   _buildIssueTimeline(issueData) {
     let timeline = {
+      title: '',
       age: { days: 0, source: '' },
       ageStatus: 0,
       ageAssignee: 0,
@@ -329,6 +331,8 @@ class JiraDataParser {
       statusChanges: 0,
       assignee: { count: 0, changes: 0, list: [] },
     }
+
+    timeline.title = issueData.fields.summary
 
     // age and ageSource
     // Try first from the 'created' field, if it exists
