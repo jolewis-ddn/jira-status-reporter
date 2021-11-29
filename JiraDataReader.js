@@ -1,27 +1,28 @@
-"use strict";
+/** @format */
 
-const debug = require("debug")("JDR");
+'use strict'
 
-const fs = require("fs");
-const glob = require("glob");
-const path = require("path");
+const debug = require('debug')('JDR')
 
-const utilities = require('./utilities');
-const { convertSecondsToDays } = require("./jiraUtils");
+const fs = require('fs')
+const glob = require('glob')
+const path = require('path')
+
+const utilities = require('./utilities')
+const { convertSecondsToDays } = require('./jiraUtils')
 
 const config = require('config')
 const dataPath = config.has('dataPath') ? config.get('dataPath') : 'data'
 const dataPathPrefix = '.' + path.sep + dataPath + path.sep
 
-const NodeCache = require("node-cache");
+const NodeCache = require('node-cache')
 
 // const JSR = require('./JiraStatusReporter')
 
-const JiraDataCache = require("./JiraDataCache");
-const { CANCELLED } = require("dns");
+const JiraDataCache = require('./JiraDataCache')
 
-const ALL_RELEASES = "ALL_RELEASES";
-const NO_RELEASE = "NONE";
+const ALL_RELEASES = 'ALL_RELEASES'
+const NO_RELEASE = 'NONE'
 
 const DATABASE_FILENAME_DEFAULT = 'jira-stats.db'
 
@@ -42,9 +43,11 @@ class JiraDataReader {
     this.nodeCache = new NodeCache({ stdTTL: 60 * 24, checkperiod: 1200 })
     this.loaded = this.cache.isActive()
     this.REBUILD = 999
-    this.UPDATE  = 500
+    this.UPDATE = 500
     this.REFRESH = 10
-    this.betterDb = require('better-sqlite3')(databaseFullname, { readonly: true })
+    this.betterDb = require('better-sqlite3')(databaseFullname, {
+      readonly: false,
+    })
     // this.jsr = new JSR()
 
     return this
@@ -76,24 +79,32 @@ class JiraDataReader {
         } else {
           createdDate = new Date(d)
         }
-        createdDate.setDate(createdDate.getDate()+1)
+        createdDate.setDate(createdDate.getDate() + 1)
         createdDate.setHours(0)
         createdDate.setMinutes(0)
         createdDate.setSeconds(0)
-        
-        const createdDateStr = `${createdDate.getFullYear()}-${utilities.padToTwoCharacters(createdDate.getMonth() + 1)}-${utilities.padToTwoCharacters(createdDate.getDate())}`
-        
+
+        const createdDateStr = `${createdDate.getFullYear()}-${utilities.padToTwoCharacters(
+          createdDate.getMonth() + 1
+        )}-${utilities.padToTwoCharacters(createdDate.getDate())}`
+
         let prevDay = new Date(createdDate)
         prevDay.setDate(createdDate.getDate() - 1)
-        const prevDayStr = `${prevDay.getFullYear()}-${utilities.padToTwoCharacters(prevDay.getMonth() + 1)}-${utilities.padToTwoCharacters(prevDay.getDate())}`
+        const prevDayStr = `${prevDay.getFullYear()}-${utilities.padToTwoCharacters(
+          prevDay.getMonth() + 1
+        )}-${utilities.padToTwoCharacters(prevDay.getDate())}`
         debug(`prevDayStr = ${prevDayStr}`)
-        
+
         // resolve(`${createdDate} / ${createdDateStr} to ${prevDay} / ${prevDayStr}`)
 
         const sql = `select key, total, min(date) as earliestDate from 'story-stats' where key in (select key from 'story-stats' where date='${createdDateStr}') and key not in (select key from 'story-stats' where date='${prevDayStr}') group by key order by key`
         debug(`sql: ${sql}`)
 
-        resolve({ sql: sql, createdDate: createdDate, data: this.betterDb.prepare(sql).all() })
+        resolve({
+          sql: sql,
+          createdDate: createdDate,
+          data: this.betterDb.prepare(sql).all(),
+        })
       } catch (err) {
         reject(err)
       }
@@ -110,7 +121,7 @@ class JiraDataReader {
    */
   async reloadCache(reloadType = this.REFRESH) {
     debug(`reloadCache(${reloadType}) called...`)
-    
+
     if (reloadType == this.REBUILD) {
       await this.clearCache()
     }
@@ -137,17 +148,19 @@ class JiraDataReader {
             summary: raw.summary,
           })
         } catch (err) {
-          console.error(`Error in reloadCache (while processing ${fname}): ${err.message}`)
+          console.error(
+            `Error in reloadCache (while processing ${fname}): ${err.message}`
+          )
         }
       }
       debug(`...done with ${fname}`)
     })
 
-    debug(`Committing inserts to database...`)
+    // debug(`Committing inserts to database...`)
     // this.db.run('COMMIT')
-    debug('...done committing')
+    // debug('...done committing')
 
-    debug(`Saving cache (${updates} updates)`)
+    debug(`Saving cache (${updates} (or len:${d.length}) updates)`)
     this.cache.saveCache(d)
     this.loaded = this.cache.isActive()
     debug('...done saving updates')
@@ -254,7 +267,7 @@ class JiraDataReader {
    * @memberof JiraDataReader
    */
   async clearCache() {
-    await this.betterDb.run("DELETE FROM 'story-stats';")
+    await this.betterDb.prepare('DELETE FROM `story-stats`').run()
 
     this.cache.makeCache()
     this.loaded = this.cache.isActive()
@@ -348,7 +361,7 @@ class JiraDataReader {
         } else {
           componentNameFilter = ` WHERE `
         }
-        
+
         componentNameFilter += ` component ${
           componentName === 'NONE'
             ? 'is null'
@@ -367,8 +380,6 @@ class JiraDataReader {
 
         let burndownStatDaily = {}
         this.getDateList().then((burndownStatDates) => {
-
-
           /* Example results...
             { status: 'In Progress', date: '2020-11-01', remaining: 3513600 },
             { status: 'In Progress', date: '2020-11-02', remaining: 2513600 },
@@ -391,12 +402,15 @@ class JiraDataReader {
             //   convertSecondsToDays(row.remaining)
             // );
 
-            burndownStatDaily[row.status][
-              burndownStatDates.indexOf(row.date)
-            ] = convertSecondsToDays(row.remaining)
+            burndownStatDaily[row.status][burndownStatDates.indexOf(row.date)] =
+              convertSecondsToDays(row.remaining)
           })
           debug(`...setting cache for burndownStats: nodeCache(${sql})`)
-          this.nodeCache.set(sql, { stats: burndownStatDaily, dates: burndownStatDates, meta: { cacheDate: new Date() } })
+          this.nodeCache.set(sql, {
+            stats: burndownStatDaily,
+            dates: burndownStatDates,
+            meta: { cacheDate: new Date() },
+          })
           resolve(this.nodeCache.get(sql))
         })
       } else {
@@ -429,25 +443,40 @@ class JiraDataReader {
       let response = {}
 
       if (!this.nodeCache.has(fname)) {
+        debug(`...cache doesn't contain ${fname}, so parsing file...`)
+        // key: i.key,
+        // lastFiledate: this.lastFiledate,
+        // name: i.fields.status.name,
+        // release: release,
+        // component: component,
+        // progress: i.fields.aggregateprogress.progress,
+        // total: i.fields.aggregateprogress.total
+        let dataInsertSQL = this.betterDb.prepare(
+          'INSERT INTO `story-stats` (key, date, status, fixVersion, component, progress, total) VALUES (@key, @lastFiledate, @name, @release, @component, @progress, @total)'
+        )
+
+        let dataInsertStmts = []
+
         let data = fs.readFileSync(fname)
         this.lastData = JSON.parse(data)
-        // debug(`this.lastData.total = ${this.lastData.total}`);
+        debug(`this.lastData.total = ${this.lastData.total}`)
         // Summarize data
         // If the issue types are listed in the config file, use that list
         // Otherwise, use a hard-coded list
         // TODO: Pull the list of issue types from Jira
         let summary = {}
         if (config.has('issueTypes')) {
-          debug(`>>> Pulling issue types from config file...`)
+          // debug(`>>> Pulling issue types from config file...`)
           config.get('issueTypes').forEach((it) => {
             summary[it] = { count: 0, issues: [] }
-            if (it == 'Story') { // Add more details for Stories
+            if (it == 'Story') {
+              // Add more details for Stories
               summary[it]['aggregateprogress'] = { progress: 0, total: 0 }
             }
           })
-          debug(`>>> types (from the config file): `, summary)
+          // debug(`>>> types (from the config file): `, summary)
         } else {
-          debug(`>>> Using hard-coded issue types...`)
+          // debug(`>>> Using hard-coded issue types...`)
           // Get the data
           // TODO: Implement the jsr.getIssueTypes(true) call
           // const issueTypes = await this.jsr.getIssueTypes(true)
@@ -477,14 +506,14 @@ class JiraDataReader {
               ? i.fields.fixVersions[0].name
               : 'NONE'
 
-          if (i.fields.fixVersions.length > 1) {
-            debug(
-              `Not Handled: Multiple (${i.fields.fixVersions.length}) releases: `,
-              release,
-              i.fields.fixVersions,
-              i.fields.issuetype.name
-            )
-          }
+          // if (i.fields.fixVersions.length > 1) {
+          //   debug(
+          //     `Not Handled: Multiple (${i.fields.fixVersions.length}) releases: `,
+          //     release,
+          //     i.fields.fixVersions,
+          //     i.fields.issuetype.name
+          //   )
+          // }
 
           // Save the component value
           // TODO: Handle multiple components
@@ -499,7 +528,7 @@ class JiraDataReader {
           // No aggregateprogress field indicates no estimated/spent time
           // Only store for Stories, not Epics or Sub-Tasks - to avoid double-counting
           if (
-            i.fields.issuetype.name === 'Story' &&
+            i.fields.issuetype.name == 'Story' &&
             i.fields.aggregateprogress
           ) {
             summary[i.fields.issuetype.name].aggregateprogress.progress +=
@@ -514,19 +543,52 @@ class JiraDataReader {
             //   0
             // ) {
             // debug(`INSERT INTO 'story-stats' (key, date, status, fixVersion, progress, total) VALUES (${i.key}, ${this.lastFiledate}, ${i.fields.status.name}, ${release}, ${i.fields.aggregateprogress.progress}, ${i.fields.aggregateprogress.total})`)
-            this.betterDb.prepare(
-              'INSERT INTO `story-stats` (key, date, status, fixVersion, component, progress, total) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              i.key,
-              this.lastFiledate,
-              i.fields.status.name,
-              release,
-              component,
-              i.fields.aggregateprogress.progress,
-              i.fields.aggregateprogress.total
-            ).run()
+            dataInsertStmts.push({
+              key: i.key,
+              lastFiledate: this.lastFiledate,
+              name: i.fields.status.name,
+              release: release,
+              component: component,
+              progress: i.fields.aggregateprogress.progress,
+              total: i.fields.aggregateprogress.total,
+            })
+            // dataInsertStmts.push({key, lastFileDate, name, release, component, progress, total })
             // }
           }
         })
+
+        // Insert bundled data
+        if (dataInsertStmts.length) {
+          try {
+            debug(`... dataInsertStmts.length = ${dataInsertStmts.length}...`)
+
+            const insertMany = this.betterDb.transaction((dataInsertStmts) => {
+              debug(`JiraDataReader() about to run....`)
+              for (const row of dataInsertStmts) dataInsertSQL.run(row)
+              // dataInsertStmts.forEach((stmt) => {
+              //   try {
+              //     let updateCount = dataInsertSQL.run(
+              //       stmt.key,
+              //       stmt.lastFiledate,
+              //       stmt.name,
+              //       stmt.release,
+              //       stmt.component,
+              //       stmt.progress,
+              //       stmt.total
+              //     )
+              //     debug(`...updateCount = ${updateCount}`)
+              //   } catch (err) {
+              //     console.error(`dataInsert error:`, err)
+              //   }
+              // })
+            })
+            insertMany(dataInsertStmts)
+          } catch (err) {
+            console.error(`ERR @ 577: `, err)
+          }
+        } else {
+          debug(`...nothing in dataInsertStmts @ 571`)
+        }
 
         response = {
           total: this.lastData.total,
@@ -534,11 +596,12 @@ class JiraDataReader {
           summary: summary,
         }
 
+        debug(`...response.total = ${response.total}`)
         // debug(`Saving ${fname} data to cache`);
         this.nodeCache.set(fname, response)
       } else {
         // Get cache instead
-        // debug(`Returning ${fname} data from cache`);
+        debug(`..._processFile: Returning ${fname} data from cache`)
         response = this.nodeCache.get(fname)
       }
       return response
@@ -549,4 +612,4 @@ class JiraDataReader {
   }
 }
 
-module.exports = JiraDataReader;
+module.exports = JiraDataReader

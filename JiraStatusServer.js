@@ -145,6 +145,8 @@ server.get('/', async (req, res, next) => {
 
   res.write(`<ul>
   <li><a href='/burndown'>Burndown chart</a> (HTML)</li>
+  <li><a href='/docs/JDP.html?q=1'>Blocking-QA</a></li>
+  <li><a href='/docs/JDP.html?q=2'>Blocked Items</a></li>
   <li><a href='/docs/blockerReport.html'>Blocker Report</a> Requires Jira key parameter ('?id=ABC-3816') (HTML)</li>
   <li><a href='/chart?exclude=DEAD'>Chart</a> (excluding DEAD issues) (HTML)</li>
   <li>Children: Requires Jira key parameter ('children/ABC-1234') (JSON)</li>
@@ -4252,17 +4254,23 @@ server.get('/burndown/:rel', async (req, res, next) => {
     )
     res.write(`<li><em>Burndown Rate:</em> ${burndownRate} estDays/day</li>`)
     if (hasForecast2) {
-      res.write(
-        `<li><em>Forecast_TeamSize:</em> ${Math.round(
-          teamSize * efficiency
-        )} estDays/day (Done: ${lastActualDay.getFullYear()}-0${
-          lastActualDay.getMonth() + 1
-        }-${
-          lastActualDay.getDate() > 9
-            ? lastActualDay.getDate()
-            : `0${lastActualDay.getDate()}`
-        }; Team Size: ${teamSize} people; Efficiency Score: ${efficiency})</li>`
-      )
+      res.write(`<li><em>Forecast_TeamSize:</em> `)
+      if (lastActualDay.getFullYear()) {
+        res.write(
+          `${Math.round(
+            teamSize * efficiency
+          )} estDays/day (Done: ${lastActualDay.getFullYear()}-0${
+            lastActualDay.getMonth() + 1
+          }-${
+            lastActualDay.getDate() > 9
+              ? lastActualDay.getDate()
+              : `0${lastActualDay.getDate()}`
+          }; Team Size: ${teamSize} people; Efficiency Score: ${efficiency})</li>`
+        )
+      } else {
+        res.write(`<em>unable to calculate</em>`)
+      }
+      res.write(`</li>`)
     }
     res.write(`</ul>`)
   } else {
@@ -5052,7 +5060,57 @@ server.get('/query', async (req, res, next) => {
  */
 
 server.get('/cacheJSR', (req, res, next) => {
-  res.send(jdr.getCacheObject(false))
+  if (req.query.format && req.query.format == 'HTML') {
+    let title = 'Cache (JSON)'
+    let jiraCache = jdr.getCacheObject(false)
+    res.write(buildHtmlHeader(title, false, false))
+    res.write(buildPageHeader(title))
+    res.write(
+      `<style>th { text-align: center; } td { text-align: center; }</style>`
+    )
+    res.write(`<table><thead><tr>
+      <th>Filename</th>
+      <th>Date</th>
+      <th>Total</th>
+      <th>Epics</th>
+      <th>Stories</th>
+      <th>Tasks</th>
+      <th>Sub-tasks</th>
+      <th>Bugs</th>
+      <th>Tests</th>
+      <th>Req'ts</th>
+      </tr>
+      </thead>
+      <tbody>
+    `)
+    let statusList = new Set(jiraCache.cache.map((y) => y.status).sort())
+    statusList.forEach((status) => {
+      jiraCache.cache
+        .filter((z) => z.status == status)
+        .forEach((c) => {
+          // res.write(`<tr><td>${c}</td></tr>`)
+          res.write(`<tr>
+            <td>${c.status}</td>
+            <td>${c.date}</td>
+            <td>${c.total}</td>
+            <td>${c.summary.Epic.count}</td>
+            <td>${c.summary.Story.count}</td>
+            <td>${c.summary.Task.count}</td>
+            <td>${c.summary['Sub-task'].count}</td>
+            <td>${c.summary.Bug.count}</td>
+            <td>${c.summary.Test.count}</td>
+            <td>${c.summary.Requirement.count}</td>
+          </tr>`)
+        })
+      // res.write(`<tr><td>${status}</td></tr>`)
+    })
+
+    res.write(`</tbody></table>`)
+    res.write(buildHtmlFooter())
+    res.end()
+  } else {
+    res.send(jdr.getCacheObject(false))
+  }
   return next()
 })
 
