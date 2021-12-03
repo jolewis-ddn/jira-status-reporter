@@ -1,3 +1,5 @@
+/** @format */
+
 'use strict'
 const debug = require('debug')('JSR')
 const JiraApi = require('jira-client')
@@ -32,7 +34,9 @@ const jira = new JiraApi({
 })
 
 const JQL_EPIC = 'type=Epic'
-const UNASSIGNED_USER = config.has('unassignedUser') ? config.unassignedUser : "UNASSIGNED"
+const UNASSIGNED_USER = config.has('unassignedUser')
+  ? config.unassignedUser
+  : 'UNASSIGNED'
 
 const { promisify } = require('util')
 const sleep = promisify(setTimeout)
@@ -99,8 +103,7 @@ class JiraStatusReporter {
     fixVersions = config.reports.releases,
     users = config.reports.users,
     project = config.project,
-    excludeTypes = config.has('reports') && 
-    config.reports.has('excludeTypes')
+    excludeTypes = config.has('reports') && config.reports.has('excludeTypes')
       ? config.reports.excludeTypes
       : [],
     excludeStatuses = config.has('reports') &&
@@ -144,7 +147,7 @@ class JiraStatusReporter {
             ? ` AND fixVersion in ("${fixVersions.join(',')}")`
             : ''
         }`
-        debug(`JQL_for_promise: ${JQL_for_promise}`)
+        //debug(`JQL_for_promise: ${JQL_for_promise}`)
         promises.push(jira.searchJira(JQL_for_promise))
       })
 
@@ -212,13 +215,13 @@ class JiraStatusReporter {
           issue.fields.issuetype.name &&
           issue.fields.issuetype.name == 'Story'
         ) {
-          if (issue.fields.subtasks.length != 0) {
-            debug(
-              `issueBelongsToRemainingWorkReport(...) returning ${
-                issue.fields.subtasks.length == 0
-              } for ${issue.key}`
-            )
-          }
+          // if (issue.fields.subtasks.length != 0) {
+          //   // debug(
+          //   //   `issueBelongsToRemainingWorkReport(...) returning ${
+          //   //     issue.fields.subtasks.length == 0
+          //   //   } for ${issue.key}`
+          //   // )
+          // }
           return issue.fields.subtasks.length == 0
         } else {
           return true
@@ -664,9 +667,8 @@ class JiraStatusReporter {
         let ndx = x
         // debug(`name: ${seq[ndx].name}; type: ${seq[ndx].issuetype}; index: ${types.indexOf(seq[ndx].issuetype)}; result: ${result}`)
         // debug(projectData[seq[ndx].name])
-        projectData[seq[ndx].name].counts[
-          types.indexOf(seq[ndx].issuetype)
-        ] = result
+        projectData[seq[ndx].name].counts[types.indexOf(seq[ndx].issuetype)] =
+          result
       }
       // debug(`finally returning `, projectData)
       return projectData
@@ -703,11 +705,13 @@ class JiraStatusReporter {
 
   async _genericJiraSearch(jql, action, fields = [], showChanges = false) {
     return new Promise((resolve, reject) => {
-      debug(`_genericJiraSearch(${jql}, ${action}, ${fields}, ${showChanges}) called...`)
+      debug(
+        `_genericJiraSearch(${jql}, ${action}, ${fields}, ${showChanges}) called...`
+      )
       var queryConfig = {}
 
       if (showChanges) {
-        queryConfig.expand = ["changelog"]
+        queryConfig.expand = ['changelog']
       }
 
       switch (action) {
@@ -780,7 +784,7 @@ class JiraStatusReporter {
                     compiledResults.maxResults = compiledResults.total
                     compiledResults.comment = 'Compiled by JiraStatusReporter'
                     compiledResults.query = jql
-                    
+
                     compiledResults.issues = []
                     for (let rrctr = 0; rrctr < rawResults.length; rrctr++) {
                       const element = rawResults[rrctr]

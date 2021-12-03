@@ -141,7 +141,7 @@ server.get('/', async (req, res, next) => {
   }
 
   const releases = await getVersions(false)
-  debug(`... releases: `, releases)
+  // debug(`... releases: `, releases)
 
   res.write(`<ul>
   <li><a href='/burndown'>Burndown chart</a> (HTML)</li>
@@ -241,67 +241,67 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
   debug(`/remainingWorkReport(${req.params.release}) called...`)
 
   const releases = await getVersions(false)
-  debug(`... releases: `, releases)
+  // debug(`... releases: `, releases)
   const releaseObj = releases.filter((rel) => rel.name == req.params.release)[0]
   const release = releaseObj && releaseObj.name ? releaseObj.name : false
-  debug(`... processing release: `, releaseObj)
+  //debug(`... processing release: `, releaseObj)
 
   if (release) {
     // Valid release provided?
     // let reportParams = {}
 
-    jsr.getRemainingWorkReport([release]).then(async (results) => {
-      const detailTable = []
-      const userSummary = {}
-      const title = 'Remaining Work Report'
+    let results = await jsr.getRemainingWorkReport([release]) //.then(async (results) => {
+    const detailTable = []
+    const userSummary = {}
+    const title = 'Remaining Work Report'
 
-      // reportParams = results.config
+    // reportParams = results.config
 
-      results.data.results.forEach(async (row) => {
-        detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
-        if (!Object.keys(userSummary).includes(row[0])) {
-          userSummary[row[0]] = {
-            progress: 0,
-            total: 0,
-            remaining: 0,
-            unestimatedCount: 0,
-            issueCount: 0,
-          }
+    results.data.results.forEach(async (row) => {
+      detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
+      if (!Object.keys(userSummary).includes(row[0])) {
+        userSummary[row[0]] = {
+          progress: 0,
+          total: 0,
+          remaining: 0,
+          unestimatedCount: 0,
+          issueCount: 0,
         }
-        userSummary[row[0]].progress += row[4]
-        userSummary[row[0]].total += row[5]
-        userSummary[row[0]].remaining += row[7]
+      }
+      userSummary[row[0]].progress += row[4]
+      userSummary[row[0]].total += row[5]
+      userSummary[row[0]].remaining += row[7]
 
-        if (row[5] == 0) {
-          userSummary[row[0]].unestimatedCount += 1
-        }
-        userSummary[row[0]].issueCount += 1
-      })
+      if (row[5] == 0) {
+        userSummary[row[0]].unestimatedCount += 1
+      }
+      userSummary[row[0]].issueCount += 1
+    })
 
-      res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.write(buildHtmlHeader(title, false))
-      res.write(buildPageHeader(title, release))
-      res.write(
-        `<div><em>Code Freeze Date</em> ${config.reports.codeFreeze}</div>`
-      )
-      res.write(
-        `<div><em>Stories with Sub-Tasks</em> are ${
-          config.has('workInSubtasksOnly') && config.workInSubtasksOnly
-            ? '<strong>not</strong>'
-            : ''
-        } shown/included</div>`
-      )
-      res.write(
-        `<div><small class="text-muted">Cache date: ${
-          results.meta.cacheDate
-        } (Expires in ${(
-          (results.meta.cacheTTL - new Date().getTime()) /
-          1000 /
-          60
-        ).toFixed(2)} minutes)</small></div>`
-      )
-      res.write(`<h3>Summary</h3>`)
-      res.write(`<table style='width: auto !important;' class='table table-sm table-striped'>
+    //res.writeHead(200, { 'Content-Type': 'text/html' })
+    res.write(buildHtmlHeader(title, false))
+    res.write(buildPageHeader(title, release))
+    res.write(
+      `<div><em>Code Freeze Date</em> ${config.reports.codeFreeze}</div>`
+    )
+    res.write(
+      `<div><em>Stories with Sub-Tasks</em> are ${
+        config.has('workInSubtasksOnly') && config.workInSubtasksOnly
+          ? '<strong>not</strong>'
+          : ''
+      } shown/included</div>`
+    )
+    res.write(
+      `<div><small class="text-muted">Cache date: ${
+        results.meta.cacheDate
+      } (Expires in ${(
+        (results.meta.cacheTTL - new Date().getTime()) /
+        1000 /
+        60
+      ).toFixed(2)} minutes)</small></div>`
+    )
+    res.write(`<h3>Summary</h3>`)
+    res.write(`<table style='width: auto !important;' class='table table-sm table-striped'>
         <thead>
         <tr>
           <th>${[
@@ -316,87 +316,87 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
         </tr>
         </thead>
         <tbody>`)
-      let sortedUserData = []
-      if (req.query.sort && req.query.sort == 'name') {
-        debug(`... sorted by name (ascending)`)
-        sortedUserData = Object.keys(userSummary).sort((a, b) => {
-          return a.toUpperCase() < b.toUpperCase()
-            ? -1
-            : a.toUpperCase() > b.toUpperCase()
-            ? 1
-            : 0 // Equal
-        })
-      } else {
-        debug(`... sorted by remaining work (descending)`)
-        sortedUserData = Object.keys(userSummary).sort((a, b) => {
-          return userSummary[b].remaining - userSummary[a].remaining
-        })
-      }
+    let sortedUserData = []
+    if (req.query.sort && req.query.sort == 'name') {
+      debug(`... sorted by name (ascending)`)
+      sortedUserData = Object.keys(userSummary).sort((a, b) => {
+        return a.toUpperCase() < b.toUpperCase()
+          ? -1
+          : a.toUpperCase() > b.toUpperCase()
+          ? 1
+          : 0 // Equal
+      })
+    } else {
+      debug(`... sorted by remaining work (descending)`)
+      sortedUserData = Object.keys(userSummary).sort((a, b) => {
+        return userSummary[b].remaining - userSummary[a].remaining
+      })
+    }
 
-      const codeFreezeDate = new Date(config.reports.codeFreeze)
+    const codeFreezeDate = new Date(config.reports.codeFreeze)
 
-      sortedUserData.forEach(async (user) => {
-        res.write(`<tr>
+    sortedUserData.forEach(async (user) => {
+      res.write(`<tr>
           <td><a href='${config.jira.protocol}://${
-          config.jira.host
-        }/issues/?jql=project="${results.config.project}"%20AND%20assignee${
-          user == UNASSIGNED_USER ? ` is empty` : `="${user}"`
-        }%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(
-          ','
-        )})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(
-          ','
-        )})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(
-          ','
-        )}")' target='_blank'>${user}</a></td>
+        config.jira.host
+      }/issues/?jql=project="${results.config.project}"%20AND%20assignee${
+        user == UNASSIGNED_USER ? ` is empty` : `="${user}"`
+      }%20AND%20status%20not%20in%20(${results.config.excludeStatuses.join(
+        ','
+      )})%20AND%20issuetype%20not%20in%20(${results.config.excludeTypes.join(
+        ','
+      )})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(
+        ','
+      )}")' target='_blank'>${user}</a></td>
           <td class="text-center">${userSummary[user].progress.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].total.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].remaining.toFixed(2)}</td>
           <td class="text-center" data-toggle="tooltip" data-html="true" title="${
             userSummary[user].unestimatedCount
           } of ${userSummary[user].issueCount} total">${
-          userSummary[user].issueCount > 0
-            ? (
-                100 *
-                (userSummary[user].unestimatedCount /
-                  userSummary[user].issueCount)
-              ).toFixed(0)
-            : 0
-        }%
+        userSummary[user].issueCount > 0
+          ? (
+              100 *
+              (userSummary[user].unestimatedCount /
+                userSummary[user].issueCount)
+            ).toFixed(0)
+          : 0
+      }%
           <!-- unestimated blocks -->`)
-        if (userSummary[user].unestimatedCount > 0) {
-          for (let i = 0; i < userSummary[user].unestimatedCount; i++) {
-            res.write(
-              `<span style="vertical-align: middle; height: 10px; width: 10px; background-color: red; padding: 0px 4px 0px 0px; margin: 2px;"></span>`
-            )
-          }
+      if (userSummary[user].unestimatedCount > 0) {
+        for (let i = 0; i < userSummary[user].unestimatedCount; i++) {
+          res.write(
+            `<span style="vertical-align: middle; height: 10px; width: 10px; background-color: red; padding: 0px 4px 0px 0px; margin: 2px;"></span>`
+          )
         }
-        res.write(`</td>
+      }
+      res.write(`</td>
           <td class="text-center">${calcFutureDate(
             userSummary[user].remaining.toFixed(2)
           )}</td>
           <td style="vertical-align: middle;"><div style="height: 20px; width: ${
             userSummary[user].remaining.toFixed(2) * 2
           }px; background-color: ${getBarColor(
-          new Date().addBusinessDays(userSummary[user].remaining),
-          codeFreezeDate
-        )};"></div></td>
+        new Date().addBusinessDays(userSummary[user].remaining),
+        codeFreezeDate
+      )};"></div></td>
           </tr>`)
-      })
-      res.write(`</tbody></table>`)
-
-      res.write(`<h3>Item Detail</h3>`)
-      res.write(
-        `<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${
-          results.data && results.data.headers
-            ? results.data.headers.join('</th><th>')
-            : ''
-        }</th></tr></thead><tbody>`
-      )
-      res.write(detailTable.join(''))
-      res.write(`</tbody></table>`)
-      res.write(buildHtmlFooter())
-      res.end()
     })
+    res.write(`</tbody></table>`)
+
+    res.write(`<h3>Item Detail</h3>`)
+    res.write(
+      `<table style='width: auto !important;' class='table table-sm table-striped'><thead><tr><th>${
+        results.data && results.data.headers
+          ? results.data.headers.join('</th><th>')
+          : ''
+      }</th></tr></thead><tbody>`
+    )
+    res.write(detailTable.join(''))
+    res.write(`</tbody></table>`)
+    res.write(buildHtmlFooter())
+    res.end()
+    //})
   } else {
     // Invalid release
     debug(`Invalid release provided: ${req.params.release}`)
