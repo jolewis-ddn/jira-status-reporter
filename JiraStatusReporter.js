@@ -151,55 +151,60 @@ class JiraStatusReporter {
         promises.push(jira.searchJira(JQL_for_promise))
       })
 
-      const results = await Promise.all(promises)
-      results.forEach(async (result) => {
-        result.issues.forEach(async (issue) => {
-          const percent = issue.fields.progress.percent
-            ? issue.fields.progress.percent
-            : 0
-          if (this.issueBelongsToRemainingWorkReport(issue)) {
-            response.push([
-              issue.fields.assignee
-                ? issue.fields.assignee.displayName
-                : UNASSIGNED_USER,
-              issue.key,
-              issue.fields.summary.length > 40
-                ? issue.fields.summary.substring(0, 37) + '...'
-                : issue.fields.summary,
-              issue.fields.issuetype.name,
-              +(issue.fields.progress.progress / 28000).toFixed(2),
-              +(issue.fields.progress.total / 28000).toFixed(2),
-              percent,
-              +(
-                (issue.fields.progress.total / 28000).toFixed(2) -
-                (issue.fields.progress.progress / 28000).toFixed(2)
-              ).toFixed(2),
-            ])
-          }
+      try {
+        const results = await Promise.all(promises)
+        results.forEach(async (result) => {
+          result.issues.forEach(async (issue) => {
+            const percent = issue.fields.progress.percent
+              ? issue.fields.progress.percent
+              : 0
+            if (this.issueBelongsToRemainingWorkReport(issue)) {
+              response.push([
+                issue.fields.assignee
+                  ? issue.fields.assignee.displayName
+                  : UNASSIGNED_USER,
+                issue.key,
+                issue.fields.summary.length > 40
+                  ? issue.fields.summary.substring(0, 37) + '...'
+                  : issue.fields.summary,
+                issue.fields.issuetype.name,
+                +(issue.fields.progress.progress / 28000).toFixed(2),
+                +(issue.fields.progress.total / 28000).toFixed(2),
+                percent,
+                +(
+                  (issue.fields.progress.total / 28000).toFixed(2) -
+                  (issue.fields.progress.progress / 28000).toFixed(2)
+                ).toFixed(2),
+              ])
+            }
+          })
         })
-      })
 
-      const cacheData = {
-        data: {
-          headers: config.reports.fields,
-          results: response,
-        },
-        config: {
-          project: project,
-          users: users,
-          fixVersions: fixVersions,
-          excludeTypes: excludeTypes,
-          excludeStatuses: excludeStatuses,
-        },
-        meta: {
-          cacheDate: new Date(),
-          cacheID: cacheID,
-        },
-        error: err,
+        const cacheData = {
+          data: {
+            headers: config.reports.fields,
+            results: response,
+          },
+          config: {
+            project: project,
+            users: users,
+            fixVersions: fixVersions,
+            excludeTypes: excludeTypes,
+            excludeStatuses: excludeStatuses,
+          },
+          meta: {
+            cacheDate: new Date(),
+            cacheID: cacheID,
+          },
+          error: err,
+        }
+        cache.set(cacheID, 'TBD')
+        cacheData.meta.cacheTTL = cache.getTtl(cacheID)
+        cache.set(cacheID, cacheData)
+      } catch (err) {
+        console.error(`Promise.all() @ 155 failed:`, err)
+        return err
       }
-      cache.set(cacheID, 'TBD')
-      cacheData.meta.cacheTTL = cache.getTtl(cacheID)
-      cache.set(cacheID, cacheData)
     } else {
       debug(`...returning data from cache`)
     } // if...!cache.has...
