@@ -96,21 +96,41 @@ class JiraStatusReporter {
    * @param {string} [project=config.project] Which project
    * @param {array} [excludeTypes=config.reports.excludeTypes] Issue types to exclude
    * @param {array} [excludeStatuses=config.reports.excludeStatuses] Issue statuses to exclude
+   * @param {string} [priority=false] Issue priority to filter (all others are excluded)
    * @returns Object containing data (header (array) and results (array of result rows)) and error
    * @memberof JiraStatusReporter
    */
   async getRemainingWorkReport(
-    fixVersions = config.reports.releases,
-    users = config.reports.users,
-    project = config.project,
-    excludeTypes = config.has('reports') && config.reports.has('excludeTypes')
-      ? config.reports.excludeTypes
-      : [],
-    excludeStatuses = config.has('reports') &&
-    config.reports.has('excludeStatuses')
-      ? config.reports.excludeStatuses
-      : []
+    inFixVersions = false,
+    inUsers = false,
+    inProject = false,
+    inExcludeTypes = false,
+    inExcludeStatuses = false,
+    inPriority = false
   ) {
+    let fixVersions = inFixVersions ? inFixVersions : config.reports.releases
+    let users = inUsers ? inUsers : config.reports.users
+    let project = inProject ? inProject : config.project
+    let excludeTypes
+    if (inExcludeTypes) {
+      excludeTypes = inExcludeStatuses
+    } else {
+      excludeTypes =
+        config.has('reports') && config.reports.has('excludeTypes')
+          ? config.reports.excludeTypes
+          : []
+    }
+    let excludeStatuses
+    if (inExcludeStatuses) {
+      excludeStatuses = inExcludeStatuses
+    } else {
+      excludeStatuses =
+        config.has('reports') && config.reports.has('excludeStatuses')
+          ? config.reports.excludeStatuses
+          : []
+    }
+    let priority = inPriority ? inPriority : ''
+
     const response = [] // Jira data collector
     const promises = [] // Per-user query
     let err = ''
@@ -122,7 +142,8 @@ class JiraStatusReporter {
         users.join(',') +
         project +
         excludeTypes.join(',') +
-        excludeStatuses.join(',')
+        excludeStatuses.join(',') +
+        priority
     )
     const cacheID = `remainingWorkReport-${hash.digest('hex')}`
     debug(`cacheID = ${cacheID}`)
@@ -146,8 +167,9 @@ class JiraStatusReporter {
           fixVersions.length
             ? ` AND fixVersion in ("${fixVersions.join(',')}")`
             : ''
-        }`
-        //debug(`JQL_for_promise: ${JQL_for_promise}`)
+        }
+        ${priority ? ` AND Priority in ("${priority}")` : ''}`
+        // debug(`JQL_for_promise: ${JQL_for_promise}`)
         promises.push(jira.searchJira(JQL_for_promise))
       })
 

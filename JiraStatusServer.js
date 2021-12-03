@@ -43,6 +43,7 @@ const dashboard = new Dashboard()
 const LocalStorage = require('node-localstorage').LocalStorage
 const { cachedDataVersionTag } = require('v8')
 const { stringify } = require('querystring')
+const { isNumber } = require('lodash')
 let ls = new LocalStorage('./.cache')
 
 const UNASSIGNED_USER = config.has('unassignedUser')
@@ -183,16 +184,24 @@ server.get('/', async (req, res, next) => {
   <li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>`)
 
   if (releases.length) {
-    res.write(`<ul><li><em>${config.project} releases:</em> `)
+    res.write(`<ul><li><em>${config.project} releases:</em><ul>`)
     res.write(
       releases
         .filter((rel) => !rel.released)
-        .map(
-          (rel) => `<a href='/remainingWorkReport/${rel.name}'>${rel.name}</a>`
+        .map((rel) =>
+          [
+            `<li>`,
+            `<a href='/remainingWorkReport/${rel.name}'>${rel.name}</a>`,
+            ` - or by Priority: `,
+            `<a href='/remainingWorkReport/${rel.name}?priority=0'>High</a>,`,
+            `<a href='/remainingWorkReport/${rel.name}?priority=1'>Medium</a>,`,
+            `<a href='/remainingWorkReport/${rel.name}?priority=2'>Low</a>,`,
+            `<a href='/remainingWorkReport/${rel.name}?priority=3'>None Set</a>`,
+          ].join(' ')
         )
-        .join(', ')
+        .join('</li>')
     )
-    res.write(`</li></ul>`)
+    res.write(`</li></ul></ul>`)
   }
 
   res.write(`<li>Report: Project-specific; Requires Jira project name ('/PROJECT_NAME', e.g. <a href='/report/${config.project}'>${config.project}</a>) (JSON)</li>
@@ -237,8 +246,28 @@ function getBarColor(estDate, relDate) {
   return estDate < relDate ? 'green' : 'red'
 }
 
+function translatePriorityNumToString(priNum) {
+  const priorityStrings = ['High', 'Medium', 'Low', 'Unspecified']
+
+  if (priorityStrings[priNum]) {
+    return priorityStrings[priNum]
+  } else {
+    throw new Error(`Invalid Priority Value: ${priNum}`)
+  }
+}
+
 server.get('/remainingWorkReport/:release', async (req, res, next) => {
   debug(`/remainingWorkReport(${req.params.release}) called...`)
+  debug(`inputPriority = ${req.query.priority}`)
+  let inputPriority
+  try {
+    inputPriority = translatePriorityNumToString(req.query.priority)
+  } catch (err) {
+    console.log(err)
+    // res.send(err)
+    // res.end()
+    inputPriority = false
+  }
 
   const releases = await getVersions(false)
   // debug(`... releases: `, releases)
@@ -247,16 +276,18 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
   //debug(`... processing release: `, releaseObj)
 
   if (release) {
-    // Valid release provided?
-    // let reportParams = {}
-
     try {
-      let results = await jsr.getRemainingWorkReport([release]) //.then(async (results) => {
+      let results = await jsr.getRemainingWorkReport(
+        [release],
+        false,
+        false,
+        false,
+        false,
+        inputPriority
+      )
       const detailTable = []
       const userSummary = {}
       const title = 'Remaining Work Report'
-
-      // reportParams = results.config
 
       results.data.results.forEach(async (row) => {
         detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
@@ -279,12 +310,20 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
         userSummary[row[0]].issueCount += 1
       })
 
-      //res.writeHead(200, { 'Content-Type': 'text/html' })
       res.write(buildHtmlHeader(title, false))
       res.write(buildPageHeader(title, release))
       res.write(
         `<div><em>Code Freeze Date</em> ${config.reports.codeFreeze}</div>`
       )
+
+      res.write(`<div><em>Priority Filter</em>: `)
+      if (inputPriority) {
+        res.write(inputPriority)
+      } else {
+        res.write(`None`)
+      }
+      res.write('</div>')
+
       res.write(
         `<div><em>Stories with Sub-Tasks</em> are ${
           config.has('workInSubtasksOnly') && config.workInSubtasksOnly
