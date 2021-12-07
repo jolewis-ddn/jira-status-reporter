@@ -1646,7 +1646,12 @@ server.get('/progress/:rel', async (req, res, next) => {
             : 'remainingWorkPerUser') +
           (config.has('dataFileExt') ? config.dataFileExt : '.json')
         debug(`...writing remaining work per user data to ${filename}`)
-        fs.writeFileSync('remainingWorkPerUser.json', JSON.stringify(userData))
+        fs.writeFileSync(
+          `${['.', config.dataPath, 'remainingWorkPerUser.json'].join(
+            path.sep
+          )}`,
+          JSON.stringify(userData)
+        )
       } else {
         debug(`prevUserRemainSum NOT found!`)
       }
