@@ -169,7 +169,7 @@ class JiraStatusReporter {
             : ''
         }
         ${priority ? ` AND Priority in ("${priority}")` : ''}`
-        // debug(`JQL_for_promise: ${JQL_for_promise}`)
+        debug(`JQL_for_promise: ${JQL_for_promise}`)
         promises.push(jira.searchJira(JQL_for_promise))
       })
 
@@ -586,6 +586,10 @@ class JiraStatusReporter {
     const jql = `project=${PROJECT_NAME} and status was "${status}" DURING ("${y}/${m}/${day}", "${y}/${m2}/${day2}")`
     debug('jql: %s; action: %d', jql, action)
     return this._genericJiraSearch(jql, action)
+  }
+
+  getUsers() {
+    return jira.getUsers(0, 300)
   }
 
   getEpicAndChildren(epicId) {

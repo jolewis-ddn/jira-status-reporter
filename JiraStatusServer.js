@@ -277,9 +277,41 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
 
   if (release) {
     try {
+      let userData
+      let users
+      debug(
+        `json file: ${['.', config.dataPath, 'remainingWorkPerUser.json'].join(
+          path.sep
+        )}`
+      )
+      // If remainingWorkPerUser.json exists, get the user list from it
+      if (
+        fs.existsSync(
+          `${['.', config.dataPath, 'remainingWorkPerUser.json'].join(
+            path.sep
+          )}`
+        )
+      ) {
+        let userData = fs.readFileSync(
+          `${['.', config.dataPath, 'remainingWorkPerUser.json'].join(
+            path.sep
+          )}`
+        )
+        users = Object.keys(JSON.parse(userData))
+        debug(`Pulling users from remainingWorkPerUser.json`)
+      } else if (config.reports.has('users')) {
+        users = config.reports.users
+        debug(`Pulling users from config file`)
+      } else {
+        debug(`Pulling users from Jira query (getUsers())`)
+        // If the JSON file doesn't exist and the config file doesn't list the users, get all the users
+        userData = await jsr.getUsers()
+        users = userData.map((x) => x.displayName)
+      }
+      console.log(users)
       let results = await jsr.getRemainingWorkReport(
         [release],
-        false,
+        users,
         false,
         false,
         false,
@@ -289,8 +321,21 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       const userSummary = {}
       const title = 'Remaining Work Report'
 
+      let sumProgress = 0
+      let sumTotal = 0
+      let sumRemain = 0
+
       results.data.results.forEach(async (row) => {
+        // Trim any excessively long names
+        let origUsername = row[0]
+        if (config.reports.has('usernameMaxLength')) {
+          let maxLenMinus2 = Number(config.reports.usernameMaxLength) - 2
+          if (row[0].length > config.reports.usernameMaxLength) {
+            row[0] = `${row[0].substring(0, maxLenMinus2)}...`
+          }
+        }
         detailTable.push(`<tr><td>${row.join(`</td><td>`)}</td></tr>`)
+        row[0] = origUsername
         if (!Object.keys(userSummary).includes(row[0])) {
           userSummary[row[0]] = {
             progress: 0,
@@ -387,7 +432,9 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
           ','
         )})%20AND%20fixVersion%20in%20("${results.config.fixVersions.join(
           ','
-        )}")' target='_blank'>${user}</a></td>
+        )}")' target='_blank'>${
+          user.length > 20 ? `${user.substring(0, 18)}...` : user
+        }</a></td>
           <td class="text-center">${userSummary[user].progress.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].total.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].remaining.toFixed(2)}</td>
@@ -421,7 +468,18 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
           codeFreezeDate
         )};"></div></td>
           </tr>`)
+        sumProgress += userSummary[user].progress
+        sumTotal += userSummary[user].total
+        sumRemain += userSummary[user].remaining
       })
+      // Now write the totals row
+      res.write(`<tr>
+          <th>Totals</th>
+          <td class="text-center totalCell">${sumProgress.toFixed(2)}</td>
+          <td class="text-center totalCell">${sumTotal.toFixed(2)}</td>
+          <td class="text-center totalCell">${sumRemain.toFixed(2)}</td>
+          <td colspan=3></td>
+          </tr>`)
       res.write(`</tbody></table>`)
 
       res.write(`<h3>Item Detail</h3>`)
@@ -643,6 +701,7 @@ function buildStylesheet() {
     .childrenCol { width: 30%; }
 
     .summCell { text-align: center; }
+    .totalCell { font-weight: bold; }
     .smcenter { font-size: smaller; text-align: center; }
     .smright { font-size: smaller; text-align: right; }
 
