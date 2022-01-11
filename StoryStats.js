@@ -13,7 +13,7 @@ class StoryStats {
     if (fs.existsSync(dbFilename)) {
       this.db = require('better-sqlite3')(dbFilename, { readonly: true })
     } else {
-      console.error(`Couldn't find db file (${dbFilename}).`)
+      console.error(`@16: Couldn't find db file (${dbFilename}).`)
       process.exit(10)
     }
   }
@@ -47,26 +47,26 @@ class StoryStats {
     const addRows = this.db.prepare(addSql).all()
     addRows.forEach((row) => {
       let components = ['none']
-        if (row.component) {
-          components = row.component.split(',')
-        }
+      if (row.component) {
+        components = row.component.split(',')
+      }
 
-        components.forEach((component) => {
-          if (!inComponent || component == inComponent) {
-            if (!Object.keys(results).includes(component)) {
-              results[component] = {
-                count: 0,
-                changed: 0,
-                completed: 0,
-                total: 0,
-                changes: [],
-                additions: [],
-              }
+      components.forEach((component) => {
+        if (!inComponent || component == inComponent) {
+          if (!Object.keys(results).includes(component)) {
+            results[component] = {
+              count: 0,
+              changed: 0,
+              completed: 0,
+              total: 0,
+              changes: [],
+              additions: [],
             }
-
-            results[component].count++
-            results[component].additions.push(row)
           }
+
+          results[component].count++
+          results[component].additions.push(row)
+        }
       })
     })
 
@@ -224,19 +224,17 @@ class StoryStats {
 
   getFullDailyReport() {
     const componentList = this.getComponentList()
-    
+
     const sql = `select date as keyDate, (sum(total)/28800) as 'total (d)', component
       from 'story-stats'
       where fixVersion='RED 1.0 Software'
       group by date,component`
 
-      const rows = this.db.prepare(sql).all()
-      debug(`Results count: `, rows.length)
-  
-      let data = []
-      rows.forEach((row) => {
+    const rows = this.db.prepare(sql).all()
+    debug(`Results count: `, rows.length)
 
-      })
+    let data = []
+    rows.forEach((row) => {})
   }
 }
 
