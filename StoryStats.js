@@ -222,15 +222,15 @@ class StoryStats {
     return this.components
   }
 
-  getFullDailyReport() {
+  getFullDailyReport(releaseName) {
     const componentList = this.getComponentList()
 
     const sql = `select date as keyDate, (sum(total)/28800) as 'total (d)', component
       from 'story-stats'
-      where fixVersion='RED 1.0 Software'
+      where fixVersion=?
       group by date,component`
 
-    const rows = this.db.prepare(sql).all()
+    const rows = this.db.prepare(sql).all(releaseName)
     debug(`Results count: `, rows.length)
 
     let data = []
