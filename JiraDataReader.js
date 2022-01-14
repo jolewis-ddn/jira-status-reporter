@@ -13,7 +13,7 @@ const { convertSecondsToDays } = require('./jiraUtils')
 
 const config = require('config')
 const dataPath = config.has('dataPath') ? config.get('dataPath') : 'data'
-const dataPathPrefix = '.' + path.sep + dataPath + path.sep
+const dataPathPrefix = dataPath + path.sep
 
 const NodeCache = require('node-cache')
 

@@ -342,6 +342,8 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
             total: 0,
             remaining: 0,
             unestimatedCount: 0,
+            unestimated: [],
+            estimated: [],
             issueCount: 0,
           }
         }
@@ -351,6 +353,13 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
 
         if (row[5] == 0) {
           userSummary[row[0]].unestimatedCount += 1
+          userSummary[row[0]].unestimated.push(
+            `<a href='${config.jira.protocol}://${config.jira.host}/browse/${row[1]}' target='_blank'>${row[1]}</a>: ${row[2]} (${row[3]})`
+          )
+        } else {
+          userSummary[row[0]].estimated.push(
+            `<a href='${config.jira.protocol}://${config.jira.host}/browse/${row[1]}' target='_blank'>${row[1]}</a>: ${row[2]} (${row[3]})`
+          )
         }
         userSummary[row[0]].issueCount += 1
       })
@@ -421,6 +430,26 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
       const codeFreezeDate = new Date(config.reports.codeFreeze)
 
       sortedUserData.forEach(async (user) => {
+        let estHtml = `<h2>${
+          userSummary[user].estimated.length
+        } Estimated</h2>${
+          userSummary[user].estimated.length
+            ? `<ul><li>${userSummary[user].estimated.join(
+                '</li><li>'
+              )}</li></ul>`
+            : 'none'
+        }`.replace(/"/g, "'")
+
+        let unestHtml = `<h2>${
+          userSummary[user].unestimated.length
+        } Unestimated</h2>${
+          userSummary[user].unestimated.length
+            ? `<ul><li>${userSummary[user].unestimated.join(
+                '</li><li>'
+              )}</li></ul>`
+            : 'none'
+        }`.replace(/"/g, "'")
+
         res.write(`<tr>
           <td><a href='${config.jira.protocol}://${
           config.jira.host
@@ -438,9 +467,10 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
           <td class="text-center">${userSummary[user].progress.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].total.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].remaining.toFixed(2)}</td>
-          <td class="text-center" data-toggle="tooltip" data-html="true" title="${
-            userSummary[user].unestimatedCount
-          } of ${userSummary[user].issueCount} total">${
+          <td class="text-center"><a tabindex="1" data-toggle="popover" data-trigger="focus" data-html="true" title="${
+            userSummary[user].unestimated.length +
+            userSummary[user].estimated.length
+          } total issues" data-content="${unestHtml}<hr>${estHtml}">${
           userSummary[user].issueCount > 0
             ? (
                 100 *
@@ -457,7 +487,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
             )
           }
         }
-        res.write(`</td>
+        res.write(`</a></td>
           <td class="text-center">${calcFutureDate(
             userSummary[user].remaining.toFixed(2)
           )}</td>
@@ -708,6 +738,7 @@ function buildStylesheet() {
     .problem { background-color: pink; color: black; }
 
     .tooltip-inner { max-width: 500px; text-align: left; }
+    .popover { max-width: 500px; }
 
     .text-center { text-align: center; }
     </style>`
@@ -753,6 +784,10 @@ function buildHtmlFooter() {
   //   var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
   //     return new bootstrap.Tooltip(tooltipTriggerEl)
   //   })
+  // var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+  // var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+  //   return new bootstrap.Popover(popoverTriggerEl)
+  // })
   // </script>`)
 
   // Bootstrap 4.5
@@ -762,6 +797,14 @@ function buildHtmlFooter() {
    $(function () {
      $('[data-toggle="tooltip"]').tooltip()
    })
+   
+   $(function () {
+    $('[data-toggle="popover"]').popover()
+  })
+
+  $('.popover-dismiss').popover({
+    trigger: 'focus'
+  })
    </script>`
 }
 
