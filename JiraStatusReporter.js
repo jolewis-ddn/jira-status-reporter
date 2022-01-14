@@ -113,7 +113,7 @@ class JiraStatusReporter {
     let project = inProject ? inProject : config.project
     let excludeTypes
     if (inExcludeTypes) {
-      excludeTypes = inExcludeStatuses
+      excludeTypes = inExcludeTypes
     } else {
       excludeTypes =
         config.has('reports') && config.reports.has('excludeTypes')

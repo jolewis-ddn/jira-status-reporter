@@ -313,7 +313,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
         [release],
         users,
         false,
-        false,
+        ['Bug', 'Epic'],
         false,
         inputPriority
       )
@@ -429,10 +429,11 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
 
       const codeFreezeDate = new Date(config.reports.codeFreeze)
 
+      const headerTag = 'h3'
       sortedUserData.forEach(async (user) => {
-        let estHtml = `<h2>${
+        let estHtml = `<${headerTag}>${
           userSummary[user].estimated.length
-        } Estimated</h2>${
+        } Estimated</${headerTag}>${
           userSummary[user].estimated.length
             ? `<ul><li>${userSummary[user].estimated.join(
                 '</li><li>'
@@ -440,9 +441,9 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
             : 'none'
         }`.replace(/"/g, "'")
 
-        let unestHtml = `<h2>${
+        let unestHtml = `<${headerTag}>${
           userSummary[user].unestimated.length
-        } Unestimated</h2>${
+        } Unestimated</${headerTag}>${
           userSummary[user].unestimated.length
             ? `<ul><li>${userSummary[user].unestimated.join(
                 '</li><li>'
