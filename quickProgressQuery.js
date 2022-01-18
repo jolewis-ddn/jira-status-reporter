@@ -200,6 +200,11 @@ function buildHtml(component, type, data) {
     component !== 'Summary' ? component : 'Component'
   }: ${type}</h2>`
   if (type == 'Summary') {
+    let sumCount = 0
+    let sumChanged = 0
+    let sumCompleted = 0
+    let sumTotal = 0
+    let sumAddition = 0
     output += `<table class="table table-sm table-striped"><thead><tr><th>${[
       'Component',
       'Count',
@@ -212,6 +217,11 @@ function buildHtml(component, type, data) {
     Object.keys(data)
       .sort()
       .forEach((item) => {
+        sumCount += data[item].count
+        sumChanged += data[item].changed
+        sumCompleted += data[item].completed
+        sumTotal += data[item].total
+        sumAddition += data[item].additions.length
         output += `<tr><td>${
           data[item].changed > 0
             ? `<a href="#${item}-Updates">`
@@ -226,6 +236,13 @@ function buildHtml(component, type, data) {
           data[item].additions.length
         }</td></tr>`
       })
+    output += `<tr><td><em style="float:right;">Totals</em></td>
+        <td>${sumCount}</td>
+        <td>${sumChanged}</td>
+        <td>${convertToDays(sumCompleted)}</td>
+        <td>${convertToDays(sumTotal)}</td>
+        <td>${sumAddition}</td>
+        </tr>`
   } else if (type == 'Additions') {
     output += `<table class="table table-sm table-striped"><thead><tr><th>${[
       'Key',
