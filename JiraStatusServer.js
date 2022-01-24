@@ -208,7 +208,18 @@ server.get('/', async (req, res, next) => {
   <li><a href='/requirements'>Requirements</a> (HTML)</li>
   <li>Timeline: Requires Jira key parameter ('/timeline/ABC-1234') (HTML)</li>
   <li>Unestimated (<a href='/unestimated'>JSON</a> or <a href='/unestimated?format=html'>HTML</a>)</li>`)
+  res.write(`</ul>`)
 
+  // Print any extra links
+  if (config.has('extraLinks')) {
+    res.write(`<h2>Additional Links</h2>`)
+    res.write(
+      `<ul>${Object.keys(config.extraLinks).map(
+        (entry) =>
+          `<li><a href="${config.extraLinks[entry]}" target="_blank">${entry}</a></li>`
+      )}</ul>`
+    )
+  }
   // Print the cache management links if the Admin param is set
   if (
     req.query &&
