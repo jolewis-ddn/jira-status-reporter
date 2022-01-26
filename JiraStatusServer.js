@@ -214,10 +214,12 @@ server.get('/', async (req, res, next) => {
   if (config.has('extraLinks')) {
     res.write(`<h2>Additional Links</h2>`)
     res.write(
-      `<ul>${Object.keys(config.extraLinks).map(
-        (entry) =>
-          `<li><a href="${config.extraLinks[entry]}" target="_blank">${entry}</a></li>`
-      )}</ul>`
+      `<ul>${Object.keys(config.extraLinks)
+        .map(
+          (entry) =>
+            `<li><a href="${config.extraLinks[entry]}" target="_blank">${entry}</a></li>`
+        )
+        .join('')}</ul>`
     )
   }
   // Print the cache management links if the Admin param is set
