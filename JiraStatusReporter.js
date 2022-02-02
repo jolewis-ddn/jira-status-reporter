@@ -781,66 +781,88 @@ class JiraStatusReporter {
           jira
             .searchJira(jql, queryConfig)
             .then((results) => {
-              debug(`A) results.issues.length = ${results.issues.length}`)
-              debug(`...total = ${results.total}`)
-              let compiledResults = {}
+              try {
+                debug(`A) results.issues.length = ${results.issues.length}`)
+                debug(`...total = ${results.total}`)
+                let compiledResults = {}
 
-              // Second: Calc # of queries needed
-              queryConfig.maxResults = 99
-              let TOTAL_RESULTS = results.total
-              if (TOTAL_RESULTS > 0) {
-                let runCount = Math.ceil(TOTAL_RESULTS / queryConfig.maxResults)
-                debug(
-                  `runCount: (Math.ceil(${queryConfig.maxResults}/${TOTAL_RESULTS})) = ${runCount}`
-                )
+                // Second: Calc # of queries needed
+                queryConfig.maxResults = 99
+                let TOTAL_RESULTS = results.total
+                if (TOTAL_RESULTS > 0) {
+                  let runCount = Math.ceil(
+                    TOTAL_RESULTS / queryConfig.maxResults
+                  )
+                  debug(
+                    `runCount: (Math.ceil(${queryConfig.maxResults}/${TOTAL_RESULTS})) = ${runCount}`
+                  )
 
-                // Third: Queue up queries
-                // Build array of queries/promises to run
-                let jobList = []
-                for (let ctr = 0; ctr < runCount; ctr++) {
-                  queryConfig.startAt = ctr * queryConfig.maxResults
-                  // debug(`jobList.push(jira.searchJira(${jql}`, queryConfig, `)`)
-                  jobList.push(jira.searchJira(jql, queryConfig))
-                }
+                  // Third: Queue up queries
+                  // Build array of queries/promises to run
+                  let jobList = []
+                  for (let ctr = 0; ctr < runCount; ctr++) {
+                    queryConfig.startAt = ctr * queryConfig.maxResults
+                    // debug(`jobList.push(jira.searchJira(${jql}`, queryConfig, `)`)
+                    jobList.push(jira.searchJira(jql, queryConfig))
+                  }
 
-                debug(`jobList built... length = ${jobList.length}`)
+                  debug(`jobList built... length = ${jobList.length}`)
 
-                // Fourth: Run queries
-                Promise.all(jobList)
-                  .then((rawResults) => {
-                    // Fifth: Combine results
-                    compiledResults.total = rawResults[0].total
-                    compiledResults.expand = rawResults[0].expand
-                    compiledResults.startAt = 0
-                    compiledResults.maxResults = compiledResults.total
-                    compiledResults.comment = 'Compiled by JiraStatusReporter'
-                    compiledResults.query = jql
+                  // Fourth: Run queries
+                  Promise.all(jobList)
+                    .then((rawResults) => {
+                      // Fifth: Combine results
+                      compiledResults.total = rawResults[0].total
+                      compiledResults.expand = rawResults[0].expand
+                      compiledResults.startAt = 0
+                      compiledResults.maxResults = compiledResults.total
+                      compiledResults.comment = 'Compiled by JiraStatusReporter'
+                      compiledResults.query = jql
 
-                    compiledResults.issues = []
-                    for (let rrctr = 0; rrctr < rawResults.length; rrctr++) {
-                      const element = rawResults[rrctr]
-                      compiledResults.issues = compiledResults.issues.concat(
-                        rawResults[rrctr].issues
+                      compiledResults.issues = []
+                      for (let rrctr = 0; rrctr < rawResults.length; rrctr++) {
+                        const element = rawResults[rrctr]
+                        compiledResults.issues = compiledResults.issues.concat(
+                          rawResults[rrctr].issues
+                        )
+                      }
+
+                      // Complain if the expected and actual total counts don't match
+                      console.assert(
+                        compiledResults.issues.length == rawResults[0].total
                       )
-                    }
 
-                    // Complain if the expected and actual total counts don't match
-                    console.assert(
-                      compiledResults.issues.length == rawResults[0].total
-                    )
-
-                    resolve(compiledResults)
-                  })
-                  .catch((err) => {
-                    reject(err)
-                  })
-              } else {
-                resolve(results)
+                      // console.log(compiledResults)
+                      resolve(compiledResults)
+                    })
+                    .catch((err) => {
+                      reject(err)
+                    })
+                } else {
+                  resolve(results)
+                }
+              } catch (err) {
+                console.error(`ERROR @ 842`)
+                console.error(err)
+                reject(err)
               }
             })
             .catch((err) => {
               debug('ERROR: jql: %s; ERR %O', jql, err.statusCode)
-              reject(err)
+              console.log(err)
+              if (
+                err.statusCode == 400 &&
+                err.name == 'StatusCodeError' &&
+                err.error.errorMessages[0] ==
+                  'Issue does not exist or you do not have permission to see it.'
+              ) {
+                console.log(
+                  `JQL resulted in "issue not found" error, so returning empty result set`
+                )
+                resolve({ error: 'Issue not found', issues: [] })
+              } else {
+                reject(err)
+              }
             })
           break
         default:

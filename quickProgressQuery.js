@@ -129,10 +129,12 @@ if (options.output && outputFormat == 'html') {
 Object.keys(summaryReport)
   .sort()
   .forEach((component) => {
+    debug(`Processing component: ${component}`)
     const componentData = summaryReport[component].changes
     if (componentData.length) {
       const outputFile = path.resolve(outputFilename)
       if (options.output && outputFormat == 'json') {
+        debug(`Appending output to ${outputFile}`)
         fs.writeFileSync(
           outputFile,
           JSON.stringify(
@@ -143,6 +145,7 @@ Object.keys(summaryReport)
           { encoding: 'utf8', flag: 'a' }
         )
       } else if (options.output && outputFormat == 'html') {
+        debug(`Appending output to ${outputFile}`)
         fs.writeFileSync(
           outputFile,
           buildHtml(component, 'Updates', componentData),
@@ -158,6 +161,9 @@ Object.keys(summaryReport)
       // console.table(addData)
       if (options.output) {
         const outputFile = path.resolve(options.output)
+        debug(
+          `addData.length (${addData.length}): Writing output to ${outputFile}`
+        )
         if (outputFormat == 'json') {
           fs.writeFileSync(
             outputFile,
@@ -176,6 +182,7 @@ Object.keys(summaryReport)
   })
 
 if (options.output && outputFormat == 'html') {
+  debug(`Writing output to ${options.output}`)
   fs.writeFileSync(options.output, htmlFooter, { encoding: 'utf8', flag: 'a' })
 }
 
@@ -195,6 +202,8 @@ function buildHtmlHeader(startDate, endDate) {
 }
 
 function buildHtml(component, type, data) {
+  debug(`buildHtml(${component}, ${type}, data)...`)
+
   let anchor = `${component}-${type}`
   let output = `<h2 id="${anchor}">${
     component !== 'Summary' ? component : 'Component'
@@ -217,6 +226,8 @@ function buildHtml(component, type, data) {
     Object.keys(data)
       .sort()
       .forEach((item) => {
+        debug(`Writing summary output for ${item}`)
+
         sumCount += data[item].count
         sumChanged += data[item].changed
         sumCompleted += data[item].completed
@@ -255,6 +266,8 @@ function buildHtml(component, type, data) {
     ].join('</th><th>')}</th></tr>`
     output += `<tbody>`
     data.forEach((addition) => {
+      debug(`Writing Additions for ${addition.key} to ${outputFile}`)
+
       output += `<tr><th>${[
         `<a href="${config.jira.protocol}:${config.jira.host}/browse/${addition.key}" target="_blank" rel="noreferrer noopener">${addition.key}</a>`,
         addition.date,
@@ -266,6 +279,8 @@ function buildHtml(component, type, data) {
       ].join('</td><td>')}</td></tr>`
     })
   } else if (type == 'Updates') {
+    debug(`Writing Updates to ${outputFile}`)
+
     output += `<table class="table table-sm table-striped"><thead><tr><th>${[
       'Key',
       'Dates',

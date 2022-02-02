@@ -3307,142 +3307,150 @@ server.get('/epicStatus/:id', async (req, res, next) => {
       ]
     )
 
-    if (includeRaw) {
-      response.raw = data
-    }
+    if (data.error) {
+      response = { error: data.error }
+    } else {
+      if (includeRaw) {
+        response.raw = data
+      }
 
-    // Save details in the "response" object
-    // Blockers are stored in the "response.blockedBy" array
-    response.blockedByCount = 0
-    response.blockedBy = {}
+      // Save details in the "response" object
+      // Blockers are stored in the "response.blockedBy" array
+      response.blockedByCount = 0
+      response.blockedBy = {}
 
-    data.issues.forEach((story) => {
-      debug(`>>> Processing story: ${story.key}...`)
-      if (story.key == id) {
-        // No progress info @ Epic level
-        response.status = story.fields.status.name
+      data.issues.forEach((story) => {
+        debug(`>>> Processing story: ${story.key}...`)
+        if (story.key == id) {
+          // No progress info @ Epic level
+          response.status = story.fields.status.name
 
-        response.progress.progress += story.fields.progress.progress
-        response.progress.total += story.fields.progress.total
-      } else {
-        response.stories.push(story.key)
-        if (story.fields.assignee) {
-          if (
-            !Object.keys(response.users).includes(
-              story.fields.assignee.displayName
+          response.progress.progress += story.fields.progress.progress
+          response.progress.total += story.fields.progress.total
+        } else {
+          response.stories.push(story.key)
+          if (story.fields.assignee) {
+            if (
+              !Object.keys(response.users).includes(
+                story.fields.assignee.displayName
+              )
+            ) {
+              response.users[story.fields.assignee.displayName] = {
+                progress: 0,
+                total: 0,
+                issues: [],
+              }
+            }
+            response.users[story.fields.assignee.displayName].progress +=
+              story.fields.progress.progress
+            response.users[story.fields.assignee.displayName].total +=
+              story.fields.progress.total
+            response.users[story.fields.assignee.displayName].issues.push(
+              story.key
             )
+          } else {
+            // No assignee
+            if (!Object.keys(response.users).includes('Unassigned')) {
+              response.users['Unassigned'] = {
+                progress: 0,
+                total: 0,
+                issues: [],
+              }
+            }
+            response.users['Unassigned'].progress +=
+              story.fields.progress.progress
+            response.users['Unassigned'].total += story.fields.progress.total
+            response.users['Unassigned'].issues.push(story.key)
+          }
+
+          response.progress.progress += story.fields.progress.progress
+          response.progress.total += story.fields.progress.total
+        }
+
+        // Check on the blockers
+        story.fields.issuelinks.forEach((link) => {
+          debug(`found link: ${link.type.name}`)
+          if (
+            link.type.inward == 'is blocked by' &&
+            Object.keys(link).includes('inwardIssue')
           ) {
-            response.users[story.fields.assignee.displayName] = {
+            response.blockedBy[link.inwardIssue.key] = {
+              summary: link.inwardIssue.fields.summary,
+              assignee: link.inwardIssue.fields.assignee,
               progress: 0,
               total: 0,
-              issues: [],
+              blocks: { id: story.key, summary: story.fields.summary },
             }
+            response.blockedByCount++
           }
-          response.users[story.fields.assignee.displayName].progress +=
-            story.fields.progress.progress
-          response.users[story.fields.assignee.displayName].total +=
-            story.fields.progress.total
-          response.users[story.fields.assignee.displayName].issues.push(
-            story.key
+        })
+      })
+
+      // Process blockers
+      let blockerKeys = Object.keys(response.blockedBy)
+      if (blockerKeys.length) {
+        response.blockedBy['Combined'] = { progress: 0, total: 0 }
+        debug(`Processing blockers: ${blockerKeys.join(',')}`)
+        const blockerJql = `project=${
+          config.project
+        } AND key in (${blockerKeys.join(',')})`
+        debug(`...blockerJql: ${blockerJql}`)
+
+        let blockerData = await jsr._genericJiraSearch(blockerJql, 99, [
+          `key`,
+          `aggregateprogress`,
+          `customfield_10008`,
+          `issuetype`,
+          `assignee`,
+          `status`,
+        ])
+        blockerData.issues.forEach((blockerIssue) => {
+          debug(
+            `blockerIssue: `,
+            blockerIssue.key,
+            blockerIssue.fields.aggregateprogress
           )
-        } else {
-          // No assignee
-          if (!Object.keys(response.users).includes('Unassigned')) {
-            response.users['Unassigned'] = { progress: 0, total: 0, issues: [] }
-          }
-          response.users['Unassigned'].progress +=
-            story.fields.progress.progress
-          response.users['Unassigned'].total += story.fields.progress.total
-          response.users['Unassigned'].issues.push(story.key)
-        }
+          response.blockedBy[blockerIssue.key].progress =
+            blockerIssue.fields.aggregateprogress.progress
+          response.blockedBy[blockerIssue.key].total =
+            blockerIssue.fields.aggregateprogress.total
 
-        response.progress.progress += story.fields.progress.progress
-        response.progress.total += story.fields.progress.total
+          if (blockerIssue.fields.assignee) {
+            response.blockedBy[blockerIssue.key].assignee =
+              blockerIssue.fields.assignee.displayName
+          } else {
+            response.blockedBy[blockerIssue.key].assignee = UNASSIGNED_USER
+          }
+
+          response.blockedBy[blockerIssue.key].status =
+            blockerIssue.fields.status.name
+          response.blockedBy[blockerIssue.key].type =
+            blockerIssue.fields.issuetype.name
+
+          response.blockedBy['Combined'].progress +=
+            blockerIssue.fields.aggregateprogress.progress
+          response.blockedBy['Combined'].total +=
+            blockerIssue.fields.aggregateprogress.total
+        })
+      } else {
+        debug(`...no blockers found`)
       }
 
-      // Check on the blockers
-      story.fields.issuelinks.forEach((link) => {
-        debug(`found link: ${link.type.name}`)
+      // Calculate the longest remaining workload
+      let maxRemaining = { user: 'unset', remaining: 0 }
+      Object.keys(response.users).forEach((user) => {
         if (
-          link.type.inward == 'is blocked by' &&
-          Object.keys(link).includes('inwardIssue')
+          response.users[user].total - response.users[user].progress >
+          maxRemaining.remaining
         ) {
-          response.blockedBy[link.inwardIssue.key] = {
-            summary: link.inwardIssue.fields.summary,
-            assignee: link.inwardIssue.fields.assignee,
-            progress: 0,
-            total: 0,
-            blocks: { id: story.key, summary: story.fields.summary },
-          }
-          response.blockedByCount++
+          maxRemaining.remaining =
+            response.users[user].total - response.users[user].progress
+          maxRemaining.user = user
         }
       })
-    })
 
-    // Process blockers
-    let blockerKeys = Object.keys(response.blockedBy)
-    if (blockerKeys.length) {
-      response.blockedBy['Combined'] = { progress: 0, total: 0 }
-      debug(`Processing blockers: ${blockerKeys.join(',')}`)
-      const blockerJql = `project=${
-        config.project
-      } AND key in (${blockerKeys.join(',')})`
-      debug(`...blockerJql: ${blockerJql}`)
-
-      let blockerData = await jsr._genericJiraSearch(blockerJql, 99, [
-        `key`,
-        `aggregateprogress`,
-        `customfield_10008`,
-        `issuetype`,
-        `assignee`,
-        `status`,
-      ])
-      blockerData.issues.forEach((blockerIssue) => {
-        debug(
-          `blockerIssue: `,
-          blockerIssue.key,
-          blockerIssue.fields.aggregateprogress
-        )
-        response.blockedBy[blockerIssue.key].progress =
-          blockerIssue.fields.aggregateprogress.progress
-        response.blockedBy[blockerIssue.key].total =
-          blockerIssue.fields.aggregateprogress.total
-
-        if (blockerIssue.fields.assignee) {
-          response.blockedBy[blockerIssue.key].assignee =
-            blockerIssue.fields.assignee.displayName
-        } else {
-          response.blockedBy[blockerIssue.key].assignee = UNASSIGNED_USER
-        }
-
-        response.blockedBy[blockerIssue.key].status =
-          blockerIssue.fields.status.name
-        response.blockedBy[blockerIssue.key].type =
-          blockerIssue.fields.issuetype.name
-
-        response.blockedBy['Combined'].progress +=
-          blockerIssue.fields.aggregateprogress.progress
-        response.blockedBy['Combined'].total +=
-          blockerIssue.fields.aggregateprogress.total
-      })
-    } else {
-      debug(`...no blockers found`)
+      response.maxRemaining = maxRemaining
     }
-
-    // Calculate the longest remaining workload
-    let maxRemaining = { user: 'unset', remaining: 0 }
-    Object.keys(response.users).forEach((user) => {
-      if (
-        response.users[user].total - response.users[user].progress >
-        maxRemaining.remaining
-      ) {
-        maxRemaining.remaining =
-          response.users[user].total - response.users[user].progress
-        maxRemaining.user = user
-      }
-    })
-
-    response.maxRemaining = maxRemaining
     response.processed = new Date().toISOString()
     cache.set(cacheName, response)
   }
