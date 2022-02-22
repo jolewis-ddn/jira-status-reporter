@@ -3,9 +3,9 @@
 'use strict'
 
 const config = require('config')
-// const path = require('path')
-// const fs = require('fs')
 const debug = require('debug')('quickProgressQuery')
+
+const DEFAULT_DAYS = 8
 
 const htmlFooter = `<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 
@@ -17,11 +17,11 @@ let storyStats = new StoryStats()
 
 const componentList = storyStats.getComponentList(true)
 
-function buildReport() {
-  fastify.log.debug('buildReport() starting...')
+function buildReport(daysAgo) {
+  fastify.log.debug(`buildReport(${daysAgo}) starting...`)
   let startDate
   let endDate
-  let daysAgo = 8 //  weekReport
+  // let daysAgo = 8 //  weekReport
 
   // Formatting source: https://stackoverflow.com/a/37649046
   startDate = new Date(new Date() - 1000 * 60 * 60 * 24 * daysAgo)
@@ -249,9 +249,11 @@ const fastify = require('fastify')({
   logger: true,
 })
 
-fastify.get('/', async (request, reply) => {
+fastify.get('/:days', async (request, reply) => {
   reply.type('text/html')
-  return buildReport()
+  // console.log(`days: `, request.params)
+  let days = request.params.days || DEFAULT_DAYS
+  return buildReport(days)
 })
 
 const start = async () => {

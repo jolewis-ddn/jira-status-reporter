@@ -420,6 +420,39 @@ class JiraDataReader {
     })
   }
 
+  async wipeCacheDatabase(issueDate, issueStatus) {
+    return new Promise((resolve, reject) => {
+      debug(`wipeCacheDatabase(${issueDate}, ${issueStatus}) called...`)
+      if (issueDate && issueStatus) {
+        try {
+          debug(issueDate)
+          debug(issueStatus)
+          debug(
+            this.betterDb
+              .prepare(
+                'SELECT count(*) from `story-stats` WHERE date=? AND status=?'
+              )
+              .get(issueDate, issueStatus)
+          )
+
+          let dataDeleteSQL = this.betterDb.prepare(
+            'DELETE FROM `story-stats` WHERE "date"=? AND status=?'
+          )
+          const res = dataDeleteSQL.run(issueDate, issueStatus)
+          debug(`delete stmt results: `, res)
+          resolve(res)
+        } catch (err) {
+          console.error(err)
+          reject(err)
+        }
+      } else {
+        reject(
+          `wipeCacheDatabase: Invalid or missing issueDate (${issueDate}) or issueStatus (${issueStatus})`
+        )
+      }
+    })
+  }
+
   /**
    * Read in the data file from local disk and store it in the cache.
    *
