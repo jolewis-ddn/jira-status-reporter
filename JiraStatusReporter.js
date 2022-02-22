@@ -129,7 +129,15 @@ class JiraStatusReporter {
           ? config.reports.excludeStatuses
           : []
     }
-    let priority = inPriority ? inPriority : ''
+
+    let priority = ''
+    if (inPriority) {
+      if (typeof inPriority == 'string') {
+        priority = `"${inPriority}"`
+      } else if (typeof inPriority == 'object') {
+        priority = `"${inPriority.join('","')}"`
+      }
+    }
 
     const response = [] // Jira data collector
     const promises = [] // Per-user query
@@ -168,7 +176,7 @@ class JiraStatusReporter {
             ? ` AND fixVersion in ("${fixVersions.join(',')}")`
             : ''
         }
-        ${priority ? ` AND Priority in ("${priority}")` : ''}`
+        ${priority ? ` AND Priority in (${priority})` : ''}`
         debug(`JQL_for_promise: ${JQL_for_promise}`)
         promises.push(jira.searchJira(JQL_for_promise))
       })

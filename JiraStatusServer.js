@@ -262,16 +262,30 @@ function getBarColor(estDate, relDate) {
 function translatePriorityNumToString(priNum) {
   const priorityStrings = ['High', 'Medium', 'Low', 'Unspecified']
 
-  if (priorityStrings[priNum]) {
-    return priorityStrings[priNum]
+  if (typeof priNum == 'string') {
+    debug(`...priNum is a string`)
+    debug(priorityStrings[priNum])
+    if (priorityStrings[priNum]) {
+      return priorityStrings[priNum]
+    } else {
+      throw new Error(
+        `Invalid Priority Value @ 272: ${priNum} / type: ${typeof priNum}`
+      )
+    }
+  } else if (typeof priNum == 'object') {
+    debug(`...priNum is an array`)
+    debug(priNum.map((n) => priorityStrings[n]))
+    return priNum.map((n) => priorityStrings[n])
   } else {
-    throw new Error(`Invalid Priority Value: ${priNum}`)
+    throw new Error(
+      `Invalid Priority Value @ 281: ${priNum} / type: ${typeof priNum}`
+    )
   }
 }
 
 server.get('/remainingWorkReport/:release', async (req, res, next) => {
   debug(`/remainingWorkReport(${req.params.release}) called...`)
-  debug(`inputPriority = ${req.query.priority}`)
+  debug(`inputPriority = ${req.query.priority} / ${typeof req.query.priority}`)
   let inputPriority
   try {
     inputPriority = translatePriorityNumToString(req.query.priority)
@@ -281,6 +295,9 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
     // res.end()
     inputPriority = false
   }
+  console.log(
+    `inputPriority: ${inputPriority}; typeof = ${typeof inputPriority}`
+  )
 
   const releases = await getVersions(false)
   // debug(`... releases: `, releases)
@@ -326,7 +343,7 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
         [release],
         users,
         false,
-        ['Bug', 'Epic'],
+        ['Bug', 'Epic', 'Requirement'],
         false,
         inputPriority
       )
@@ -385,7 +402,20 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
 
       res.write(`<div><em>Priority Filter</em>: `)
       if (inputPriority) {
-        res.write(inputPriority)
+        if (typeof inputPriority == 'string') {
+          res.write(inputPriority)
+        } else if (typeof inputPriority == 'object') {
+          res.write(inputPriority.join(', '))
+        }
+      } else {
+        res.write(`None`)
+      }
+      res.write('</div>')
+
+      // Efficiency score
+      res.write(`<div><em>Efficiency Modifier</em>: `)
+      if (config.has('forecast') && config.forecast.has('efficiency')) {
+        res.write(String(config.forecast.efficiency))
       } else {
         res.write(`None`)
       }
@@ -415,9 +445,9 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
             'User',
             'Progress',
             'Total',
-            'Remaining',
-            '% Unestimated',
-            'Finish Date',
+            'Remain',
+            '% Unest',
+            'Finish',
             'Timespan',
           ].join('</th><th>')}</th>
         </tr>
@@ -480,11 +510,23 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
         }</a></td>
           <td class="text-center">${userSummary[user].progress.toFixed(2)}</td>
           <td class="text-center">${userSummary[user].total.toFixed(2)}</td>
-          <td class="text-center">${userSummary[user].remaining.toFixed(2)}</td>
-          <td class="text-center"><a tabindex="1" data-toggle="popover" data-trigger="focus" data-html="true" title="${
-            userSummary[user].unestimated.length +
-            userSummary[user].estimated.length
-          } total issues" data-content="${unestHtml}<hr>${estHtml}">${
+          <td class="text-center">`)
+        if (config.has('forecast') && config.forecast.has('efficiency')) {
+          res.write(
+            `<a tabindex="1" data-toggle="popover" data-trigger="focus" data-html="true" title="Unadjusted Remaining Days" data-content="${userSummary[
+              user
+            ].remaining.toFixed(2)}d">${(
+              userSummary[user].remaining / config.forecast.efficiency
+            ).toFixed(2)}</a></td>`
+          )
+        } else {
+          // No efficiency modifier
+          res.write(`${userSummary[user].remaining.toFixed(2)}</td>`)
+        }
+        res.write(`<td class="text-center"><a tabindex="1" data-toggle="popover" data-trigger="focus" data-html="true" title="${
+          userSummary[user].unestimated.length +
+          userSummary[user].estimated.length
+        } total issues" data-content="${unestHtml}<hr>${estHtml}">${
           userSummary[user].issueCount > 0
             ? (
                 100 *
@@ -501,17 +543,36 @@ server.get('/remainingWorkReport/:release', async (req, res, next) => {
             )
           }
         }
-        res.write(`</a></td>
-          <td class="text-center">${calcFutureDate(
+        res.write(`</a></td>`)
+        if (config.has('forecast') && config.forecast.has('efficiency')) {
+          res.write(`<td class="text-center"><a tabindex="2" data-toggle="popover" data-trigger="focus" data-html="true" title="Unadjusted Completion Date" data-content="${calcFutureDate(
             userSummary[user].remaining.toFixed(2)
-          )}</td>
+          )}">${calcFutureDate(
+            (userSummary[user].remaining / config.forecast.efficiency).toFixed(
+              2
+            )
+          )}</a></td>
           <td style="vertical-align: middle;"><div style="height: 20px; width: ${
             userSummary[user].remaining.toFixed(2) * 2
           }px; background-color: ${getBarColor(
-          new Date().addBusinessDays(userSummary[user].remaining),
-          codeFreezeDate
-        )};"></div></td>
-          </tr>`)
+            new Date().addBusinessDays(
+              userSummary[user].remaining / config.forecast.efficiency
+            ),
+            codeFreezeDate
+          )};"></div></td>`)
+        } else {
+          // No efficiency modifier
+          res.write(`<td class="text-center">${calcFutureDate(
+            userSummary[user].remaining.toFixed(2)
+          )}</a></td>
+          <td style="vertical-align: middle;"><div style="height: 20px; width: ${
+            userSummary[user].remaining.toFixed(2) * 2
+          }px; background-color: ${getBarColor(
+            new Date().addBusinessDays(userSummary[user].remaining),
+            codeFreezeDate
+          )};"></div></td>`)
+        }
+        res.write(`</tr>`)
         sumProgress += userSummary[user].progress
         sumTotal += userSummary[user].total
         sumRemain += userSummary[user].remaining
