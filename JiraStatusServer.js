@@ -117,6 +117,22 @@ function buildAlert(content, title = false, alertClass = 'success') {
 </div>`
 }
 
+/**
+ * Should the specified report be shown on the home page?
+ * Ensure that the config file contains the 'reports' and 'reports.omit' entries
+ * and, if so, does the array contain the specified report name?
+ * @param {string} reportName Report to check
+ */
+function shouldShowReport(reportName) {
+  const DEFAULT_SHOW = true
+  if (config.has('reports')) {
+    if (config.reports.has('omit')) {
+      return !config.reports.omit.includes(reportName)
+    }
+  }
+  return DEFAULT_SHOW
+}
+
 server.get(
   '/docs/*',
   restify.plugins.serveStatic({ directory: './static', default: 'charts.html' })
@@ -180,10 +196,12 @@ server.get('/', async (req, res, next) => {
 
   res.write(`<li>Projects (<a href='/projects'>JSON</a> or <a href='/projects?format=html'>HTML</a>)</li>
   <li>Query</li>
-  <li>Releases (<a href='/releases'>JSON</a> or <a href='/releases?format=html'>HTML</a>)</li>
-  <li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>`)
+  <li>Releases (<a href='/releases'>JSON</a> or <a href='/releases?format=html'>HTML</a>)</li>`)
 
-  if (releases.length) {
+  if (releases.length && shouldShowReport('Remaining Work Report')) {
+    res.write(
+      `<li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>`
+    )
     res.write(`<ul><li><em>${config.project} releases:</em><ul>`)
     res.write(
       releases
