@@ -117,20 +117,43 @@ function buildAlert(content, title = false, alertClass = 'success') {
 </div>`
 }
 
+function shouldHideOrRedirect(reportName) {
+  return shouldHideReport(reportName) || shouldRedirectReport(reportName)
+}
+
 /**
  * Should the specified report be shown on the home page?
  * Ensure that the config file contains the 'reports' and 'reports.omit' entries
  * and, if so, does the array contain the specified report name?
  * @param {string} reportName Report to check
  */
-function shouldShowReport(reportName) {
-  const DEFAULT_SHOW = true
+function shouldHideReport(reportName) {
+  if (config.has('reports') && config.reports.has('omit')) {
+    return config.reports.omit.includes(reportName)
+  }
+  return false
+}
+
+function shouldRedirectReport(reportName) {
+  console.log(`shouldRedirectReport(${reportName})`)
   if (config.has('reports')) {
-    if (config.reports.has('omit')) {
-      return !config.reports.omit.includes(reportName)
+    if (config.reports.has('redirect')) {
+      return Object.keys(config.reports.redirect).includes(reportName)
     }
   }
-  return DEFAULT_SHOW
+  return false
+}
+
+function getRedirectReportUrl(reportName) {
+  console.log(`getRedirectReportUrl(${reportName})`)
+  if (shouldRedirectReport(reportName)) {
+    return config.reports.redirect[reportName]
+  } else {
+    console.error(
+      `getRedirectReportUrl(${reportName}) called - but redirect isn't valid, so returning nothing`
+    )
+    return ''
+  }
 }
 
 server.get(
@@ -198,28 +221,40 @@ server.get('/', async (req, res, next) => {
   <li>Query</li>
   <li>Releases (<a href='/releases'>JSON</a> or <a href='/releases?format=html'>HTML</a>)</li>`)
 
-  if (releases.length && shouldShowReport('Remaining Work Report')) {
-    res.write(
-      `<li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>`
-    )
-    res.write(`<ul><li><em>${config.project} releases:</em><ul>`)
-    res.write(
-      releases
-        .filter((rel) => !rel.released)
-        .map((rel) =>
-          [
-            `<li>`,
-            `<a href='/remainingWorkReport/${rel.name}'>${rel.name}</a>`,
-            ` - or by Priority: `,
-            `<a href='/remainingWorkReport/${rel.name}?priority=0'>High</a>,`,
-            `<a href='/remainingWorkReport/${rel.name}?priority=1'>Medium</a>,`,
-            `<a href='/remainingWorkReport/${rel.name}?priority=2'>Low</a>,`,
-            `<a href='/remainingWorkReport/${rel.name}?priority=3'>None Set</a>`,
-          ].join(' ')
+  if (releases.length) {
+    if (shouldHideOrRedirect('Remaining Work Report')) {
+      if (shouldRedirectReport('Remaining Work Report')) {
+        res.write(
+          `<li><a href="${getRedirectReportUrl(
+            'Remaining Work Report'
+          )}">Remaining Work Report</a> (external)</li>`
         )
-        .join('</li>')
-    )
-    res.write(`</li></ul></ul>`)
+      } else {
+        debug(`Hiding report 'Remaining Work Report'`)
+      }
+    } else {
+      res.write(
+        `<li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>`
+      )
+      res.write(`<ul><li><em>${config.project} releases:</em><ul>`)
+      res.write(
+        releases
+          .filter((rel) => !rel.released)
+          .map((rel) =>
+            [
+              `<li>`,
+              `<a href='/remainingWorkReport/${rel.name}'>${rel.name}</a>`,
+              ` - or by Priority: `,
+              `<a href='/remainingWorkReport/${rel.name}?priority=0'>High</a>,`,
+              `<a href='/remainingWorkReport/${rel.name}?priority=1'>Medium</a>,`,
+              `<a href='/remainingWorkReport/${rel.name}?priority=2'>Low</a>,`,
+              `<a href='/remainingWorkReport/${rel.name}?priority=3'>None Set</a>`,
+            ].join(' ')
+          )
+          .join('</li>')
+      )
+      res.write(`</li></ul></ul>`)
+    }
   }
 
   res.write(`<li>Report: Project-specific; Requires Jira project name ('/PROJECT_NAME', e.g. <a href='/report/${config.project}'>${config.project}</a>) (JSON)</li>
