@@ -117,6 +117,11 @@ function buildAlert(content, title = false, alertClass = 'success') {
 </div>`
 }
 
+/**
+ * Is the specified report suppressed or redirected?
+ * @param {string} reportName Normal report name
+ * @returns boolean Is the report either hidden or redirected?
+ */
 function shouldHideOrRedirect(reportName) {
   return shouldHideReport(reportName) || shouldRedirectReport(reportName)
 }
@@ -134,6 +139,11 @@ function shouldHideReport(reportName) {
   return false
 }
 
+/**
+ * Should the report be reformatted into another URL?
+ * @param {string} reportName Normal report name
+ * @returns boolean Redirect the report?
+ */
 function shouldRedirectReport(reportName) {
   console.log(`shouldRedirectReport(${reportName})`)
   if (config.has('reports')) {
@@ -144,6 +154,11 @@ function shouldRedirectReport(reportName) {
   return false
 }
 
+/**
+ * What is the redirect URL for the report (empty string if not formatted)
+ * @param {string} reportName Normal report name
+ * @returns URL for redirected report
+ */
 function getRedirectReportUrl(reportName) {
   console.log(`getRedirectReportUrl(${reportName})`)
   if (shouldRedirectReport(reportName)) {
@@ -233,6 +248,7 @@ server.get('/', async (req, res, next) => {
         debug(`Hiding report 'Remaining Work Report'`)
       }
     } else {
+      // Normal output
       res.write(
         `<li>Remaining Work Report ('/remainingWorkReport/RELEASE_NAME' histogram - add '?sort=name' to sort by Assignee)</li>`
       )
