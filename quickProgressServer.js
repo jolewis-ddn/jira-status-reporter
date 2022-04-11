@@ -18,7 +18,7 @@ let storyStats = new StoryStats()
 const componentList = storyStats.getComponentList(true)
 
 function buildReport(daysAgo) {
-  fastify.log.debug(`buildReport(${daysAgo}) starting...`)
+  debug(`buildReport(${daysAgo}) starting...`)
   let startDate
   let endDate
   // let daysAgo = 8 //  weekReport
@@ -31,13 +31,25 @@ function buildReport(daysAgo) {
       day: '2-digit',
     })
     .replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2') // daysAgo
-  endDate = new Date(new Date() - 1000 * 60 * 60 * 24 * 1)
+  endDate = new Date(new Date() - 1000 * 60 * 60 * 24 * 2)
     .toLocaleString('en-us', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     })
     .replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2') // Yesterday
+
+  debug(
+    `@43 ==> startDate: ${startDate} (orig: ${new Date(
+      new Date() - 1000 * 60 * 60 * 24 * daysAgo
+    ).toLocaleString('en-us', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })}; raw: ${new Date(
+      new Date() - 1000 * 60 * 60 * 24 * daysAgo
+    )}; daysAgo: ${daysAgo}); endDate: ${endDate}`
+  )
 
   const summaryReport = storyStats.getSummaryReport(
     startDate,
@@ -52,18 +64,20 @@ function buildReport(daysAgo) {
     summaryReport
   )}`
 
-  fastify.log.debug('resp set')
+  debug('resp set')
+
+  debug(`Components found: ${Object.keys(summaryReport).sort().join(', ')}`)
   Object.keys(summaryReport)
     .sort()
     .forEach((component) => {
-      fastify.log.debug(`Processing component: ${component}`)
+      debug(`Processing component: ${component}`)
       const componentData = summaryReport[component].changes
       if (componentData.length) {
         resp += buildHtml(component, 'Updates', componentData)
       }
       const addData = summaryReport[component].additions
       if (addData.length) {
-        fastify.log.debug(`addData processing...`)
+        debug(`addData processing...`)
         resp += buildHtml(component, 'Additions', addData)
       }
     })
@@ -249,9 +263,9 @@ const fastify = require('fastify')({
   logger: true,
 })
 
-fastify.get('/:days', async (request, reply) => {
+fastify.get('/days/:days', async (request, reply) => {
   reply.type('text/html')
-  // console.log(`days: `, request.params)
+  debug(`days: `, request.params)
   let days = request.params.days || DEFAULT_DAYS
   return buildReport(days)
 })

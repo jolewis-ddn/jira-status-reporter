@@ -51,5 +51,11 @@
   "bugs": {
     "url": "https://github.com/jolewis-ddn/jira-status-reporter/issues"
   },
+  "ava": {
+    "files": [
+      "tests/**/*"
+    ],
+    "verbose": true
+  },
   "homepage": "https://github.com/jolewis-ddn/jira-status-reporter#readme"
 }
