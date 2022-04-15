@@ -31,7 +31,7 @@ function buildReport(daysAgo) {
       day: '2-digit',
     })
     .replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2') // daysAgo
-  endDate = new Date(new Date() - 1000 * 60 * 60 * 24 * 2)
+  endDate = new Date(new Date() - 1000 * 60 * 60 * 24 * 1)
     .toLocaleString('en-us', {
       year: 'numeric',
       month: '2-digit',
@@ -264,6 +264,13 @@ const fastify = require('fastify')({
 })
 
 fastify.get('/days/:days', async (request, reply) => {
+  reply.type('text/html')
+  debug(`days: `, request.params)
+  let days = request.params.days || DEFAULT_DAYS
+  return buildReport(days)
+})
+
+fastify.get('/:days', async (request, reply) => {
   reply.type('text/html')
   debug(`days: `, request.params)
   let days = request.params.days || DEFAULT_DAYS
